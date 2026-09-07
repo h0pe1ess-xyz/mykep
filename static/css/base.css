@@ -1,69 +1,68 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
 :root {
+    --bg-main: #110c0a;
+    --bg-surface: #1f1714;
+    --bg-surface-hover: #2a1f1b;
+    --border-color: rgba(255, 255, 255, 0.05);
     --text-main: #ffffff;
-    --text-muted: #8b8079;
+    --text-muted: #a0958f;
     --accent-orange: #ff5500; 
     --pill-active: #dfd1c9;
     --pill-dark: #372e29;
     --card-bg: rgba(36, 28, 24, 0.65); 
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.25s ease;
 }
 
-/* ЗАБОРОНА ВИДІЛЕННЯ ТЕКСТУ */
 * { 
     box-sizing: border-box; 
     margin: 0; 
     padding: 0; 
     font-family: 'Inter', sans-serif; 
-    -webkit-user-select: none; 
-    -ms-user-select: none; 
-    user-select: none; 
     -webkit-tap-highlight-color: transparent; 
-}
-input, textarea {
-    -webkit-user-select: auto;
-    -ms-user-select: auto;
-    user-select: auto;
 }
 
 body {
-    background-color: #110c0a;
-    background-image: 
-        radial-gradient(circle at 50% 15%, rgba(135, 60, 25, 0.45) 0%, transparent 60%),
-        radial-gradient(circle at 85% -10%, rgba(200, 80, 25, 0.25) 0%, transparent 50%),
-        linear-gradient(180deg, #2a1c15 0%, #0d0907 100%);
-    background-attachment: fixed;
+    background-color: var(--bg-main);
+    background-image: radial-gradient(circle at 50% 15%, rgba(255, 85, 0, 0.12) 0%, transparent 65%);
     color: var(--text-main);
     display: flex;
     justify-content: center;
     margin: 0;
     height: 100dvh;
     overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
-/* =========================================
-   АНІМАЦІЇ (ПЛАВНА ПОЯВА)
-   ========================================= */
-@keyframes fadeUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-@keyframes scaleIn {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
+button {
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: inherit;
 }
 
-/* Анімації Дашборду */
-.gauge-wrapper { animation: scaleIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
-.wellness-text { animation: fadeUp 0.6s ease forwards; animation-delay: 0.1s; opacity: 0; }
-#current-lesson-card { animation: fadeUp 0.6s ease forwards; animation-delay: 0.2s; opacity: 0; }
-#next-lesson-card { animation: fadeUp 0.6s ease forwards; animation-delay: 0.3s; opacity: 0; }
+a {
+    text-decoration: none;
+    color: inherit;
+}
 
-/* Анімація всього блоку днів (щоб не ламати JS дугу) */
-.day-picker { animation: fadeUp 0.6s ease forwards; opacity: 0; }
-.lesson-card { animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+/* Base Utility Classes */
+.align-right {
+    text-align: right;
+}
 
-/* Анімації Налаштувань */
-.app-container main > .card:nth-of-type(1) { animation: fadeUp 0.6s ease forwards; animation-delay: 0.1s; opacity: 0; }
-.app-container main > .card:nth-of-type(2) { animation: fadeUp 0.6s ease forwards; animation-delay: 0.2s; opacity: 0; }
-.credits-block { animation: fadeUp 0.6s ease forwards; animation-delay: 0.3s; opacity: 0; }
+.text-center {
+    text-align: center;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.animate-enter {
+    animation: fadeIn var(--transition-normal) forwards;
+}

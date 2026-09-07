@@ -1,52 +1,58 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Шукаємо, на якій ми зараз сторінці
     const currentPath = window.location.pathname.split('/').pop() || 'index.html';
-    const navLinks = document.querySelectorAll('.bottom-nav a');
+    const navLinks = document.querySelectorAll('.bottom-nav a, .bottom-nav button');
     
     navLinks.forEach(link => {
-        const linkPath = link.getAttribute('href');
-        // Якщо це поточна сторінка — робимо кнопку активною і блокуємо клік
+        let linkPath = link.getAttribute('href');
+        if (!linkPath && link.hasAttribute('onclick')) {
+            const match = link.getAttribute('onclick').match(/'([^']+)'/);
+            if (match) linkPath = match[1];
+        }
+        
         if (linkPath === currentPath) {
             link.classList.add('active');
             link.addEventListener('click', (e) => {
-                e.preventDefault(); // Не даємо сторінці перезавантажитись
+                e.preventDefault();
             });
         }
     });
 
-    // Додаємо клас анімації для головних блоків
-    const mainContainers = document.querySelectorAll('#dashboard-main, #schedule-main, #settings-main');
+    const mainContainers = document.querySelectorAll('.main-content');
     mainContainers.forEach(container => container.classList.add('animate-enter'));
 });
 
-async function initApp() {
-    // РОЗКОМЕНТУВАТИ ДЛЯ БЛОКУВАННЯ В БРАУЗЕРІ:
-    // if (!isPWA()) { showPWAGuide(); return; }
-
+async function initApplication() {
     if (checkOnboarding()) return; 
 
     initSettings();
     updateHeaderDisplays();
 
-    let scheduleDict = await fetchSchedule();
-    if (Array.isArray(scheduleDict)) {
+    let scheduleData = await fetchSchedule();
+    if (Array.isArray(scheduleData)) {
         localStorage.removeItem('mykep_schedule');
-        scheduleDict = await fetchSchedule();
+        scheduleData = await fetchSchedule();
     }
 
     const daysMap = ["неділя", "понеділок", "вівторок", "середа", "четвер", "п'ятниця", "субота"];
     const currentDayName = daysMap[new Date().getDay()];
 
-    if (document.getElementById('dashboard-main')) renderDashboard(scheduleDict[currentDayName] || []);
-    if (document.getElementById('dynamic-schedule-list')) initSchedulePage(scheduleDict);
+    const dashboardMain = document.getElementById('dashboard-main');
+    if (dashboardMain) {
+        renderDashboard(scheduleData[currentDayName] || []);
+    }
+
+    const scheduleList = document.getElementById('dynamic-schedule-list');
+    if (scheduleList) {
+        initSchedulePage(scheduleData);
+    }
 }
 
-document.addEventListener('DOMContentLoaded', initApp);
+document.addEventListener('DOMContentLoaded', initApplication);
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').catch(err => {
-            console.log('Помилка реєстрації Service Worker: ', err);
+            console.error('Service Worker registration failed:', err);
         });
     });
 }

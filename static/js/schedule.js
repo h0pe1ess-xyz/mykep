@@ -4,13 +4,13 @@ function renderScheduleList(schedule) {
     
     listContainer.innerHTML = ''; 
     listContainer.classList.remove('animate-enter'); 
-    void listContainer.offsetWidth; // Тригер рефлоу для перезапуску анімації
+    void listContainer.offsetWidth; 
     listContainer.classList.add('animate-enter');
 
     if (!schedule || schedule.length === 0) {
         listContainer.innerHTML = `
             <div style="text-align: center; margin-top: 60px;">
-                <div style="font-size: 48px; margin-bottom: 16px;">🎉</div>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="margin-bottom: 16px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
                 <h3 style="font-size: 18px; font-weight: 500; color: var(--text-main);">Вихідний день</h3>
                 <p style="font-size: 13px; color: var(--text-muted);">На цей день пар не заплановано</p>
             </div>
@@ -21,16 +21,16 @@ function renderScheduleList(schedule) {
     schedule.forEach((lesson, index) => {
         const delay = index * 0.06; 
         const cardHtml = `
-            <div class="lesson-card" style="animation-delay: ${delay}s;">
+            <div class="lesson-card" style="animation: fadeIn var(--transition-normal) forwards; animation-delay: ${delay}s; opacity: 0;">
                 <div class="lesson-top">
-                    <span>${lesson.lesson}-га пара</span>
+                    <span>${lesson.lesson}-${getLessonSuffix(lesson.lesson)} пара</span>
                     <span>${lesson.time}</span>
                 </div>
                 <div class="lesson-title">${lesson.subject}</div>
                 <div class="lesson-divider"></div>
                 <div class="lesson-bottom">
                     <div class="teacher-name">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                         ${lesson.teacher}
                     </div>
                     <div class="room-badge">${lesson.room}</div>
@@ -79,66 +79,80 @@ function initSchedulePage(scheduleDict) {
     function renderForDay(dayId) {
         if (activeDayId === dayId) return; 
         activeDayId = dayId;
+        
+        items.forEach(item => {
+            if (item.getAttribute('data-day') === dayId) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+
         renderScheduleList(scheduleDict[dayId] || []);
-        if (navigator.vibrate) navigator.vibrate(20); // Легка вібрація при зміні дня (працює на Android)
+        if (navigator.vibrate) navigator.vibrate(10); 
     }
 
     function updateArc() {
-        const pickerRect = picker.getBoundingClientRect();
-        const pickerCenter = pickerRect.left + pickerRect.width / 2;
-
+        const pickerCenter = picker.scrollLeft + picker.clientWidth / 2;
         let closestItem = null;
         let minDistance = Infinity;
 
         items.forEach(item => {
-            const itemRect = item.getBoundingClientRect();
-            const itemCenter = itemRect.left + itemRect.width / 2;
-            const distance = Math.abs(pickerCenter - itemCenter);
-            const translateY = Math.pow(distance / 45, 2) * 2.5; 
+            const itemCenter = item.offsetLeft + item.clientWidth / 2;
+            const distance = itemCenter - pickerCenter;
+            const absDistance = Math.abs(distance);
             
-            let scale = 1, opacity = 0.5;
-
-            if (distance < minDistance) {
-                minDistance = distance;
+            if (absDistance < minDistance) {
+                minDistance = absDistance;
                 closestItem = item;
             }
-
-            if (distance < 25) {
-                scale = 1.15; opacity = 1; item.classList.add('active');
-            } else {
-                scale = Math.max(0.85, 1 - (distance / 400));
-                opacity = Math.max(0.2, 0.6 - (distance / 300));
-                item.classList.remove('active');
-            }
-
+            
+            const normalizedDist = Math.min(absDistance / (picker.clientWidth / 2), 1);
+            const scale = 1 - normalizedDist * 0.15;
+            const translateY = normalizedDist * 15;
+            const opacity = 1 - normalizedDist * 0.6;
+            
             item.style.transform = `translateY(${translateY}px) scale(${scale})`;
             item.style.opacity = opacity;
         });
 
-        if (closestItem) {
-            const newDayId = closestItem.getAttribute('data-day');
-            renderForDay(newDayId);
+        if (closestItem && !isProgrammaticScroll) {
+            const dayId = closestItem.getAttribute('data-day');
+            if (dayId !== activeDayId) {
+                activeDayId = dayId;
+                items.forEach(i => i.classList.remove('active'));
+                closestItem.classList.add('active');
+                renderScheduleList(scheduleDict[dayId] || []);
+                if (navigator.vibrate) navigator.vibrate(10);
+            }
         }
     }
 
-    picker.addEventListener('scroll', updateArc);
-    window.addEventListener('resize', updateArc);
-    
+    let isProgrammaticScroll = false;
+    let scrollTimeout;
+    picker.addEventListener('scroll', () => {
+        updateArc();
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+            isProgrammaticScroll = false;
+        }, 150);
+    });
+
     items.forEach(item => {
         item.addEventListener('click', () => {
-            const scrollPos = item.offsetLeft - picker.offsetWidth / 2 + item.offsetWidth / 2;
-            picker.scrollTo({ left: scrollPos, behavior: 'smooth' });
+            isProgrammaticScroll = true;
+            item.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            renderForDay(item.getAttribute('data-day'));
         });
     });
 
-    renderForDay(todayId);
+    // initial setup
+    const initialItem = Array.from(items).find(i => i.getAttribute('data-day') === todayId) || items[0];
+    if (initialItem) {
+        initialItem.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
+        renderForDay(initialItem.getAttribute('data-day'));
+    }
     
-    setTimeout(() => {
-        updateArc();
-        const activeItem = picker.querySelector('.day-item.active') || items[2];
-        if (activeItem) {
-            const scrollPos = activeItem.offsetLeft - picker.offsetWidth / 2 + activeItem.offsetWidth / 2;
-            picker.scrollTo({ left: scrollPos, behavior: 'auto' });
-        }
-    }, 50);
+    // trigger arc update on next frame to ensure layout is ready
+    requestAnimationFrame(() => updateArc());
 }

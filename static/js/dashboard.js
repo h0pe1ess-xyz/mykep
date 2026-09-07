@@ -1,6 +1,6 @@
-function setGauge(percentage) {
+function updateTimerDisplay(percentage) {
     const arc = document.getElementById('progress-arc');
-    const knob = document.getElementById('gauge-knob');
+    const knob = document.getElementById('timer-knob');
     if (!arc || !knob) return; 
     
     const totalLength = 130 * Math.PI; 
@@ -22,10 +22,10 @@ function renderDashboard(schedule) {
     const progressText = document.getElementById('day-progress-text');
 
     if (!schedule || schedule.length === 0) {
-        setGauge(100);
-        if (gaugeMain) { gaugeMain.innerHTML = `🎉`; gaugeMain.style.fontSize = "56px"; }
+        updateTimerDisplay(100);
+        if (gaugeMain) { gaugeMain.innerHTML = `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`; }
         if (gaugeSub) gaugeSub.innerHTML = `Вихідний`;
-        if (statusText) statusText.innerText = "На сьогодні пар немає. Відпочивайте!";
+        if (statusText) statusText.innerText = "На сьогодні пар немає.";
         if (currentCard) currentCard.style.display = "none";
         if (nextCard) nextCard.style.display = "none";
         return; 
@@ -60,10 +60,10 @@ function renderDashboard(schedule) {
         const minutesLeft = totalDuration - passedTime;
         const progressPercent = (passedTime / totalDuration) * 100;
 
-        setGauge(progressPercent);
-        if (gaugeMain) gaugeMain.innerHTML = `${minutesLeft}<span class="score-sub">хв</span>`;
+        updateTimerDisplay(progressPercent);
+        if (gaugeMain) gaugeMain.innerHTML = `${minutesLeft}<span class="timer-unit">хв</span>`;
         if (gaugeSub) gaugeSub.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg> Ауд. ${currentLesson.room}`;
-        if (statusText) statusText.innerText = `Зараз йде ${currentLesson.lesson}-га пара, залишайтесь сфокусованими.`;
+        if (statusText) statusText.innerText = `Зараз йде ${currentLesson.lesson}-${getLessonSuffix(currentLesson.lesson)} пара, залишайтесь сфокусованими.`;
         
         document.getElementById('current-subject').innerText = currentLesson.subject;
         document.getElementById('current-teacher').innerText = currentLesson.teacher;
@@ -74,19 +74,19 @@ function renderDashboard(schedule) {
             const start = timeToMins(nextLesson.time.split(' - ')[0]);
             const minsToNext = start - currentMins;
             if (minsToNext > 0 && minsToNext <= 90) {
-                setGauge((minsToNext / 20) * 100); 
-                if (gaugeMain) gaugeMain.innerHTML = `${minsToNext}<span class="score-sub">хв</span>`;
+                updateTimerDisplay((minsToNext / 20) * 100); 
+                if (gaugeMain) gaugeMain.innerHTML = `${minsToNext}<span class="timer-unit">хв</span>`;
                 if (gaugeSub) gaugeSub.innerHTML = `до ${nextLesson.lesson}-ї пари`;
-                if (statusText) statusText.innerText = "Зараз перерва.";
+                if (statusText) statusText.innerText = "Перерва.";
             } else {
-                setGauge(100);
-                if (gaugeMain) { gaugeMain.innerHTML = `☕`; gaugeMain.style.fontSize = "56px"; }
+                updateTimerDisplay(100);
+                if (gaugeMain) { gaugeMain.innerHTML = `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`; }
                 if (gaugeSub) gaugeSub.innerHTML = `Очікування`;
                 if (statusText) statusText.innerText = "Пари ще не почалися.";
             }
         } else {
-            setGauge(100);
-            if (gaugeMain) { gaugeMain.innerHTML = `🌙`; gaugeMain.style.fontSize = "56px"; }
+            updateTimerDisplay(100);
+            if (gaugeMain) { gaugeMain.innerHTML = `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`; }
             if (gaugeSub) gaugeSub.innerHTML = `Кінець дня`;
             if (statusText) statusText.innerText = "Всі пари на сьогодні завершились.";
         }

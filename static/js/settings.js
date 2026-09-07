@@ -4,14 +4,19 @@ function initSettings() {
     const durationDesc = document.getElementById('duration-desc');
 
     const savedDuration = localStorage.getItem('mykep_duration') || '80'; 
-    if (savedDuration === '80' && durationToggle) {
-        durationToggle.classList.add('active');
-    } else if (durationToggle) {
-        durationToggle.classList.remove('active');
+    if (durationToggle) {
+        if (savedDuration === '80') {
+            durationToggle.classList.add('active');
+        } else {
+            durationToggle.classList.remove('active');
+        }
     }
-    if(durationDesc) durationDesc.innerText = `Поточна: ${savedDuration} хвилин`;
+    
+    if (durationDesc) {
+        durationDesc.innerText = `Поточна: ${savedDuration} хвилин`;
+    }
 
-    if(durationToggle) {
+    if (durationToggle) {
         durationToggle.addEventListener('click', () => {
             durationToggle.classList.toggle('active'); 
             const newDuration = durationToggle.classList.contains('active') ? '80' : '60'; 
@@ -21,7 +26,7 @@ function initSettings() {
         });
     }
 
-    if(clearBtn) {
+    if (clearBtn) {
         clearBtn.addEventListener('click', () => {
             if (confirm("Видалити збережений розклад?")) {
                 localStorage.removeItem('mykep_schedule');
@@ -53,12 +58,15 @@ window.obNextSlide = function(step) {
 }
 
 window.obFinish = function() {
-    const groupInput = document.getElementById('ob-group-input').value.trim() || 'ПІ-24-02';
+    const groupInput = document.getElementById('ob-group-input');
+    const groupValue = groupInput && groupInput.value.trim() ? groupInput.value.trim() : 'ПІ-24-02';
     const obDurationToggle = document.getElementById('ob-duration-toggle');
     const newDuration = (obDurationToggle && !obDurationToggle.classList.contains('active')) ? '60' : '80';
-    localStorage.setItem('mykep_group', groupInput.toUpperCase());
+    
+    localStorage.setItem('mykep_group', groupValue.toUpperCase());
     localStorage.setItem('mykep_duration', newDuration);
     localStorage.setItem('mykep_onboarded', 'true');
     localStorage.removeItem('mykep_schedule');
+    
     window.location.reload(); 
 }

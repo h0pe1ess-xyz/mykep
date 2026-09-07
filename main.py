@@ -5,50 +5,58 @@ import re
 import cloudscraper
 import chompjs
 import traceback
+import logging
 from datetime import datetime, timedelta, date
+from typing import Dict, Any, Optional
+
 from fastapi import FastAPI, BackgroundTasks, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 import uvicorn
-import os
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 DB_PATH = "schedule.db"
 STATS_PATH = "stats.txt"
 URL = "https://kep.nung.edu.ua/pages/education/schedule"
 
-# ==========================================
-# СТАТИСТИКА
-# ==========================================
-stats_data = {
+stats_data: Dict[str, Any] = {
     "total_requests": 0,
     "unique_users": set(),
     "groups": {}
 }
 
-async def init_db():
+async def init_db() -> None:
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute('''CREATE TABLE IF NOT EXISTS schedule 
-                            (id INTEGER PRIMARY KEY, group_name TEXT, date TEXT, data TEXT)''')
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS schedule (
+                id INTEGER PRIMARY KEY,
+                group_name TEXT,
+                date TEXT,
+                data TEXT
+            )
+        ''')
         await db.commit()
 
-def save_stats_to_file():
+def save_stats_to_file() -> None:
     try:
         with open(STATS_PATH, "w", encoding="utf-8") as f:
-            f.write("=== СТАТИСТИКА MyKep ===\n")
-            f.write(f"Оновлено: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("=== MyKep API Statistics ===\n")
+            f.write(f"Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write("------------------------\n")
-            f.write(f"Унікальних користувачів: {len(stats_data['unique_users'])}\n")
-            f.write(f"Всього запитів до API: {stats_data['total_requests']}\n")
+            f.write(f"Unique Users: {len(stats_data['unique_users'])}\n")
+            f.write(f"Total API Requests: {stats_data['total_requests']}\n")
             f.write("------------------------\n")
-            f.write("Популярність груп:\n")
+            f.write("Group Popularity:\n")
             sorted_groups = sorted(stats_data["groups"].items(), key=lambda x: x[1], reverse=True)
             for grp, count in sorted_groups:
-                f.write(f"  • {grp}: {count} запитів\n")
-    except:
-        pass
+                f.write(f"  - {grp}: {count} requests\n")
+    except Exception as e:
+        logger.warning(f"Failed to write stats file: {e}")
 
-def track_usage(uid: str, group: str):
+def track_usage(uid: Optional[str], group: str) -> None:
     stats_data["total_requests"] += 1
     if uid:
         stats_data["unique_users"].add(uid)
@@ -56,17 +64,14 @@ def track_usage(uid: str, group: str):
         stats_data["groups"][group] = stats_data["groups"].get(group, 0) + 1
     save_stats_to_file()
 
-# ==========================================
-# ПАРСЕР ТА ОБРОБКА
-# ==========================================
-def fetch_schedule_sync():
+def fetch_schedule_sync() -> Dict[str, Any]:
     scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
     response = scraper.get(URL, timeout=15)
     response.raise_for_status() 
     match = re.search(r'normalizeScheduleGroups\s*\(\s*\{', response.text)
     if match:
         return chompjs.parse_js_object(response.text[match.end() - 1:])
-    raise ValueError("Не вдалося знайти початок розкладу на сторінці.")
+    raise ValueError("Failed to locate schedule data in page source.")
 
 def get_academic_week(target_date: date) -> int:
     base_monday = date(2026, 8, 31)
@@ -74,20 +79,17 @@ def get_academic_week(target_date: date) -> int:
     if delta_days < 0: return 1
     return (delta_days // 7 % 4) + 1
 
-def is_lesson_active(weeks_str, current_week: int) -> bool:
+def is_lesson_active(weeks_str: str, current_week: int) -> bool:
     try:
         if not weeks_str: return True
         w_str = str(weeks_str).lower().strip()
         
-        # Якщо пара йде постійно
         if not w_str or "всі" in w_str or "усі" in w_str or "1-4" in w_str or "щотижня" in w_str: 
             return True
         
-        # Рятуємо будь-які розділювачі (слеші, крапки, коми, слова "та/і")
         w_str = w_str.replace("/", ",").replace("\\", ",").replace(".", ",").replace(";", ",")
         w_str = w_str.replace(" та ", ",").replace(" і ", ",")
         
-        # Залишаємо виключно цифри, коми і тире
         clean_str = re.sub(r'[^0-9,\-]', '', w_str)
         if not clean_str: return True
 
@@ -99,18 +101,16 @@ def is_lesson_active(weeks_str, current_week: int) -> bool:
                 if int(part) == current_week: return True
         return False
     except Exception as e:
-        print(f"Помилка фільтрації тижня '{weeks_str}': {e}")
-        # Якщо сталася помилка - ми ПОВЕРТАЄМО пару, щоб вона не зникла безслідно
+        logger.warning(f"Error filtering active week '{weeks_str}': {e}. Defaulting to True.")
         return True 
 
-async def update_schedule_cache(group_name: str, duration: int, cache_key: str):
+async def update_schedule_cache(group_name: str, duration: int, cache_key: str) -> Optional[Dict[str, Any]]:
     raw_data = await asyncio.to_thread(fetch_schedule_sync)
     if not raw_data: return None
         
     group_schedule = {}
-    
-    # Шукаємо групу супернадійно: без урахування регістру, пробілів і дефісів
     search_group = group_name.lower().replace("-", "").strip()
+    
     for key, value in raw_data.items():
         if search_group in str(key).lower().replace("-", "").strip():
             group_schedule = value
@@ -118,22 +118,25 @@ async def update_schedule_cache(group_name: str, duration: int, cache_key: str):
 
     if not group_schedule: return {}
     
-    # Нормалізуємо дні тижня з сайту (щоб "Понеділок" і "понеділок" були однаковими)
     normalized_schedule = {str(k).lower().strip(): v for k, v in group_schedule.items()}
 
     now = datetime.now()
     current_weekday = now.weekday()
     reference_date = now
     
-    # Визначаємо, на який тиждень ми дивимось (якщо вихідні - показуємо наступний)
-    if current_weekday == 6: reference_date = now + timedelta(days=1)
-    elif current_weekday == 5 and now.hour > 15: reference_date = now + timedelta(days=2)
+    if current_weekday == 6:
+        reference_date = now + timedelta(days=1)
+    elif current_weekday == 5 and now.hour > 15:
+        reference_date = now + timedelta(days=2)
 
     base_monday = reference_date - timedelta(days=reference_date.weekday())
     days_to_check = {
-        "понеділок": base_monday, "вівторок": base_monday + timedelta(days=1),
-        "середа": base_monday + timedelta(days=2), "четвер": base_monday + timedelta(days=3),
-        "п'ятниця": base_monday + timedelta(days=4), "субота": base_monday + timedelta(days=5)
+        "понеділок": base_monday,
+        "вівторок": base_monday + timedelta(days=1),
+        "середа": base_monday + timedelta(days=2),
+        "четвер": base_monday + timedelta(days=3),
+        "п'ятниця": base_monday + timedelta(days=4),
+        "субота": base_monday + timedelta(days=5)
     }
 
     time_mapping = {
@@ -150,7 +153,6 @@ async def update_schedule_cache(group_name: str, duration: int, cache_key: str):
         formatted_day = []
         
         for lesson in normalized_schedule.get(day_name, []):
-            # Перевіряємо обидва варіанти ключа, якщо раптом сайт змінив "week" на "weeks"
             week_val = lesson.get("week", lesson.get("weeks", ""))
             
             if not is_lesson_active(week_val, week_num): 
@@ -177,15 +179,18 @@ async def update_schedule_cache(group_name: str, duration: int, cache_key: str):
         
     return full_week_schedule
 
-# ==========================================
-# API ЕНДПОІНТИ
-# ==========================================
 @app.on_event("startup")
-async def startup_event():
+async def startup_event() -> None:
     await init_db()
+    logger.info("Database initialized.")
 
 @app.get("/api/schedule")
-async def get_schedule(background_tasks: BackgroundTasks, group: str = Query("ПІ-24-02"), duration: int = Query(60), uid: str = Query(None)):
+async def get_schedule(
+    background_tasks: BackgroundTasks, 
+    group: str = Query("ПІ-24-02"), 
+    duration: int = Query(60), 
+    uid: Optional[str] = Query(None)
+) -> JSONResponse:
     background_tasks.add_task(track_usage, uid, group)
 
     today = datetime.now().strftime("%Y-%m-%d")
@@ -201,10 +206,16 @@ async def get_schedule(background_tasks: BackgroundTasks, group: str = Query("П
         data = await update_schedule_cache(group, duration, cache_key)
         if data is not None:
             return JSONResponse({"status": "success", "data": data})
-        return JSONResponse({"status": "error", "message": "Розклад не знайдено або порожній"}, status_code=404)
+        return JSONResponse(
+            {"status": "error", "message": "Schedule not found or empty"}, 
+            status_code=404
+        )
     except Exception as e:
-        print(f"\n--- ❌ ПОМИЛКА ПАРСИНГУ ---\n{traceback.format_exc()}\n---------------------------\n")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error(f"Error parsing schedule: {traceback.format_exc()}")
+        return JSONResponse(
+            status_code=500, 
+            content={"status": "error", "message": str(e)}
+        )
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
