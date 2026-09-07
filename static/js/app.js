@@ -38,7 +38,7 @@ async function initApplication() {
 
     const dashboardMain = document.getElementById('dashboard-main');
     if (dashboardMain) {
-        renderDashboard(scheduleData[currentDayName] || []);
+        startDashboard(scheduleData[currentDayName] || []);
     }
 
     const scheduleList = document.getElementById('dynamic-schedule-list');
