@@ -467,6 +467,12 @@ function checkOnboarding() {
     return true; 
 }
 
+window.obNextSlide = function(step) {
+    document.querySelectorAll('.onboarding-slide').forEach(el => el.classList.remove('active'));
+    const nextSlide = document.getElementById('ob-slide-' + step);
+    if (nextSlide) nextSlide.classList.add('active');
+}
+
 window.obFinish = function() {
     const groupInput = document.getElementById('ob-group-input').value.trim() || 'ПІ-24-02';
     const obDurationToggle = document.getElementById('ob-duration-toggle');
