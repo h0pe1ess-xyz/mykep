@@ -103,7 +103,7 @@ async function fetchSchedule() {
     const uid = getUserId(); 
     
     try {
-        const response = await fetch(`/api/schedule?group=${group}&duration=${duration}&uid=${uid}`);
+        const response = await fetch(`/api/schedule?group=${encodeURIComponent(group)}&duration=${duration}&uid=${uid}`);
         const result = await response.json();
         
         if (result.status === "success") {
@@ -123,8 +123,9 @@ function fallbackCache() {
 }
 
 function timeToMins(tStr) {
+    if (!tStr) return 0;
     const [h, m] = tStr.split(':').map(Number);
-    return h * 60 + m;
+    return (h || 0) * 60 + (m || 0);
 }
 
 function renderDashboard(schedule) {
@@ -153,7 +154,10 @@ function renderDashboard(schedule) {
 
     for (let i = 0; i < schedule.length; i++) {
         const lesson = schedule[i];
-        const [startStr, endStr] = lesson.time.split(' - ');
+        if (!lesson || !lesson.time) continue;
+        const parts = lesson.time.split(' - ');
+        if (parts.length !== 2) continue;
+        const [startStr, endStr] = parts;
         const start = timeToMins(startStr);
         const end = timeToMins(endStr);
 
@@ -465,7 +469,10 @@ function checkOnboarding() {
 
 window.obFinish = function() {
     const groupInput = document.getElementById('ob-group-input').value.trim() || 'ПІ-24-02';
+    const obDurationToggle = document.getElementById('ob-duration-toggle');
+    const newDuration = (obDurationToggle && !obDurationToggle.classList.contains('active')) ? '60' : '80';
     localStorage.setItem('mykep_group', groupInput.toUpperCase());
+    localStorage.setItem('mykep_duration', newDuration);
     localStorage.setItem('mykep_onboarded', 'true');
     localStorage.removeItem('mykep_schedule');
     window.location.reload(); 
