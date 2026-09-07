@@ -1,0 +1,36 @@
+/* Gauge */
+.gauge-wrapper { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; } 
+.gauge-glow { position: absolute; top: 30%; left: 50%; transform: translateX(-50%); width: 220px; height: 120px; background: radial-gradient(ellipse, rgba(255, 85, 0, 0.25) 0%, transparent 60%); filter: blur(25px); z-index: 0; }
+.gauge-svg { width: 100%; max-height: 180px; position: relative; z-index: 1; overflow: visible; }
+.arc-track { fill: none; stroke: #2a2320; stroke-width: 30; stroke-linecap: round; }
+.arc-progress { fill: none; stroke: url(#arcGrad); stroke-width: 30; stroke-linecap: round; stroke-dasharray: 408; stroke-dashoffset: 408; transition: stroke-dashoffset 1s ease-out; }
+#gauge-knob { transform-origin: 150px 150px; transition: transform 1s ease-out; }
+.score-display { position: absolute; bottom: 0; text-align: center; z-index: 2; }
+.score-main { font-size: 48px; font-weight: 300; letter-spacing: -2px; line-height: 1; }
+.score-sub { font-size: 24px; color: var(--text-muted); }
+.trend { margin-top: 8px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--text-muted); background: rgba(255,255,255,0.04); padding: 4px 10px; border-radius: 12px; }
+
+/* Status Text */
+.wellness-text { text-align: center; } 
+.wellness-text h2 { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+.wellness-text p { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+
+/* Cards */
+.card { background-color: var(--card-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.04); border-radius: 24px; padding: 16px 20px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15); }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.card-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--text-muted); }
+.icon-circle { width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; }
+.dropdown-pill { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.04); padding: 4px 10px; border-radius: 12px; cursor: pointer; }
+
+/* Progress */
+.bpm-header { display: flex; justify-content: space-between; margin-bottom: 24px; }
+.label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.bpm-value { font-size: 20px; font-weight: 500; }
+.reading-time { text-align: right; }
+.time-val { font-size: 13px; font-weight: 500; }
+.slider-container { position: relative; height: 24px; display: flex; align-items: center; }
+.slider-track { position: absolute; width: 100%; height: 4px; background-color: #3b2a24; border-radius: 2px; }
+.slider-fill { position: absolute; height: 4px; background-color: var(--accent-orange); border-radius: 2px; transition: width 1s ease; }
+.slider-thumb { position: absolute; transform: translateX(-50%); background-color: var(--accent-orange); color: white; display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; transition: left 1s ease, transform 1s ease; }
+.bpm-footer { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-weight: 500; margin-top: 16px; }
+.bpm-footer div { display: flex; align-items: center; gap: 4px; }

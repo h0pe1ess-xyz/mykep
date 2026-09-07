@@ -1,0 +1,23 @@
+/* НАЛАШТУВАННЯ ТА CREDITS */
+.settings-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.settings-row:last-child { border-bottom: none; padding-bottom: 0; }
+.settings-row:first-child { padding-top: 0; }
+.settings-info { display: flex; flex-direction: column; gap: 4px; }
+.settings-title { font-size: 14px; font-weight: 500; color: var(--text-main); }
+.settings-desc { font-size: 11px; color: var(--text-muted); }
+.settings-btn { background: rgba(255, 255, 255, 0.08); border: none; color: var(--text-main); padding: 8px 14px; border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+.settings-btn.danger { color: #ff4d4d; background: rgba(255, 77, 77, 0.1); }
+.toggle { position: relative; width: 44px; height: 24px; background: rgba(255, 255, 255, 0.15); border-radius: 12px; cursor: pointer; transition: background 0.3s ease; }
+.toggle.active { background: var(--accent-orange); }
+.toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: #ffffff; border-radius: 50%; transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+.toggle.active::after { transform: translateX(20px); }
+
+.credits-block { flex: 1; background: rgba(36, 28, 24, 0.4); border: 1px solid rgba(255, 255, 255, 0.04); border-radius: 24px; padding: 32px 24px; display: flex; justify-content: space-around; align-items: center; }
+.credit-person { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.avatar { width: 80px; height: 80px; border-radius: 50%; display: flex; justify-content: center; align-items: center; overflow: hidden; font-weight: 600; font-size: 28px; color: white; border: 2px solid rgba(255,255,255,0.1); margin-bottom: 4px; background: linear-gradient(135deg, #2a2320, #1e1e1e); }
+.avatar img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.nick { font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 20px; }
+.credits-socials { display: flex; flex-direction: column; gap: 16px; }
+.social-btn { width: 52px; height: 52px; border-radius: 14px; background: rgba(255, 255, 255, 0.06); border: none; color: var(--text-muted); display: flex; justify-content: center; align-items: center; cursor: pointer; transition: all 0.2s; }
+.social-btn svg { width: 24px; height: 24px; }
+.social-btn:hover { background: var(--accent-orange); color: white; transform: scale(1.05); }

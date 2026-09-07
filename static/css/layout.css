@@ -1,0 +1,12 @@
+.app-container { width: 100%; max-width: 400px; position: relative; padding: 24px 20px 90px 20px; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+main { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; min-height: 0; }
+
+/* Header */
+.header { display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 10; flex-shrink: 0; margin-bottom: 20px; }
+.header h1 { font-size: 22px; font-weight: 500; letter-spacing: -0.5px; }
+.location-pill { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.06); padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 500; color: var(--text-muted); }
+
+/* Bottom Nav */
+.bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 400px; display: flex; justify-content: center; gap: 48px; align-items: center; padding: 16px 24px 30px 24px; background: linear-gradient(to top, rgba(17, 12, 10, 0.95) 40%, transparent); z-index: 100; }
+.nav-btn { background: none; border: none; color: var(--text-muted); padding: 8px; cursor: pointer; display: flex; transition: color 0.2s; }
+.center-action { background: radial-gradient(circle, #ff6a00 0%, #ee3900 100%); color: white; width: 48px; height: 48px; border-radius: 50%; justify-content: center; align-items: center; box-shadow: 0 4px 16px rgba(255, 85, 0, 0.4); padding: 0; }
