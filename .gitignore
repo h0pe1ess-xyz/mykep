@@ -1,0 +1,5 @@
+venv/
+flake.nix
+flake.lock
+__pycache__/
+*.db
