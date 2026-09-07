@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Graduation%20Cap.png" alt="Graduation Cap" width="80" height="80" />
+  <img alt="mykep" src="https://github.com/user-attachments/assets/58265975-c92d-46bf-bcec-cd4ea7f56cad" width="80" height="80" />
   <h1>MyKep 🎓</h1>
   <p><strong>Сучасний, швидкий та автономний PWA-розклад для студентів КЕП ІФНТУНГ.</strong></p>
   
@@ -14,17 +14,18 @@
 
 <br/>
 
-> **MyKep** — це не просто парсер. Це повноцінний веб-додаток, який рятує студентів від хаосу з розкладами, "падаючого" сайту коледжу та заплутаних тижнів. Він кешує дані, працює без інтернету і виглядає як дорогий нативний додаток на iOS та Android.
+> **MyKep** — це не просто парсер. Це повноцінний веб-додаток, який рятує студентів від хаосу з розкладами та заплутаних тижнів. Він кешує дані, працює без інтернету і виглядає як нативний додаток на iOS та Android.
 
 ## 📱 Скріншоти
 
 <div align="center">
   <!-- ⚠️ ЗАМІНИ ЦІ ПОСИЛАННЯ НА СВОЇ КАРТИНКИ (можеш просто перетягнути їх у вікно редагування GitHub) -->
-  <img src="https://placehold.co/250x500/110c0a/ff5500?text=Головний+Екран" alt="Dashboard" width="22%">
+
+  <img src="https://github.com/user-attachments/assets/f4d58cb6-d6d8-4fe9-9fe4-043ed57dfd80" alt="Dashboard" width="22%">
   &nbsp;
-  <img src="https://placehold.co/250x500/110c0a/ff5500?text=Розклад+на+Тиждень" alt="Schedule" width="22%">
+  <img src="https://github.com/user-attachments/assets/4c4c9d6c-6d96-459d-9772-8d85799d8598" alt="Schedule" width="22%">
   &nbsp;
-  <img src="https://placehold.co/250x500/110c0a/ff5500?text=Налаштування" alt="Settings" width="22%">
+  <img src="https://github.com/user-attachments/assets/41cfa07c-ff31-47b6-b5eb-e6dad7de0d8d" alt="Settings" width="22%">
   &nbsp;
 </div>
 
@@ -40,7 +41,7 @@
 ### ⚡ Native-like PWA (Фронтенд)
 * **Повний Офлайн:** Завдяки кастомному Service Worker (`sw.js`) та `localStorage`, додаток працює навіть в укритті без зв'язку.
 * **Apple & Android Ready:** Налаштовані Safe Area (відступи під "чубчик" та нижню смужку), статус-бар кольору фону та безшовна навігація без перезавантаження сторінок.
-* **Glassmorphism UI:** Сучасний темний дизайн з напівпрозорими картками, мікроанімаціями та "масляним" скролом.
+* **"Pro" UI/UX:** Сучасний темний дизайн з напівпрозорими картками, мікроанімаціями та "масляним" скролом.
 
 ---
 
@@ -59,5 +60,5 @@
 
 1. **Клонуй репозиторій:**
    ```bash
-   git clone [https://github.com/ТВІЙ_ЮЗЕРНЕЙМ/mykep.git](https://github.com/ТВІЙ_ЮЗЕРНЕЙМ/mykep.git)
+   git clone [https://github.com/h0pe1ess-xyz/mykep.git](https://github.com/h0pe1ess-xyz/mykep.git)
    cd mykep
