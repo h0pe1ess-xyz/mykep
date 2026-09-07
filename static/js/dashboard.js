@@ -128,3 +128,25 @@ function renderDashboard(schedule) {
         }
     }
 }
+
+// --- ДОДАНИЙ БЛОК: Запуск інтервалу оновлення ---
+let currentGlobalSchedule = null;
+let dashboardInterval = null;
+
+// Викликай startDashboard(schedule) замість renderDashboard(schedule) там, де отримуєш дані
+function startDashboard(schedule) {
+    currentGlobalSchedule = schedule;
+    
+    // Оновлюємо дашборд миттєво при першому виклику
+    renderDashboard(currentGlobalSchedule);
+    
+    // Очищаємо старий інтервал, якщо функція викликається повторно
+    if (dashboardInterval) clearInterval(dashboardInterval);
+    
+    // Запускаємо оновлення кожні 10 секунд
+    dashboardInterval = setInterval(() => {
+        if (currentGlobalSchedule && currentGlobalSchedule.length > 0) {
+            renderDashboard(currentGlobalSchedule);
+        }
+    }, 10000);
+}
