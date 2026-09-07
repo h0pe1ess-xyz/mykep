@@ -1,198 +1,104 @@
-/* ==========================================
-   БАЗОВІ НАЛАШТУВАННЯ ТА ЗМІННІ
-   ========================================== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 :root {
-    --bg-main: #110c0a;
-    --accent-orange: #ff5500;
-    --card-bg: rgba(36, 28, 24, 0.65);
-    --card-border: rgba(255, 255, 255, 0.05);
     --text-main: #ffffff;
     --text-muted: #8b8079;
-    --font-main: 'Inter', sans-serif;
+    --accent-orange: #ff5500; 
+    --pill-active: #dfd1c9;
+    --pill-dark: #372e29;
+    --card-bg: rgba(36, 28, 24, 0.65); 
 }
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    -webkit-tap-highlight-color: transparent;
+/* ЗАБОРОНА ВИДІЛЕННЯ ТЕКСТУ */
+* { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+    font-family: 'Inter', sans-serif; 
+    -webkit-user-select: none; 
+    -ms-user-select: none; 
+    user-select: none; 
+    -webkit-tap-highlight-color: transparent; 
+}
+input, textarea {
+    -webkit-user-select: auto;
+    -ms-user-select: auto;
+    user-select: auto;
 }
 
 body {
-    background-color: var(--bg-main);
+    background-color: #110c0a;
+    background-image: 
+        radial-gradient(circle at 50% 15%, rgba(135, 60, 25, 0.45) 0%, transparent 60%),
+        radial-gradient(circle at 85% -10%, rgba(200, 80, 25, 0.25) 0%, transparent 50%),
+        linear-gradient(180deg, #2a1c15 0%, #0d0907 100%);
+    background-attachment: fixed;
     color: var(--text-main);
-    font-family: var(--font-main);
-    /* iOS Fix: фон під статус-баром і відступи від "чубчика" та нижньої смужки */
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: calc(env(safe-area-inset-bottom) + 80px); /* 80px для нижнього меню */
-    min-height: 100vh;
-    overflow-x: hidden;
-    -webkit-font-smoothing: antialiased;
-}
-
-/* ==========================================
-   АНІМАЦІЇ ТА ПЛАВНІСТЬ
-   ========================================== */
-@keyframes smoothAppear {
-    from { 
-        opacity: 0; 
-        transform: translateY(12px) scale(0.98); 
-    }
-    to { 
-        opacity: 1; 
-        transform: translateY(0) scale(1); 
-    }
-}
-
-.animate-enter {
-    animation: smoothAppear 0.4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-}
-
-.scroll-container {
-    -webkit-overflow-scrolling: touch; /* Масляний скрол на iOS */
-    overflow-y: auto;
-}
-
-/* ==========================================
-   КОМПОНЕНТИ ТА КАРТКИ (GLASSMORPHISM)
-   ========================================== */
-.glass-card {
-    background: var(--card-bg);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--card-border);
-    border-radius: 24px;
-    padding: 20px;
-    margin-bottom: 16px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-}
-
-.lesson-card {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: 20px;
-    padding: 16px;
-    margin-bottom: 12px;
-    opacity: 0; 
-    animation: smoothAppear 0.4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-}
-
-.lesson-top {
     display: flex;
-    justify-content: space-between;
-    font-size: 13px;
-    color: var(--text-muted);
-    margin-bottom: 8px;
-    font-weight: 500;
+    justify-content: center;
+    margin: 0;
+    height: 100dvh;
+    overflow: hidden;
 }
 
-.lesson-title {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 12px;
-    color: var(--text-main);
-}
+.app-container { width: 100%; max-width: 400px; position: relative; padding: 24px 20px 90px 20px; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+main { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; min-height: 0; }
 
-.lesson-divider {
-    height: 1px;
-    background: var(--card-border);
-    margin: 0 -16px 12px -16px;
-}
+/* Header */
+.header { display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 10; flex-shrink: 0; margin-bottom: 20px; }
+.header h1 { font-size: 22px; font-weight: 500; letter-spacing: -0.5px; }
+.location-pill { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.06); padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 500; color: var(--text-muted); }
 
-.lesson-bottom {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 14px;
-}
+/* Gauge */
+.gauge-wrapper { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; } 
+.gauge-glow { position: absolute; top: 30%; left: 50%; transform: translateX(-50%); width: 220px; height: 120px; background: radial-gradient(ellipse, rgba(255, 85, 0, 0.25) 0%, transparent 60%); filter: blur(25px); z-index: 0; }
+.gauge-svg { width: 100%; max-height: 180px; position: relative; z-index: 1; overflow: visible; }
+.arc-track { fill: none; stroke: #2a2320; stroke-width: 30; stroke-linecap: round; }
+.arc-progress { fill: none; stroke: url(#arcGrad); stroke-width: 30; stroke-linecap: round; stroke-dasharray: 408; stroke-dashoffset: 408; transition: stroke-dashoffset 1s ease-out; }
+#gauge-knob { transform-origin: 150px 150px; transition: transform 1s ease-out; }
+.score-display { position: absolute; bottom: 0; text-align: center; z-index: 2; }
+.score-main { font-size: 48px; font-weight: 300; letter-spacing: -2px; line-height: 1; }
+.score-sub { font-size: 24px; color: var(--text-muted); }
+.trend { margin-top: 8px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--text-muted); background: rgba(255,255,255,0.04); padding: 4px 10px; border-radius: 12px; }
 
-.teacher-name {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--text-muted);
-}
+/* Status Text */
+.wellness-text { text-align: center; } 
+.wellness-text h2 { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+.wellness-text p { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
 
-.room-badge {
-    background: rgba(255, 85, 0, 0.1);
-    color: var(--accent-orange);
-    padding: 4px 10px;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 12px;
-}
+/* Cards */
+.card { background-color: var(--card-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.04); border-radius: 24px; padding: 16px 20px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15); }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.card-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--text-muted); }
+.icon-circle { width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; }
+.dropdown-pill { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.04); padding: 4px 10px; border-radius: 12px; cursor: pointer; }
 
-/* ==========================================
-   НАВІГАЦІЯ (НИЖНЄ МЕНЮ)
-   ========================================== */
-.bottom-nav {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background: rgba(17, 12, 10, 0.85);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid var(--card-border);
-    display: flex;
-    justify-content: space-around;
-    padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
-    z-index: 1000;
-}
+/* Progress */
+.bpm-header { display: flex; justify-content: space-between; margin-bottom: 24px; }
+.label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.bpm-value { font-size: 20px; font-weight: 500; }
+.reading-time { text-align: right; }
+.time-val { font-size: 13px; font-weight: 500; }
+.slider-container { position: relative; height: 24px; display: flex; align-items: center; }
+.slider-track { position: absolute; width: 100%; height: 4px; background-color: #3b2a24; border-radius: 2px; }
+.slider-fill { position: absolute; height: 4px; background-color: var(--accent-orange); border-radius: 2px; transition: width 1s ease; }
+.slider-thumb { position: absolute; transform: translateX(-50%); background-color: var(--accent-orange); color: white; display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; transition: left 1s ease, transform 1s ease; }
+.bpm-footer { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-weight: 500; margin-top: 16px; }
+.bpm-footer div { display: flex; align-items: center; gap: 4px; }
 
-.nav-item {
-    text-decoration: none;
-    color: var(--text-muted);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    font-weight: 500;
-    transition: 0.2s ease;
-}
+/* Bottom Nav */
+.bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 400px; display: flex; justify-content: center; gap: 48px; align-items: center; padding: 16px 24px 30px 24px; background: linear-gradient(to top, rgba(17, 12, 10, 0.95) 40%, transparent); z-index: 100; }
+.nav-btn { background: none; border: none; color: var(--text-muted); padding: 8px; cursor: pointer; display: flex; transition: color 0.2s; }
+.center-action { background: radial-gradient(circle, #ff6a00 0%, #ee3900 100%); color: white; width: 48px; height: 48px; border-radius: 50%; justify-content: center; align-items: center; box-shadow: 0 4px 16px rgba(255, 85, 0, 0.4); padding: 0; }
 
-.nav-item.active {
-    color: var(--accent-orange);
-}
-
-.nav-item svg {
-    width: 24px;
-    height: 24px;
-    stroke: currentColor;
-}
-
-/* ==========================================
-   ВИБІР ДНІВ (ДУГА)
-   ========================================== */
-.day-picker {
-    display: flex;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-    padding: 20px 50%;
-    margin: 0 -20px 20px -20px;
-    -webkit-overflow-scrolling: touch;
-}
+/* ДУГА ДНІВ ТА РОЗКЛАД */
+.page-schedule .header { margin-bottom: 30px; }
+.day-picker { display: flex; align-items: flex-start; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 10px calc(50% - 22px) 30px calc(50% - 22px); margin: 0 -20px 20px -20px; -ms-overflow-style: none; scrollbar-width: none; }
 .day-picker::-webkit-scrollbar { display: none; }
-
-.day-item {
-    scroll-snap-align: center;
-    flex-shrink: 0;
-    width: 60px;
-    text-align: center;
-    transition: transform 0.2s ease, opacity 0.2s ease;
-    opacity: 0.5;
-    margin: 0 10px;
-}
-.day-item.active {
-    opacity: 1;
-    color: var(--accent-orange);
-}
-.day-num { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
-.day-name { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
-
-/* Інші необхідні стилі для онбордингу, модалок тощо... */
+.day-item { display: flex; flex-direction: column; align-items: center; gap: 8px; scroll-snap-align: center; cursor: pointer; will-change: transform, opacity; }
+.day-num { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 500; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); transition: background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease; }
+.day-item.active .day-num { border: 2px solid var(--accent-orange); background: rgba(255, 85, 0, 0.15); box-shadow: 0 0 12px rgba(255, 85, 0, 0.3); }
+.day-name { font-size: 11px; font-weight: 500; }
 
 .schedule-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .schedule-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; -ms-overflow-style: none; scrollbar-width: none; padding-bottom: 20px; }

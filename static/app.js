@@ -72,6 +72,21 @@ function getUserId() {
     return uid;
 }
 
+function animateValue(obj, start, end, duration) {
+    let startTimestamp = null;
+    const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        const easeProgress = progress * (2 - progress); // easeOutQuad
+        obj.innerText = Math.floor(start + easeProgress * (end - start)) + '%';
+        if (progress < 1) {
+            window.requestAnimationFrame(step);
+        } else {
+            obj.innerText = Math.floor(end) + '%';
+        }
+    };
+    window.requestAnimationFrame(step);
+}
 // ==========================================
 // 3. АНІМАЦІЯ SVG-ТАЙМЕРА
 // ==========================================
@@ -84,14 +99,8 @@ function setGauge(percentage) {
     const offset = totalLength - (percentage / 100) * totalLength;
     arc.style.strokeDashoffset = offset;
 
-    const angle = Math.PI - (percentage / 100) * Math.PI;
-    const r = 130, cx = 150, cy = 150;
-    
-    const x = cx + r * Math.cos(angle);
-    const y = cy - r * Math.sin(angle);
     const rotation = (percentage / 100) * 180 - 90;
-    
-    knob.setAttribute('transform', `translate(${x}, ${y}) rotate(${rotation})`);
+    knob.style.transform = `rotate(${rotation}deg)`;
 }
 
 // ==========================================
@@ -233,8 +242,17 @@ function renderDashboard(schedule) {
     }
     
     if (progressFill) progressFill.style.width = `${dayProgress}%`;
-    if (progressThumb) progressThumb.style.left = `${dayProgress}%`;
-    if (progressText) progressText.innerText = `${Math.floor(dayProgress)}%`;
+    if (progressThumb) {
+        progressThumb.style.left = `${dayProgress}%`;
+        progressThumb.style.transform = `translateX(-${dayProgress}%)`;
+    }
+    if (progressText) {
+        const targetProgress = Math.floor(dayProgress);
+        const currentProgress = parseInt(progressText.innerText) || 0;
+        if (currentProgress !== targetProgress) {
+            animateValue(progressText, currentProgress, targetProgress, 1000);
+        }
+    }
 }
 
 // ==========================================

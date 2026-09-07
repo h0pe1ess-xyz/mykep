@@ -103,9 +103,11 @@
                     </defs>
                     <path class="arc-track" d="M 20 150 A 130 130 0 0 1 280 150" style="stroke: #2d241f;" />
                     <path class="arc-progress" id="progress-arc" d="M 20 150 A 130 130 0 0 1 280 150" />
-                    <g id="gauge-knob" transform="translate(20, 150) rotate(-90)">
-                        <circle cx="0" cy="0" r="16" fill="#ffffff" filter="url(#shadow)" />
-                        <polyline points="-2,-4 2,0 -2,4" fill="none" stroke="#e84e12" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <g id="gauge-knob" style="transform: rotate(-90deg);">
+                        <g transform="translate(150, 20)">
+                            <circle cx="0" cy="0" r="16" fill="#ffffff" filter="url(#shadow)" />
+                            <polyline points="-2,-4 2,0 -2,4" fill="none" stroke="#e84e12" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </g>
                     </g>
                 </svg>
                 <div class="score-display">
