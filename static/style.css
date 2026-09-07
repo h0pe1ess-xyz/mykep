@@ -1,0 +1,294 @@
+/* ==========================================
+   БАЗОВІ НАЛАШТУВАННЯ ТА ЗМІННІ
+   ========================================== */
+:root {
+    --bg-main: #110c0a;
+    --accent-orange: #ff5500;
+    --card-bg: rgba(36, 28, 24, 0.65);
+    --card-border: rgba(255, 255, 255, 0.05);
+    --text-main: #ffffff;
+    --text-muted: #8b8079;
+    --font-main: 'Inter', sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    font-family: var(--font-main);
+    /* iOS Fix: фон під статус-баром і відступи від "чубчика" та нижньої смужки */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 80px); /* 80px для нижнього меню */
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ==========================================
+   АНІМАЦІЇ ТА ПЛАВНІСТЬ
+   ========================================== */
+@keyframes smoothAppear {
+    from { 
+        opacity: 0; 
+        transform: translateY(12px) scale(0.98); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0) scale(1); 
+    }
+}
+
+.animate-enter {
+    animation: smoothAppear 0.4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.scroll-container {
+    -webkit-overflow-scrolling: touch; /* Масляний скрол на iOS */
+    overflow-y: auto;
+}
+
+/* ==========================================
+   КОМПОНЕНТИ ТА КАРТКИ (GLASSMORPHISM)
+   ========================================== */
+.glass-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--card-border);
+    border-radius: 24px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.lesson-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    padding: 16px;
+    margin-bottom: 12px;
+    opacity: 0; 
+    animation: smoothAppear 0.4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.lesson-top {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.lesson-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-main);
+}
+
+.lesson-divider {
+    height: 1px;
+    background: var(--card-border);
+    margin: 0 -16px 12px -16px;
+}
+
+.lesson-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+}
+
+.teacher-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-muted);
+}
+
+.room-badge {
+    background: rgba(255, 85, 0, 0.1);
+    color: var(--accent-orange);
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+/* ==========================================
+   НАВІГАЦІЯ (НИЖНЄ МЕНЮ)
+   ========================================== */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(17, 12, 10, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--card-border);
+    display: flex;
+    justify-content: space-around;
+    padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+    z-index: 1000;
+}
+
+.nav-item {
+    text-decoration: none;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    transition: 0.2s ease;
+}
+
+.nav-item.active {
+    color: var(--accent-orange);
+}
+
+.nav-item svg {
+    width: 24px;
+    height: 24px;
+    stroke: currentColor;
+}
+
+/* ==========================================
+   ВИБІР ДНІВ (ДУГА)
+   ========================================== */
+.day-picker {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding: 20px 50%;
+    margin: 0 -20px 20px -20px;
+    -webkit-overflow-scrolling: touch;
+}
+.day-picker::-webkit-scrollbar { display: none; }
+
+.day-item {
+    scroll-snap-align: center;
+    flex-shrink: 0;
+    width: 60px;
+    text-align: center;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+    opacity: 0.5;
+    margin: 0 10px;
+}
+.day-item.active {
+    opacity: 1;
+    color: var(--accent-orange);
+}
+.day-num { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+.day-name { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Інші необхідні стилі для онбордингу, модалок тощо... */
+
+.schedule-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.schedule-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; -ms-overflow-style: none; scrollbar-width: none; padding-bottom: 20px; }
+.schedule-list::-webkit-scrollbar { display: none; }
+.lesson-card { background-color: rgba(42, 35, 32, 0.65); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.04); border-radius: 16px; padding: 16px; }
+.lesson-top { display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); font-weight: 500; margin-bottom: 8px; }
+.lesson-title { font-size: 18px; font-weight: 500; margin-bottom: 14px; color: var(--text-main); }
+.lesson-divider { height: 1px; background: rgba(255, 255, 255, 0.06); margin-bottom: 12px; width: 100%; }
+.lesson-bottom { display: flex; justify-content: space-between; align-items: center; }
+.teacher-name { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+.room-badge { background: rgba(255, 255, 255, 0.06); padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; color: #dcdcdc; border: 1px solid rgba(255,255,255,0.03); }
+
+/* НАЛАШТУВАННЯ ТА CREDITS */
+.settings-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.settings-row:last-child { border-bottom: none; padding-bottom: 0; }
+.settings-row:first-child { padding-top: 0; }
+.settings-info { display: flex; flex-direction: column; gap: 4px; }
+.settings-title { font-size: 14px; font-weight: 500; color: var(--text-main); }
+.settings-desc { font-size: 11px; color: var(--text-muted); }
+.settings-btn { background: rgba(255, 255, 255, 0.08); border: none; color: var(--text-main); padding: 8px 14px; border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+.settings-btn.danger { color: #ff4d4d; background: rgba(255, 77, 77, 0.1); }
+.toggle { position: relative; width: 44px; height: 24px; background: rgba(255, 255, 255, 0.15); border-radius: 12px; cursor: pointer; transition: background 0.3s ease; }
+.toggle.active { background: var(--accent-orange); }
+.toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: #ffffff; border-radius: 50%; transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+.toggle.active::after { transform: translateX(20px); }
+
+.credits-block { flex: 1; background: rgba(36, 28, 24, 0.4); border: 1px solid rgba(255, 255, 255, 0.04); border-radius: 24px; padding: 32px 24px; display: flex; justify-content: space-around; align-items: center; }
+.credit-person { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.avatar { width: 80px; height: 80px; border-radius: 50%; display: flex; justify-content: center; align-items: center; overflow: hidden; font-weight: 600; font-size: 28px; color: white; border: 2px solid rgba(255,255,255,0.1); margin-bottom: 4px; background: linear-gradient(135deg, #2a2320, #1e1e1e); }
+.avatar img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.nick { font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 20px; }
+.credits-socials { display: flex; flex-direction: column; gap: 16px; }
+.social-btn { width: 52px; height: 52px; border-radius: 14px; background: rgba(255, 255, 255, 0.06); border: none; color: var(--text-muted); display: flex; justify-content: center; align-items: center; cursor: pointer; transition: all 0.2s; }
+.social-btn svg { width: 24px; height: 24px; }
+.social-btn:hover { background: var(--accent-orange); color: white; transform: scale(1.05); }
+
+/* МОДАЛЬНЕ ВІКНО */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+.modal-overlay.active { opacity: 1; pointer-events: auto; }
+.modal-container { width: 100%; max-width: 400px; background: #1a1412; border-radius: 24px 24px 0 0; padding: 24px; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; max-height: 80vh; }
+.modal-overlay.active .modal-container { transform: translateY(0); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.modal-header h3 { font-size: 18px; font-weight: 500; }
+.close-modal { background: none; border: none; color: var(--text-muted); font-size: 24px; cursor: pointer; }
+.modal-search { width: 100%; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 12px 16px; color: white; outline: none; margin-bottom: 16px; font-size: 14px; }
+.modal-search::placeholder { color: var(--text-muted); }
+.modal-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; scrollbar-width: none; }
+.modal-list::-webkit-scrollbar { display: none; }
+.modal-item { padding: 14px 16px; border-radius: 12px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background 0.2s; color: var(--text-main); }
+.modal-item:hover { background: rgba(255, 255, 255, 0.08); }
+.modal-item.selected { background: rgba(255, 85, 0, 0.15); color: var(--accent-orange); }
+
+/* ONBOARDING (СТАРТОВИЙ ЕКРАН) */
+.onboarding-overlay { position: fixed; inset: 0; background: #110c0a; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 24px; transition: opacity 0.4s ease; }
+.onboarding-card { width: 100%; max-width: 400px; background: rgba(36, 28, 24, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 24px; padding: 32px 24px; text-align: center; overflow: hidden; position: relative; min-height: 400px; display: flex; flex-direction: column; }
+.onboarding-slide { position: absolute; inset: 0; padding: 32px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; transform: translateX(50px); pointer-events: none; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+.onboarding-slide.active { opacity: 1; transform: translateX(0); pointer-events: auto; }
+.onboarding-slide h2 { font-size: 24px; font-weight: 600; margin-bottom: 12px; color: var(--text-main); }
+.onboarding-slide p { font-size: 14px; color: var(--text-muted); line-height: 1.5; margin-bottom: 32px; }
+.ob-features { display: flex; flex-direction: column; gap: 16px; margin-bottom: 32px; text-align: left; width: 100%; }
+.ob-feature { display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500; color: #dcdcdc; background: rgba(255,255,255,0.04); padding: 12px 16px; border-radius: 12px; }
+.ob-btn-group { display: flex; gap: 12px; width: 100%; margin-top: auto; }
+.ob-btn { flex: 1; padding: 14px; border-radius: 16px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; transition: transform 0.2s; background: var(--accent-orange); color: white; }
+.ob-btn.secondary { background: rgba(255,255,255,0.08); color: var(--text-main); }
+.ob-btn:active { transform: scale(0.95); }
+.ob-input-group { width: 100%; text-align: left; margin-bottom: 24px; }
+.ob-input-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 8px; font-weight: 500; }
+.ob-input { width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 14px 16px; color: white; outline: none; font-size: 16px; font-weight: 500; }
+.ob-input:focus { border-color: var(--accent-orange); }
+.ob-avatars { display: flex; justify-content: center; gap: 24px; margin-bottom: 32px; }
+.ob-avatars .avatar { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; background: #2a2320; border: none; margin: 0 auto; }
+.ob-avatars img { width: 100%; height: 100%; object-fit: cover; }
+
+/* =========================================
+   АНІМАЦІЇ (ПЛАВНА ПОЯВА)
+   ========================================= */
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+/* Анімації Дашборду */
+.gauge-wrapper { animation: scaleIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+.wellness-text { animation: fadeUp 0.6s ease forwards; animation-delay: 0.1s; opacity: 0; }
+#current-lesson-card { animation: fadeUp 0.6s ease forwards; animation-delay: 0.2s; opacity: 0; }
+#next-lesson-card { animation: fadeUp 0.6s ease forwards; animation-delay: 0.3s; opacity: 0; }
+
+/* Анімація всього блоку днів (щоб не ламати JS дугу) */
+.day-picker { animation: fadeUp 0.6s ease forwards; opacity: 0; }
+.lesson-card { animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+
+/* Анімації Налаштувань */
+.app-container main > .card:nth-of-type(1) { animation: fadeUp 0.6s ease forwards; animation-delay: 0.1s; opacity: 0; }
+.app-container main > .card:nth-of-type(2) { animation: fadeUp 0.6s ease forwards; animation-delay: 0.2s; opacity: 0; }
+.credits-block { animation: fadeUp 0.6s ease forwards; animation-delay: 0.3s; opacity: 0; }

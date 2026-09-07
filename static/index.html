@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MyKep</title>
+     <link rel="icon" type="image/png" href="favicon.png">
+     <link rel="apple-touch-icon" href="favicon.png">
+     <link rel="manifest" href="manifest.json">
+     <meta name="apple-mobile-web-app-capable" content="yes">
+     <meta name="theme-color" content="#110c0a">
+     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- ОНБОРДИНГ (Показується лише при першому запуску) -->
+    <div class="onboarding-overlay" id="onboarding" style="display: none;">
+        <div class="onboarding-card">
+            <!-- Слайд 1: Вітання -->
+            <div class="onboarding-slide active" id="ob-slide-1">
+                <h2>Вітаємо в MyKep 👋</h2>
+                <p>Твій ідеальний розклад завжди під рукою, без зайвого клопоту.</p>
+                <div class="ob-features">
+                    <div class="ob-feature"><span style="font-size: 20px;">🕒</span> Точний час до кінця пари</div>
+                    <div class="ob-feature"><span style="font-size: 20px;">🚀</span> Працює швидко і зручно</div>
+                    <div class="ob-feature"><span style="font-size: 20px;">🌙</span> Ідеальна темна тема</div>
+                </div>
+                <div class="ob-btn-group">
+                    <button class="ob-btn" onclick="obNextSlide(2)">Далі</button>
+                </div>
+            </div>
+
+            <!-- Слайд 2: Автори -->
+            <div class="onboarding-slide" id="ob-slide-2">
+                <h2>Хто ми? 🧑‍💻</h2>
+                <p>Додаток створений студентами для студентів з любов'ю та монстром.</p>
+                <div class="ob-avatars">
+                    <div style="text-align: center;">
+                        <div class="avatar"><img src="pfp/1.png" alt="h0pe1esss"></div>
+                        <div style="font-size: 12px; color: #fff; margin-top: 8px;">@h0pe1esss</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div class="avatar"><img src="pfp/2.gif" alt="ODDxq"></div>
+                        <div style="font-size: 12px; color: #fff; margin-top: 8px;">@ODDxq</div>
+                    </div>
+                </div>
+                <div class="ob-btn-group">
+                    <button class="ob-btn secondary" onclick="obNextSlide(1)">Назад</button>
+                    <button class="ob-btn" onclick="obNextSlide(3)">Далі</button>
+                </div>
+            </div>
+
+            <!-- Слайд 3: Налаштування -->
+            <div class="onboarding-slide" id="ob-slide-3">
+                <h2>Останній крок ⚙️</h2>
+                <p>Введи свою групу, щоб ми завантажили розклад.</p>
+                
+                <div class="ob-input-group">
+                    <label>ТВОЯ ГРУПА (напр. ПІ-24-02)</label>
+                    <input type="text" id="ob-group-input" class="ob-input" placeholder="ПІ-24-02" value="ПІ-24-02">
+                </div>
+
+                <!-- ДОДАНИЙ ТУМБЛЕР ЧАСУ ПАР -->
+                <div class="settings-row" style="width: 100%; margin-bottom: 24px; background: rgba(255,255,255,0.04); padding: 16px; border-radius: 12px; border: none;">
+                    <div class="settings-info" style="text-align: left;">
+                        <div class="settings-title" style="color: #ffffff; font-size: 14px; font-weight: 500;">Тривалість пар</div>
+                        <div class="settings-desc" id="ob-dur-desc" style="color: #8b8079; font-size: 11px;">80 хвилин</div>
+                    </div>
+                    <div class="toggle active" id="ob-duration-toggle" onclick="this.classList.toggle('active'); document.getElementById('ob-dur-desc').innerText = this.classList.contains('active') ? '80 хвилин' : '60 хвилин';"></div>
+                </div>
+
+                <div class="ob-btn-group">
+                    <button class="ob-btn secondary" onclick="obNextSlide(2)">Назад</button>
+                    <button class="ob-btn" onclick="obFinish()">Погнали!</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ОСНОВНИЙ ДОДАТОК -->
+    <div class="app-container" id="main-app" style="opacity: 0;">
+        <header class="header">
+            <h1 style="font-weight: 500; font-size: 24px; letter-spacing: -0.5px;">MyKep</h1>
+            <div class="location-pill" style="background: rgba(255,255,255,0.04); padding: 6px 12px; border-radius: 20px; color: #8b8079; display: flex; align-items: center; gap: 6px; font-weight: 500; font-size: 12px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                <span id="header-group-text">Група ПІ-24-02</span>
+            </div>
+        </header>
+
+        <main id="dashboard-main">
+            <!-- Таймер -->
+            <div class="gauge-wrapper">
+                <div class="gauge-glow"></div>
+                <svg class="gauge-svg" viewBox="0 0 300 180">
+                    <defs>
+                        <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#eb3905" />
+                            <stop offset="100%" stop-color="#f59a3f" />
+                        </linearGradient>
+                        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feDropShadow dx="-1" dy="3" stdDeviation="3.5" flood-color="#000" flood-opacity="0.4" />
+                        </filter>
+                    </defs>
+                    <path class="arc-track" d="M 20 150 A 130 130 0 0 1 280 150" style="stroke: #2d241f;" />
+                    <path class="arc-progress" id="progress-arc" d="M 20 150 A 130 130 0 0 1 280 150" />
+                    <g id="gauge-knob" transform="translate(20, 150) rotate(-90)">
+                        <circle cx="0" cy="0" r="16" fill="#ffffff" filter="url(#shadow)" />
+                        <polyline points="-2,-4 2,0 -2,4" fill="none" stroke="#e84e12" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </g>
+                </svg>
+                <div class="score-display">
+                    <div class="score-main" id="minutes-left">0<span class="score-sub">хв</span></div>
+                    <div class="trend" id="current-room">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+                        Ауд. ---
+                    </div>
+                </div>
+            </div>
+
+            <!-- Текст статусу -->
+            <div class="wellness-text">
+                <h2>Розклад на сьогодні</h2>
+                <p id="status-text">Завантаження розкладу...</p>
+            </div>
+
+            <!-- Картка Поточної Пари -->
+            <div class="card" id="current-lesson-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <div class="icon-circle"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+                        Поточна пара
+                    </div>
+                    <div class="dropdown-pill">Зараз</div>
+                </div>
+                <div class="bpm-header">
+                    <div class="bpm-value" id="current-subject">---</div>
+                </div>
+                <div class="bpm-footer">
+                    <div style="color: var(--text-muted);" id="current-teacher">---</div>
+                    <div style="color: var(--accent-orange);" id="current-time">00:00 - 00:00</div>
+                </div>
+            </div>
+
+            <!-- Картка Наступної Пари -->
+            <div class="card" id="next-lesson-card">
+                <div class="bpm-header" style="margin-bottom: 12px;">
+                    <div>
+                        <div class="label">Наступна пара</div>
+                        <div class="time-val" id="next-subject" style="font-size: 16px;">---</div>
+                    </div>
+                    <div class="reading-time">
+                        <div class="label">Аудиторія</div>
+                        <div class="time-val" id="next-room">---</div>
+                    </div>
+                </div>
+                <div class="bpm-footer" style="margin-top: 12px; margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px;">
+                    <div style="color: var(--text-muted);" id="next-teacher">---</div>
+                    <div id="next-time">00:00 - 00:00</div>
+                </div>
+                <div class="label">Прогрес навчального дня</div>
+                <div class="slider-container">
+                    <div class="slider-track"></div>
+                    <div class="slider-fill" id="day-progress-fill" style="width: 0%;"></div>
+                    <div class="slider-thumb" id="day-progress-thumb" style="left: 0%;">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        <span id="day-progress-text">0%</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <nav class="bottom-nav">
+            <button class="nav-btn" onclick="window.location.href='schedule.html'"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></button>
+            <button class="nav-btn center-action" onclick="window.location.href='index.html'"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg></button>
+            <button class="nav-btn" onclick="window.location.href='settings.html'"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
+        </nav>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

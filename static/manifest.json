@@ -1,0 +1,17 @@
+{
+  "name": "MyKep",
+  "short_name": "MyKep",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#110c0a",
+  "theme_color": "#110c0a",
+  "description": "Твій ідеальний розклад КЕП",
+  "icons": [
+    {
+      "src": "favicon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
