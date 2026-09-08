@@ -1,27 +1,63 @@
 function initSettings() {
     const clearBtn = document.getElementById('clear-cache-btn');
-    const durationToggle = document.getElementById('duration-toggle');
-    const durationDesc = document.getElementById('duration-desc');
+    const duration1Toggle = document.getElementById('duration1-toggle');
+    const duration1Desc = document.getElementById('duration1-desc');
+    const duration2Toggle = document.getElementById('duration2-toggle');
+    const duration2Desc = document.getElementById('duration2-desc');
+    const resetDurationBtn = document.getElementById('reset-duration-btn');
 
-    const savedDuration = localStorage.getItem('mykep_duration') || '80'; 
-    if (durationToggle) {
-        if (savedDuration === '80') {
-            durationToggle.classList.add('active');
-        } else {
-            durationToggle.classList.remove('active');
+    const savedDuration1 = localStorage.getItem('mykep_duration1') || '80'; 
+    const savedDuration2 = localStorage.getItem('mykep_duration2') || '60'; 
+
+    if (duration1Toggle) {
+        if (savedDuration1 === '80') duration1Toggle.classList.add('active');
+        else duration1Toggle.classList.remove('active');
+    }
+    if (duration1Desc) duration1Desc.innerText = `Поточна: ${savedDuration1} хвилин`;
+
+    if (duration2Toggle) {
+        if (savedDuration2 === '80') duration2Toggle.classList.add('active');
+        else duration2Toggle.classList.remove('active');
+    }
+    if (duration2Desc) duration2Desc.innerText = `Поточна: ${savedDuration2} хвилин`;
+
+    function confirmDurationChange(callback) {
+        if (confirm("Це рекомендовані настройки MyKep так як у нас зараз пари саме так налаштовані, що краще нічого не змінювати. Продовжити?")) {
+            if (confirm("Чи точно ви хочете змінити це?")) {
+                callback();
+            }
         }
     }
-    
-    if (durationDesc) {
-        durationDesc.innerText = `Поточна: ${savedDuration} хвилин`;
+
+    if (duration1Toggle) {
+        duration1Toggle.addEventListener('click', () => {
+            confirmDurationChange(() => {
+                duration1Toggle.classList.toggle('active'); 
+                const newDuration = duration1Toggle.classList.contains('active') ? '80' : '60'; 
+                localStorage.setItem('mykep_duration1', newDuration);
+                localStorage.removeItem('mykep_schedule'); 
+                window.location.reload();
+            });
+        });
     }
 
-    if (durationToggle) {
-        durationToggle.addEventListener('click', () => {
-            durationToggle.classList.toggle('active'); 
-            const newDuration = durationToggle.classList.contains('active') ? '80' : '60'; 
-            localStorage.setItem('mykep_duration', newDuration);
-            localStorage.removeItem('mykep_schedule'); 
+    if (duration2Toggle) {
+        duration2Toggle.addEventListener('click', () => {
+            confirmDurationChange(() => {
+                duration2Toggle.classList.toggle('active'); 
+                const newDuration = duration2Toggle.classList.contains('active') ? '80' : '60'; 
+                localStorage.setItem('mykep_duration2', newDuration);
+                localStorage.removeItem('mykep_schedule'); 
+                window.location.reload();
+            });
+        });
+    }
+
+    if (resetDurationBtn) {
+        resetDurationBtn.addEventListener('click', () => {
+            localStorage.setItem('mykep_duration1', '80');
+            localStorage.setItem('mykep_duration2', '60');
+            localStorage.removeItem('mykep_schedule');
             window.location.reload();
         });
     }
@@ -60,11 +96,9 @@ window.obNextSlide = function(step) {
 window.obFinish = function() {
     const groupInput = document.getElementById('ob-group-input');
     const groupValue = groupInput && groupInput.value.trim() ? groupInput.value.trim() : 'ПІ-24-02';
-    const obDurationToggle = document.getElementById('ob-duration-toggle');
-    const newDuration = (obDurationToggle && !obDurationToggle.classList.contains('active')) ? '60' : '80';
-    
     localStorage.setItem('mykep_group', groupValue.toUpperCase());
-    localStorage.setItem('mykep_duration', newDuration);
+    localStorage.setItem('mykep_duration1', '80');
+    localStorage.setItem('mykep_duration2', '60');
     localStorage.setItem('mykep_onboarded', 'true');
     localStorage.removeItem('mykep_schedule');
     
