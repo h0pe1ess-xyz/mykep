@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mykep-cache-v2.9';
+const CACHE_NAME = 'mykep-cache-v2.10';
 const urlsToCache = [
     './',
     './index.html',
