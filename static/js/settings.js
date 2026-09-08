@@ -22,6 +22,7 @@ function initSettings() {
     if (duration2Desc) duration2Desc.innerText = `Поточна: ${savedDuration2} хвилин`;
 
     const openGroupModalBtn = document.getElementById('open-group-modal');
+    const obGroupInput = document.getElementById('ob-group-input');
     const groupModal = document.getElementById('group-modal');
     const closeGroupModalBtn = document.getElementById('close-modal');
     const currentGroupDisplay = document.getElementById('current-group-display');
@@ -34,6 +35,7 @@ function initSettings() {
     }
     
     let cachedGroups = [];
+    let isFromOnboarding = false;
 
     async function loadGroups() {
         modalGroupList.innerHTML = '<div style="padding: 14px; text-align: center; color: var(--text-muted);">Завантаження...</div>';
@@ -63,9 +65,14 @@ function initSettings() {
             if (grp === savedGroup) div.classList.add('selected');
             div.innerText = grp;
             div.addEventListener('click', () => {
-                localStorage.setItem('mykep_group', grp);
-                localStorage.removeItem('mykep_schedule');
-                window.location.reload();
+                if (isFromOnboarding && obGroupInput) {
+                    obGroupInput.value = grp;
+                    groupModal.classList.remove('active');
+                } else {
+                    localStorage.setItem('mykep_group', grp);
+                    localStorage.removeItem('mykep_schedule');
+                    window.location.reload();
+                }
             });
             modalGroupList.appendChild(div);
         });
@@ -81,6 +88,19 @@ function initSettings() {
 
     if (openGroupModalBtn && groupModal) {
         openGroupModalBtn.addEventListener('click', () => {
+            isFromOnboarding = false;
+            groupModal.classList.add('active');
+            if (cachedGroups.length === 0) {
+                loadGroups();
+            } else {
+                renderGroupList(cachedGroups);
+            }
+        });
+    }
+
+    if (obGroupInput && groupModal) {
+        obGroupInput.addEventListener('click', () => {
+            isFromOnboarding = true;
             groupModal.classList.add('active');
             if (cachedGroups.length === 0) {
                 loadGroups();

@@ -243,7 +243,15 @@ async def get_groups() -> JSONResponse:
         try:
             raw_data = await asyncio.to_thread(fetch_schedule_sync)
             if raw_data:
-                cached_groups_list = sorted([str(k).strip() for k in raw_data.keys() if str(k).strip()])
+                raw_groups = []
+                for k in raw_data.keys():
+                    if str(k).strip():
+                        parts = str(k).replace('/', '|').replace(',', '|').split('|')
+                        for part in parts:
+                            clean = part.strip()
+                            if clean:
+                                raw_groups.append(clean)
+                cached_groups_list = sorted(list(set(raw_groups)))
                 last_groups_fetch = now
         except Exception as e:
             logger.error(f"Failed to fetch groups: {e}")

@@ -66,7 +66,7 @@
                 
                 <div class="input-group">
                     <label for="ob-group-input">Група (напр. ПІ-24-02)</label>
-                    <input type="text" id="ob-group-input" class="text-input" placeholder="ПІ-24-02" value="ПІ-24-02">
+                    <input type="text" id="ob-group-input" class="text-input" placeholder="Оберіть групу" value="ПІ-24-02" readonly style="cursor: pointer;">
                 </div>
 
 
@@ -74,6 +74,20 @@
                     <button class="btn btn-secondary" onclick="obNextSlide(2)">Назад</button>
                     <button class="btn btn-primary" onclick="obFinish()">Розпочати</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальне вікно вибору групи (для онбордингу) -->
+    <div class="modal-overlay" id="group-modal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>Вибір групи</h3>
+                <button class="close-modal" id="close-modal">&times;</button>
+            </div>
+            <input type="text" class="modal-search" id="modal-search" placeholder="Пошук групи...">
+            <div class="modal-list" id="modal-group-list">
+                <!-- Заповнюється через JS -->
             </div>
         </div>
     </div>
