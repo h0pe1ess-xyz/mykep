@@ -26,7 +26,6 @@ function initSettings() {
 
 function initGroupModal() {
     const openGroupModalBtn = document.getElementById('open-group-modal');
-    const obGroupInput = document.getElementById('ob-group-input');
     const groupModal = document.getElementById('group-modal');
     const closeGroupModalBtn = document.getElementById('close-modal');
     const currentGroupDisplay = document.getElementById('current-group-display');
@@ -39,7 +38,6 @@ function initGroupModal() {
     }
     
     let cachedGroups = [];
-    let isFromOnboarding = false;
 
     async function loadGroups() {
         if (!modalGroupList) return;
@@ -71,14 +69,9 @@ function initGroupModal() {
             if (grp === savedGroup) div.classList.add('selected');
             div.innerText = grp;
             div.addEventListener('click', () => {
-                if (isFromOnboarding && obGroupInput) {
-                    obGroupInput.value = grp;
-                    if (groupModal) groupModal.classList.remove('active');
-                } else {
-                    localStorage.setItem('mykep_group', grp);
-                    localStorage.removeItem('mykep_schedule');
-                    window.location.reload();
-                }
+                localStorage.setItem('mykep_group', grp);
+                localStorage.removeItem('mykep_schedule');
+                window.location.reload();
             });
             modalGroupList.appendChild(div);
         });
@@ -94,19 +87,6 @@ function initGroupModal() {
 
     if (openGroupModalBtn && groupModal) {
         openGroupModalBtn.addEventListener('click', () => {
-            isFromOnboarding = false;
-            groupModal.classList.add('active');
-            if (cachedGroups.length === 0) {
-                loadGroups();
-            } else {
-                renderGroupList(cachedGroups);
-            }
-        });
-    }
-
-    if (obGroupInput && groupModal) {
-        obGroupInput.addEventListener('click', () => {
-            isFromOnboarding = true;
             groupModal.classList.add('active');
             if (cachedGroups.length === 0) {
                 loadGroups();
