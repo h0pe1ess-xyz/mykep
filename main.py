@@ -28,6 +28,9 @@ stats_data: Dict[str, Any] = {
     "groups": {}
 }
 
+cached_groups_list = []
+last_groups_fetch = 0
+
 async def init_db() -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('''
@@ -229,6 +232,25 @@ async def get_schedule(
             status_code=500, 
             content={"status": "error", "message": str(e)}
         )
+
+@app.get("/api/groups")
+async def get_groups() -> JSONResponse:
+    global cached_groups_list, last_groups_fetch
+    import time
+    now = time.time()
+    
+    if not cached_groups_list or (now - last_groups_fetch > 3600):
+        try:
+            raw_data = await asyncio.to_thread(fetch_schedule_sync)
+            if raw_data:
+                cached_groups_list = sorted([str(k).strip() for k in raw_data.keys() if str(k).strip()])
+                last_groups_fetch = now
+        except Exception as e:
+            logger.error(f"Failed to fetch groups: {e}")
+            if not cached_groups_list:
+                return JSONResponse(status_code=500, content={"status": "error", "message": "Could not fetch groups"})
+    
+    return JSONResponse({"status": "success", "data": cached_groups_list})
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
