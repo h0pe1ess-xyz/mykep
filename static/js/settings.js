@@ -21,6 +21,10 @@ function initSettings() {
     }
     if (duration2Desc) duration2Desc.innerText = `Поточна: ${savedDuration2} хвилин`;
 
+    initGroupModal();
+}
+
+function initGroupModal() {
     const openGroupModalBtn = document.getElementById('open-group-modal');
     const obGroupInput = document.getElementById('ob-group-input');
     const groupModal = document.getElementById('group-modal');
@@ -38,6 +42,7 @@ function initSettings() {
     let isFromOnboarding = false;
 
     async function loadGroups() {
+        if (!modalGroupList) return;
         modalGroupList.innerHTML = '<div style="padding: 14px; text-align: center; color: var(--text-muted);">Завантаження...</div>';
         try {
             const resp = await fetch('/api/groups');
@@ -54,6 +59,7 @@ function initSettings() {
     }
 
     function renderGroupList(groups) {
+        if (!modalGroupList) return;
         modalGroupList.innerHTML = '';
         if (groups.length === 0) {
             modalGroupList.innerHTML = '<div style="padding: 14px; text-align: center; color: var(--text-muted);">Нічого не знайдено</div>';
@@ -67,7 +73,7 @@ function initSettings() {
             div.addEventListener('click', () => {
                 if (isFromOnboarding && obGroupInput) {
                     obGroupInput.value = grp;
-                    groupModal.classList.remove('active');
+                    if (groupModal) groupModal.classList.remove('active');
                 } else {
                     localStorage.setItem('mykep_group', grp);
                     localStorage.removeItem('mykep_schedule');
@@ -115,6 +121,7 @@ function initSettings() {
             groupModal.classList.remove('active');
         });
     }
+
 
     const confirmModal = document.getElementById('confirm-modal');
     const confirmModalTitle = document.getElementById('confirm-modal-title');
@@ -238,6 +245,7 @@ function checkOnboarding() {
     }
     onboarding.style.display = 'flex';
     if (mainApp) mainApp.style.opacity = '0';
+    initGroupModal();
     return true; 
 }
 
