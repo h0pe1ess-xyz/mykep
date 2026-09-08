@@ -21,12 +21,47 @@ function initSettings() {
     }
     if (duration2Desc) duration2Desc.innerText = `Поточна: ${savedDuration2} хвилин`;
 
-    function confirmDurationChange(callback) {
-        if (confirm("Це рекомендовані настройки MyKep так як у нас зараз пари саме так налаштовані, що краще нічого не змінювати. Продовжити?")) {
-            if (confirm("Чи точно ви хочете змінити це?")) {
-                callback();
-            }
+    const confirmModal = document.getElementById('confirm-modal');
+    const confirmModalTitle = document.getElementById('confirm-modal-title');
+    const confirmModalDesc = document.getElementById('confirm-modal-desc');
+    const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+    const confirmOkBtn = document.getElementById('confirm-ok-btn');
+    
+    let pendingCallback = null;
+
+    function showConfirmModal(title, desc, okText, callback) {
+        pendingCallback = callback;
+        if (confirmModalTitle) confirmModalTitle.innerText = title;
+        if (confirmModalDesc) confirmModalDesc.innerHTML = desc;
+        if (confirmOkBtn) confirmOkBtn.innerText = okText;
+        
+        if (confirmModal) {
+            confirmModal.classList.add('active');
         }
+    }
+
+    if (confirmCancelBtn) {
+        confirmCancelBtn.addEventListener('click', () => {
+            pendingCallback = null;
+            if (confirmModal) confirmModal.classList.remove('active');
+        });
+    }
+
+    if (confirmOkBtn) {
+        confirmOkBtn.addEventListener('click', () => {
+            if (pendingCallback) pendingCallback();
+            pendingCallback = null;
+            if (confirmModal) confirmModal.classList.remove('active');
+        });
+    }
+
+    function confirmDurationChange(callback) {
+        showConfirmModal(
+            "Увага!", 
+            "Це рекомендовані настройки MyKep.<br>Так як у нас зараз пари саме так налаштовані, краще нічого не змінювати.<br><br>Чи точно ви хочете змінити це?", 
+            "Змінити", 
+            callback
+        );
     }
 
     if (duration1Toggle) {
@@ -64,10 +99,15 @@ function initSettings() {
 
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
-            if (confirm("Видалити збережений розклад?")) {
-                localStorage.removeItem('mykep_schedule');
-                window.location.reload();
-            }
+            showConfirmModal(
+                "Очищення даних",
+                "Видалити збережений розклад? Це змусить додаток завантажити розклад з сервера заново.",
+                "Видалити",
+                () => {
+                    localStorage.removeItem('mykep_schedule');
+                    window.location.reload();
+                }
+            );
         });
     }
 }
