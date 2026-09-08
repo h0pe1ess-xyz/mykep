@@ -58,7 +58,7 @@ function initSettings() {
     function confirmDurationChange(callback) {
         showConfirmModal(
             "Увага!", 
-            "Це рекомендовані настройки MyKep.<br>Так як у нас зараз пари саме так налаштовані, краще нічого не змінювати.<br><br>Чи точно ви хочете змінити це?", 
+            "Це рекомендовані настройки MyKep.<br>Так як у нас пари зараз проходять іменно в такому форматі, краще тут нічого не міняти<br><br>Чи точно ви хочете змінити це?", 
             "Змінити", 
             callback
         );
@@ -66,25 +66,41 @@ function initSettings() {
 
     if (duration1Toggle) {
         duration1Toggle.addEventListener('click', () => {
-            confirmDurationChange(() => {
+            const isCurrentlyDefault = duration1Toggle.classList.contains('active'); // active means 80 (default)
+            
+            const performChange = () => {
                 duration1Toggle.classList.toggle('active'); 
                 const newDuration = duration1Toggle.classList.contains('active') ? '80' : '60'; 
                 localStorage.setItem('mykep_duration1', newDuration);
                 localStorage.removeItem('mykep_schedule'); 
                 window.location.reload();
-            });
+            };
+
+            if (isCurrentlyDefault) {
+                confirmDurationChange(performChange);
+            } else {
+                performChange();
+            }
         });
     }
 
     if (duration2Toggle) {
         duration2Toggle.addEventListener('click', () => {
-            confirmDurationChange(() => {
+            const isCurrentlyDefault = !duration2Toggle.classList.contains('active'); // not active means 60 (default)
+            
+            const performChange = () => {
                 duration2Toggle.classList.toggle('active'); 
                 const newDuration = duration2Toggle.classList.contains('active') ? '80' : '60'; 
                 localStorage.setItem('mykep_duration2', newDuration);
                 localStorage.removeItem('mykep_schedule'); 
                 window.location.reload();
-            });
+            };
+
+            if (isCurrentlyDefault) {
+                confirmDurationChange(performChange);
+            } else {
+                performChange();
+            }
         });
     }
 
