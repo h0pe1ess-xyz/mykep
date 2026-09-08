@@ -64,10 +64,15 @@ function initSettings() {
         );
     }
 
+    function isRecommendedState() {
+        if (!duration1Toggle || !duration2Toggle) return false;
+        const dur1Is80 = duration1Toggle.classList.contains('active');
+        const dur2Is60 = !duration2Toggle.classList.contains('active');
+        return dur1Is80 && dur2Is60;
+    }
+
     if (duration1Toggle) {
         duration1Toggle.addEventListener('click', () => {
-            const isCurrentlyDefault = duration1Toggle.classList.contains('active'); // active means 80 (default)
-            
             const performChange = () => {
                 duration1Toggle.classList.toggle('active'); 
                 const newDuration = duration1Toggle.classList.contains('active') ? '80' : '60'; 
@@ -76,7 +81,7 @@ function initSettings() {
                 window.location.reload();
             };
 
-            if (isCurrentlyDefault) {
+            if (isRecommendedState()) {
                 confirmDurationChange(performChange);
             } else {
                 performChange();
@@ -86,8 +91,6 @@ function initSettings() {
 
     if (duration2Toggle) {
         duration2Toggle.addEventListener('click', () => {
-            const isCurrentlyDefault = !duration2Toggle.classList.contains('active'); // not active means 60 (default)
-            
             const performChange = () => {
                 duration2Toggle.classList.toggle('active'); 
                 const newDuration = duration2Toggle.classList.contains('active') ? '80' : '60'; 
@@ -96,7 +99,7 @@ function initSettings() {
                 window.location.reload();
             };
 
-            if (isCurrentlyDefault) {
+            if (isRecommendedState()) {
                 confirmDurationChange(performChange);
             } else {
                 performChange();
