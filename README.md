@@ -58,5 +58,45 @@
 
 1. **Клонувати репозиторій:**
    ```bash
-   git clone [https://github.com/h0pe1ess-xyz/mykep.git](https://github.com/h0pe1ess-xyz/mykep.git)
+   git clone https://github.com/h0pe1ess-xyz/mykep.git
    cd mykep
+   ```
+
+2. **Встановити залежності:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Запустити сервер:**
+   ```bash
+   python main.py
+   ```
+   Або через Uvicorn безпосередньо:
+   ```bash
+   uvicorn main:app --host 0.0.0.0 --port 8000
+   ```
+
+Додаток буде доступний за адресою: `http://localhost:8000`.
+
+---
+
+## 📂 Структура проекту
+
+```text
+mykep/
+├── main.py              # Головний файл FastAPI сервера (маршрутизація, парсинг)
+├── requirements.txt     # Залежності Python
+└── static/              # Фронтенд частина (HTML, CSS, JS, PWA ресурси)
+    ├── index.html       # Головна сторінка (таймер, поточні пари)
+    ├── schedule.html    # Розклад на тиждень
+    ├── settings.html    # Налаштування
+    ├── sw.js            # Service Worker для роботи в офлайн-режимі
+    ├── css/             # Модульні стилі
+    └── js/              # Клієнтська логіка
+```
+
+---
+
+## 🤝 Контриб'ют
+
+Проект відкритий для покращень. Якщо у вас є ідеї щодо оптимізації коду, виправлення багів або додавання нових функцій — створюйте **Pull Request** або пишіть в **Issues**.
