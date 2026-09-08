@@ -21,7 +21,7 @@ function initSettings() {
     }
     if (duration2Desc) duration2Desc.innerText = `Поточна: ${savedDuration2} хвилин`;
 
-    initGroupModal();
+    initNativeGroupSelect();
 
     const confirmModal = document.getElementById('confirm-modal');
     const confirmModalTitle = document.getElementById('confirm-modal-title');
@@ -133,85 +133,60 @@ function initSettings() {
     }
 }
 
-function initGroupModal() {
-    const openGroupModalBtn = document.getElementById('open-group-modal');
-    const groupModal = document.getElementById('group-modal');
-    const closeGroupModalBtn = document.getElementById('close-modal');
+function initNativeGroupSelect() {
+    const groupSelect = document.getElementById('native-group-select');
     const currentGroupDisplay = document.getElementById('current-group-display');
-    const modalSearch = document.getElementById('modal-search');
-    const modalGroupList = document.getElementById('modal-group-list');
-
     const savedGroup = localStorage.getItem('mykep_group') || 'ПІ-24-02';
+    
     if (currentGroupDisplay) {
         currentGroupDisplay.innerText = `Поточна: ${savedGroup}`;
     }
     
-    let cachedGroups = [];
-
+    if (!groupSelect) return;
+    
+    groupSelect.innerHTML = `<option value="${savedGroup}" selected>${savedGroup}</option>`;
+    
     async function loadGroups() {
-        if (!modalGroupList) return;
-        modalGroupList.innerHTML = '<div style="padding: 14px; text-align: center; color: var(--text-muted);">Завантаження...</div>';
         try {
             const resp = await fetch('/api/groups');
             const data = await resp.json();
-            if (data.status === 'success') {
-                cachedGroups = data.data;
-                renderGroupList(cachedGroups);
-            } else {
-                modalGroupList.innerHTML = '<div style="padding: 14px; text-align: center; color: #ff4444;">Помилка завантаження</div>';
+            if (data.status === 'success' && data.data.length > 0) {
+                groupSelect.innerHTML = '';
+                let found = false;
+                data.data.forEach(grp => {
+                    const option = document.createElement('option');
+                    option.value = grp;
+                    option.innerText = grp;
+                    if (grp === savedGroup) {
+                        option.selected = true;
+                        found = true;
+                    }
+                    groupSelect.appendChild(option);
+                });
+                
+                if (!found) {
+                    const option = document.createElement('option');
+                    option.value = savedGroup;
+                    option.innerText = savedGroup;
+                    option.selected = true;
+                    groupSelect.insertBefore(option, groupSelect.firstChild);
+                }
             }
         } catch (e) {
-            modalGroupList.innerHTML = '<div style="padding: 14px; text-align: center; color: #ff4444;">Помилка завантаження</div>';
+            console.error('Failed to load groups', e);
         }
     }
-
-    function renderGroupList(groups) {
-        if (!modalGroupList) return;
-        modalGroupList.innerHTML = '';
-        if (groups.length === 0) {
-            modalGroupList.innerHTML = '<div style="padding: 14px; text-align: center; color: var(--text-muted);">Нічого не знайдено</div>';
-            return;
+    
+    loadGroups();
+    
+    groupSelect.addEventListener('change', (e) => {
+        const newGroup = e.target.value;
+        if (newGroup && newGroup !== savedGroup) {
+            localStorage.setItem('mykep_group', newGroup);
+            localStorage.removeItem('mykep_schedule');
+            window.location.reload();
         }
-        groups.forEach(grp => {
-            const div = document.createElement('div');
-            div.className = 'modal-item';
-            if (grp === savedGroup) div.classList.add('selected');
-            div.innerText = grp;
-            div.addEventListener('click', () => {
-                localStorage.setItem('mykep_group', grp);
-                localStorage.removeItem('mykep_schedule');
-                window.location.reload();
-            });
-            modalGroupList.appendChild(div);
-        });
-    }
-
-    if (modalSearch) {
-        modalSearch.addEventListener('input', (e) => {
-            const q = e.target.value.toLowerCase().replace(/[^a-zа-яієїґ0-9]/g, '');
-            const filtered = cachedGroups.filter(grp => grp.toLowerCase().replace(/[^a-zа-яієїґ0-9]/g, '').includes(q));
-            renderGroupList(filtered);
-        });
-    }
-
-    if (openGroupModalBtn && groupModal) {
-        openGroupModalBtn.addEventListener('click', () => {
-            groupModal.classList.add('active');
-            if (cachedGroups.length === 0) {
-                loadGroups();
-            } else {
-                renderGroupList(cachedGroups);
-            }
-        });
-    }
-
-    if (closeGroupModalBtn && groupModal) {
-        closeGroupModalBtn.addEventListener('click', () => {
-            groupModal.classList.remove('active');
-        });
-    }
-
-
+    });
 }
 
 function checkOnboarding() {
@@ -226,7 +201,6 @@ function checkOnboarding() {
     }
     onboarding.style.display = 'flex';
     if (mainApp) mainApp.style.opacity = '0';
-    initGroupModal();
     return true; 
 }
 

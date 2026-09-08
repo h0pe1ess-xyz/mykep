@@ -30,7 +30,11 @@
                         <div class="settings-title">Академічна група</div>
                         <div class="settings-desc" id="current-group-display">Поточна: ПІ-24-02</div>
                     </div>
-                    <button class="settings-btn" id="open-group-modal">Змінити</button>
+                    <div class="native-select-wrapper">
+                        <select class="settings-btn native-select" id="native-group-select">
+                        </select>
+                        <svg class="select-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
                 </div>
                 <div class="settings-row">
                     <div class="settings-info">
@@ -113,19 +117,7 @@
 
         </main>
 
-        <!-- Модальне вікно вибору групи -->
-        <div class="modal-overlay" id="group-modal">
-            <div class="modal-container">
-                <div class="modal-header">
-                    <h3>Вибір групи</h3>
-                    <button class="close-modal" id="close-modal">&times;</button>
-                </div>
-                <input type="text" class="modal-search" id="modal-search" placeholder="Пошук групи...">
-                <div class="modal-list" id="modal-group-list">
-                    <!-- Заповнюється через JS -->
-                </div>
-            </div>
-        </div>
+
 
         <!-- Модальне вікно підтвердження -->
         <div class="modal-overlay" id="confirm-modal">
