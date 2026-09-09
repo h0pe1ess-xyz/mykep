@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mykep-cache-v2.10';
+const CACHE_NAME = 'mykep-cache-v2.11';
 const urlsToCache = [
     './',
     './index.html',
@@ -12,18 +12,15 @@ const urlsToCache = [
     './pfp/2.gif'
 ];
 
-// Зберігаємо файли при першому завантаженні
 self.addEventListener('install', event => {
+    self.skipWaiting();
     event.waitUntil(
         caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
     );
 });
 
-// Віддаємо файли з кешу, коли немає інтернету
 self.addEventListener('fetch', event => {
-    // API запити ігноруємо (бо в app.js ми вже зробили для них свій кеш)
     if (event.request.url.includes('/api/')) return;
-
     event.respondWith(
         caches.match(event.request).then(response => {
             return response || fetch(event.request);
@@ -31,7 +28,6 @@ self.addEventListener('fetch', event => {
     );
 });
 
-// Очищуємо старі кеші при активації нового Service Worker
 self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(cacheNames => {
@@ -42,6 +38,6 @@ self.addEventListener('activate', event => {
                     }
                 })
             );
-        })
+        }).then(() => self.clients.claim())
     );
 });
