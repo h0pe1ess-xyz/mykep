@@ -28,9 +28,6 @@ stats_data: Dict[str, Any] = {
     "groups": {}
 }
 
-cached_groups_list = []
-last_groups_fetch = 0
-
 async def init_db() -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('''
@@ -107,7 +104,7 @@ def is_lesson_active(weeks_str: str, current_week: int) -> bool:
         logger.warning(f"Error filtering active week '{weeks_str}': {e}. Defaulting to True.")
         return True 
 
-async def update_schedule_cache(group_name: str, duration1: int, duration2: int, cache_key: str) -> Optional[Dict[str, Any]]:
+async def update_schedule_cache(group_name: str, duration: int, cache_key: str) -> Optional[Dict[str, Any]]:
     raw_data = await asyncio.to_thread(fetch_schedule_sync)
     if not raw_data: return None
         
@@ -142,25 +139,13 @@ async def update_schedule_cache(group_name: str, duration1: int, duration2: int,
         "субота": base_monday + timedelta(days=5)
     }
 
-    # 1st shift: 1-4 lessons
-    shift1_80 = {
-        "1": "08:00 - 09:20", "2": "09:30 - 10:50", "3": "11:10 - 12:30", "4": "12:40 - 14:00"
-    }
-    shift1_60 = {
-        "1": "08:00 - 09:00", "2": "09:10 - 10:10", "3": "10:30 - 11:30", "4": "11:40 - 12:40"
-    }
-    
-    # 2nd shift: 5-8 lessons
-    shift2_80 = {
+    time_mapping = {
+        "1": "08:00 - 09:20", "2": "09:30 - 10:50", "3": "11:10 - 12:30", "4": "12:40 - 14:00", 
         "5": "14:10 - 15:30", "6": "15:40 - 17:00", "7": "17:10 - 18:30", "8": "18:40 - 20:00"
+    } if int(duration) == 80 else {
+        "1": "08:00 - 09:00", "2": "09:10 - 10:10", "3": "10:30 - 11:30", "4": "11:40 - 12:40",
+        "5": "13:00 - 14:00", "6": "14:10 - 15:10", "7": "15:20 - 16:20", "8": "16:30 - 17:30"
     }
-    shift2_60 = {
-        "5": "14:10 - 15:10", "6": "15:20 - 16:20", "7": "16:30 - 17:30", "8": "17:40 - 18:40"
-    }
-    
-    time_mapping = {}
-    time_mapping.update(shift1_80 if int(duration1) == 80 else shift1_60)
-    time_mapping.update(shift2_80 if int(duration2) == 80 else shift2_60)
 
     full_week_schedule = {}
     for day_name, day_date in days_to_check.items():
@@ -203,14 +188,13 @@ async def startup_event() -> None:
 async def get_schedule(
     background_tasks: BackgroundTasks, 
     group: str = Query("ПІ-24-02"), 
-    duration1: int = Query(80),
-    duration2: int = Query(60),
+    duration: int = Query(60), 
     uid: Optional[str] = Query(None)
 ) -> JSONResponse:
     background_tasks.add_task(track_usage, uid, group)
 
     today = datetime.now().strftime("%Y-%m-%d")
-    cache_key = f"{group}_{duration1}_{duration2}" 
+    cache_key = f"{group}_{duration}" 
     
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT data FROM schedule WHERE group_name = ? AND date = ?", (cache_key, today)) as cursor:
@@ -219,7 +203,7 @@ async def get_schedule(
                 return JSONResponse({"status": "success", "data": json.loads(row[0])})
     
     try:
-        data = await update_schedule_cache(group, duration1, duration2, cache_key)
+        data = await update_schedule_cache(group, duration, cache_key)
         if data is not None:
             return JSONResponse({"status": "success", "data": data})
         return JSONResponse(
@@ -232,33 +216,6 @@ async def get_schedule(
             status_code=500, 
             content={"status": "error", "message": str(e)}
         )
-
-@app.get("/api/groups")
-async def get_groups() -> JSONResponse:
-    global cached_groups_list, last_groups_fetch
-    import time
-    now = time.time()
-    
-    if not cached_groups_list or (now - last_groups_fetch > 3600):
-        try:
-            raw_data = await asyncio.to_thread(fetch_schedule_sync)
-            if raw_data:
-                raw_groups = []
-                for k in raw_data.keys():
-                    if str(k).strip():
-                        parts = str(k).replace('/', '|').replace(',', '|').split('|')
-                        for part in parts:
-                            clean = part.strip()
-                            if clean:
-                                raw_groups.append(clean)
-                cached_groups_list = sorted(list(set(raw_groups)))
-                last_groups_fetch = now
-        except Exception as e:
-            logger.error(f"Failed to fetch groups: {e}")
-            if not cached_groups_list:
-                return JSONResponse(status_code=500, content={"status": "error", "message": "Could not fetch groups"})
-    
-    return JSONResponse({"status": "success", "data": cached_groups_list})
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
