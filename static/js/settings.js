@@ -21,7 +21,7 @@ function initSettings() {
     }
     if (duration2Desc) duration2Desc.innerText = `Поточна: ${savedDuration2} хвилин`;
 
-    initNativeGroupSelect();
+    initGroupModal();
 
     const confirmModal = document.getElementById('confirm-modal');
     const confirmModalTitle = document.getElementById('confirm-modal-title');
@@ -133,59 +133,75 @@ function initSettings() {
     }
 }
 
-function initNativeGroupSelect() {
-    const groupSelect = document.getElementById('native-group-select');
+function initGroupModal() {
+    const modal = document.getElementById('group-modal');
+    const openBtn = document.getElementById('open-group-modal');
+    const closeBtn = document.getElementById('close-modal');
+    const searchInput = document.getElementById('modal-search');
+    const groupList = document.getElementById('modal-group-list');
     const currentGroupDisplay = document.getElementById('current-group-display');
+
+    if (!modal || !openBtn || !closeBtn || !searchInput || !groupList) return;
+
+    let groupsData = [];
     const savedGroup = localStorage.getItem('mykep_group') || 'ПІ-24-02';
     
     if (currentGroupDisplay) {
         currentGroupDisplay.innerText = `Поточна: ${savedGroup}`;
     }
-    
-    if (!groupSelect) return;
-    
-    groupSelect.innerHTML = `<option value="${savedGroup}" selected>${savedGroup}</option>`;
-    
+
     async function loadGroups() {
         try {
             const resp = await fetch('/api/groups');
             const data = await resp.json();
-            if (data.status === 'success' && data.data.length > 0) {
-                groupSelect.innerHTML = '';
-                let found = false;
-                data.data.forEach(grp => {
-                    const option = document.createElement('option');
-                    option.value = grp;
-                    option.innerText = grp;
-                    if (grp === savedGroup) {
-                        option.selected = true;
-                        found = true;
-                    }
-                    groupSelect.appendChild(option);
-                });
-                
-                if (!found) {
-                    const option = document.createElement('option');
-                    option.value = savedGroup;
-                    option.innerText = savedGroup;
-                    option.selected = true;
-                    groupSelect.insertBefore(option, groupSelect.firstChild);
-                }
+            if (data.status === 'success') {
+                groupsData = data.data;
+                renderGroups(groupsData);
             }
         } catch (e) {
             console.error('Failed to load groups', e);
         }
     }
-    
-    loadGroups();
-    
-    groupSelect.addEventListener('change', (e) => {
-        const newGroup = e.target.value;
-        if (newGroup && newGroup !== savedGroup) {
-            localStorage.setItem('mykep_group', newGroup);
-            localStorage.removeItem('mykep_schedule');
-            window.location.reload();
+
+    function renderGroups(list) {
+        groupList.innerHTML = '';
+        list.forEach(grp => {
+            const div = document.createElement('div');
+            div.className = 'modal-item';
+            if (grp === savedGroup) div.classList.add('selected');
+            div.innerText = grp;
+            div.addEventListener('click', () => {
+                if (grp !== savedGroup) {
+                    localStorage.setItem('mykep_group', grp);
+                    localStorage.removeItem('mykep_schedule');
+                    window.location.reload();
+                } else {
+                    modal.classList.remove('active');
+                }
+            });
+            groupList.appendChild(div);
+        });
+    }
+
+    openBtn.addEventListener('click', () => {
+        modal.classList.add('active');
+        loadGroups();
+    });
+
+    closeBtn.addEventListener('click', () => {
+        modal.classList.remove('active');
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.remove('active');
         }
+    });
+
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        const filtered = groupsData.filter(g => g.toLowerCase().includes(query));
+        renderGroups(filtered);
     });
 }
 

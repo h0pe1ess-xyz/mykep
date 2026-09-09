@@ -30,10 +30,7 @@
                         <div class="settings-title">Академічна група</div>
                         <div class="settings-desc" id="current-group-display">Поточна: ПІ-24-02</div>
                     </div>
-                    <div class="native-select-wrapper">
-                        <select class="settings-btn native-select" id="native-group-select">
-                        </select>
-                    </div>
+                    <button class="settings-btn" id="open-group-modal">Змінити</button>
                 </div>
                 <div class="settings-row">
                     <div class="settings-info">
@@ -49,7 +46,7 @@
                     </div>
                     <div class="toggle active" id="duration2-toggle"></div>
                 </div>
-                <div class="settings-row" style="padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 5px;">
+                <div class="settings-row">
                     <div class="settings-info">
                         <div class="settings-title" style="font-size: 13px; color: #a0a0a0;">Повернути рекомендований розклад</div>
                     </div>
@@ -130,6 +127,20 @@
                 <div style="display: flex; gap: 10px; justify-content: center;">
                     <button class="settings-btn" id="confirm-cancel-btn" style="flex: 1; background: rgba(255, 255, 255, 0.1); color: white;">Відміна</button>
                     <button class="settings-btn" id="confirm-ok-btn" style="flex: 1; background: rgba(255, 68, 68, 0.8); color: white; border-color: rgba(255, 68, 68, 0.5);">Змінити</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Модальне вікно вибору групи -->
+        <div class="modal-overlay" id="group-modal">
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3>Вибір групи</h3>
+                    <button class="close-modal" id="close-modal">&times;</button>
+                </div>
+                <input type="text" class="modal-search" id="modal-search" placeholder="Пошук групи...">
+                <div class="modal-list" id="modal-group-list">
+                    <!-- Заповнюється через JS -->
                 </div>
             </div>
         </div>
