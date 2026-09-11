@@ -22,6 +22,11 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function initApplication() {
+    if (!isPWA()) {
+        showPWAGuide();
+        return;
+    }
+
     if (checkOnboarding()) return; 
 
     initSettings();
