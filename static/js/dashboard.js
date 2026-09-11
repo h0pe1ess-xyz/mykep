@@ -117,8 +117,17 @@ function renderDashboard(schedule) {
     
     if (progressFill) progressFill.style.width = `${dayProgress}%`;
     if (progressThumb) {
-        progressThumb.style.left = `${dayProgress}%`;
-        progressThumb.style.transform = `translateX(-${dayProgress}%)`;
+        const thumbWidth = progressThumb.offsetWidth;
+        const containerWidth = progressThumb.parentElement.offsetWidth;
+        let minPct = 8;
+        let maxPct = 92;
+        if (containerWidth > 0 && thumbWidth > 0) {
+            minPct = (thumbWidth / 2 / containerWidth) * 100;
+            maxPct = 100 - minPct;
+        }
+        const clampedLeft = Math.max(minPct, Math.min(dayProgress, maxPct));
+        progressThumb.style.left = `${clampedLeft}%`;
+        progressThumb.style.transform = `translateX(-50%)`;
     }
     if (progressText) {
         const targetProgress = Math.floor(dayProgress);
