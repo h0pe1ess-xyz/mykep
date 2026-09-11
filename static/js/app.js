@@ -19,6 +19,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const mainContainers = document.querySelectorAll('.main-content');
     mainContainers.forEach(container => container.classList.add('animate-enter'));
+
+    document.addEventListener('touchstart', (e) => {
+        if (e.touches[0].clientX < 30) {
+            e.preventDefault();
+        }
+    }, { passive: false });
 });
 
 async function initApplication() {
