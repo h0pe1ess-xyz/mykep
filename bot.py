@@ -2,12 +2,11 @@ import asyncio
 import logging
 from datetime import datetime, time as dtime
 from telegram import Update, Bot
+from telegram.error import Conflict
 from telegram.ext import (
     Application,
     CommandHandler,
     ContextTypes,
-    MessageHandler,
-    filters,
 )
 
 import analytics
@@ -233,33 +232,57 @@ async def _daily_report_scheduler(bot: Bot) -> None:
 
 
 async def start_bot(token: str) -> None:
-    """Initialize and run the Telegram bot (polling mode)."""
-    app = Application.builder().token(token).build()
+    """Initialize and run the Telegram bot (polling mode) with retry on conflict."""
+    while True:
+        try:
+            app = Application.builder().token(token).build()
 
-    app.add_handler(CommandHandler("start", cmd_help))
-    app.add_handler(CommandHandler("help", cmd_help))
-    app.add_handler(CommandHandler("stats", cmd_stats))
-    app.add_handler(CommandHandler("week", cmd_week))
-    app.add_handler(CommandHandler("groups", cmd_groups))
-    app.add_handler(CommandHandler("users", cmd_users))
-    app.add_handler(CommandHandler("live", cmd_live))
-    app.add_handler(CommandHandler("hours", cmd_hours))
-    app.add_handler(CommandHandler("platforms", cmd_platforms))
+            app.add_handler(CommandHandler("start", cmd_help))
+            app.add_handler(CommandHandler("help", cmd_help))
+            app.add_handler(CommandHandler("stats", cmd_stats))
+            app.add_handler(CommandHandler("week", cmd_week))
+            app.add_handler(CommandHandler("groups", cmd_groups))
+            app.add_handler(CommandHandler("users", cmd_users))
+            app.add_handler(CommandHandler("live", cmd_live))
+            app.add_handler(CommandHandler("hours", cmd_hours))
+            app.add_handler(CommandHandler("platforms", cmd_platforms))
 
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling(drop_pending_updates=True)
+            await app.initialize()
+            await app.start()
 
-    # Schedule daily reports
-    asyncio.create_task(_daily_report_scheduler(app.bot))
+            # Wait for old polling connections to close after restart/reload
+            await asyncio.sleep(2)
 
-    logger.info("Telegram bot started (polling).")
+            await app.updater.start_polling(drop_pending_updates=True)
 
-    # Keep alive
-    try:
-        while True:
-            await asyncio.sleep(3600)
-    except asyncio.CancelledError:
-        await app.updater.stop()
-        await app.stop()
-        await app.shutdown()
+            # Schedule daily reports
+            asyncio.create_task(_daily_report_scheduler(app.bot))
+
+            logger.info("Telegram bot started (polling).")
+
+            # Keep alive
+            while True:
+                await asyncio.sleep(3600)
+
+        except Conflict:
+            logger.warning("Bot conflict detected (another instance running). Retrying in 5s...")
+            try:
+                await app.updater.stop()
+                await app.stop()
+                await app.shutdown()
+            except Exception:
+                pass
+            await asyncio.sleep(5)
+
+        except asyncio.CancelledError:
+            try:
+                await app.updater.stop()
+                await app.stop()
+                await app.shutdown()
+            except Exception:
+                pass
+            break
+
+        except Exception as e:
+            logger.error(f"Bot error: {e}. Retrying in 10s...")
+            await asyncio.sleep(10)
