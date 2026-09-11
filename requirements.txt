@@ -3,3 +3,5 @@ uvicorn
 aiosqlite
 cloudscraper
 chompjs
+python-telegram-bot
+python-dotenv

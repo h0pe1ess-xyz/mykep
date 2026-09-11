@@ -1,6 +1,7 @@
 import asyncio
 import aiosqlite
 import json
+import os
 import re
 import cloudscraper
 import chompjs
@@ -11,10 +12,16 @@ from typing import Dict, Any, Optional
 import sys
 from pathlib import Path
 
-from fastapi import FastAPI, BackgroundTasks, Query
+from fastapi import FastAPI, BackgroundTasks, Query, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 import uvicorn
+
+import analytics
+import bot
+
+from dotenv import load_dotenv
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -26,14 +33,9 @@ if str(BASE_DIR) not in sys.path:
 app = FastAPI()
 STATIC_DIR = BASE_DIR / "static"
 DB_PATH = str(BASE_DIR / "schedule.db")
-STATS_PATH = str(BASE_DIR / "stats.txt")
 URL = "https://kep.nung.edu.ua/pages/education/schedule"
 
-stats_data: Dict[str, Any] = {
-    "total_requests": 0,
-    "unique_users": set(),
-    "groups": {}
-}
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 
 cached_groups_list = []
 last_groups_fetch = 0
@@ -50,29 +52,7 @@ async def init_db() -> None:
         ''')
         await db.commit()
 
-def save_stats_to_file() -> None:
-    try:
-        with open(STATS_PATH, "w", encoding="utf-8") as f:
-            f.write("=== MyKep API Statistics ===\n")
-            f.write(f"Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write("------------------------\n")
-            f.write(f"Unique Users: {len(stats_data['unique_users'])}\n")
-            f.write(f"Total API Requests: {stats_data['total_requests']}\n")
-            f.write("------------------------\n")
-            f.write("Group Popularity:\n")
-            sorted_groups = sorted(stats_data["groups"].items(), key=lambda x: x[1], reverse=True)
-            for grp, count in sorted_groups:
-                f.write(f"  - {grp}: {count} requests\n")
-    except Exception as e:
-        logger.warning(f"Failed to write stats file: {e}")
 
-def track_usage(uid: Optional[str], group: str) -> None:
-    stats_data["total_requests"] += 1
-    if uid:
-        stats_data["unique_users"].add(uid)
-    if group:
-        stats_data["groups"][group] = stats_data["groups"].get(group, 0) + 1
-    save_stats_to_file()
 
 def fetch_schedule_sync() -> Dict[str, Any]:
     scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
@@ -204,17 +184,25 @@ async def update_schedule_cache(group_name: str, duration1: int, duration2: int,
 @app.on_event("startup")
 async def startup_event() -> None:
     await init_db()
+    await analytics.init_analytics_db()
     logger.info("Database initialized.")
+    if BOT_TOKEN:
+        asyncio.create_task(bot.start_bot(BOT_TOKEN))
+        logger.info("Telegram bot task created.")
+    else:
+        logger.warning("TELEGRAM_BOT_TOKEN not set, bot disabled.")
 
 @app.get("/api/schedule")
 async def get_schedule(
+    request: Request,
     background_tasks: BackgroundTasks, 
     group: str = Query("ПІ-24-02"), 
     duration1: int = Query(80),
     duration2: int = Query(60),
     uid: Optional[str] = Query(None)
 ) -> JSONResponse:
-    background_tasks.add_task(track_usage, uid, group)
+    ua = request.headers.get("user-agent", "")
+    background_tasks.add_task(analytics.log_request, uid, group, "/api/schedule", ua)
 
     today = datetime.now().strftime("%Y-%m-%d")
     cache_key = f"{group}_{duration1}_{duration2}" 
@@ -241,7 +229,7 @@ async def get_schedule(
         )
 
 @app.get("/api/groups")
-async def get_groups() -> JSONResponse:
+async def get_groups(request: Request, background_tasks: BackgroundTasks) -> JSONResponse:
     global cached_groups_list, last_groups_fetch
     import time
     now = time.time()
@@ -265,6 +253,8 @@ async def get_groups() -> JSONResponse:
             if not cached_groups_list:
                 return JSONResponse(status_code=500, content={"status": "error", "message": "Could not fetch groups"})
     
+    ua = request.headers.get("user-agent", "")
+    background_tasks.add_task(analytics.log_request, None, "", "/api/groups", ua)
     return JSONResponse({"status": "success", "data": cached_groups_list})
 
 app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
