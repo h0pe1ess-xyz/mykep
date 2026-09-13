@@ -1,284 +1,105 @@
 import asyncio
-import aiosqlite
-import json
-import os
-import re
-import cloudscraper
-import chompjs
-import traceback
 import logging
-from datetime import datetime, timedelta, date
-from typing import Dict, Any, Optional
-import sys
-from pathlib import Path
+from contextlib import asynccontextmanager
+from typing import Optional
 
-from fastapi import FastAPI, BackgroundTasks, Query, Request
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
-import uvicorn
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 
+from config import BASE_DIR, BOT_MODE
+from database import init_database
+from schedule_service import ScheduleService
 import analytics
-import bot
 
-from dotenv import load_dotenv
-load_dotenv()
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+# Never log Telegram request URLs, which contain the bot token.
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('httpcore').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
+schedule = ScheduleService()
 
-BASE_DIR = Path(__file__).resolve().parent
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
 
-app = FastAPI()
-STATIC_DIR = BASE_DIR / "static"
-DB_PATH = str(BASE_DIR / "schedule.db")
-URL = "https://kep.nung.edu.ua/pages/education/schedule"
-
-BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-
-# In-memory cache for ALL schedule data (fetched once from KEP)
-raw_schedule_data: Dict[str, Any] = {}
-raw_schedule_last_fetch: float = 0
-cached_groups_list = []
-last_groups_fetch = 0
-
-async def init_db() -> None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute('''
-            CREATE TABLE IF NOT EXISTS schedule (
-                id INTEGER PRIMARY KEY,
-                group_name TEXT,
-                date TEXT,
-                data TEXT
-            )
-        ''')
-        await db.commit()
-
-def fetch_schedule_sync() -> Dict[str, Any]:
-    scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
-    last_error = None
-    for attempt in range(3):
-        try:
-            timeout = 20 + attempt * 15
-            response = scraper.get(URL, timeout=timeout)
-            response.raise_for_status()
-            match = re.search(r'normalizeScheduleGroups\s*\(\s*\{', response.text)
-            if match:
-                return chompjs.parse_js_object(response.text[match.end() - 1:])
-            raise ValueError("Failed to locate schedule data in page source.")
-        except Exception as e:
-            last_error = e
-            logger.warning(f"KEP fetch attempt {attempt+1}/3 failed: {e}")
-            if attempt < 2:
-                import time as _time
-                _time.sleep(3)
-    raise last_error
-
-async def refresh_raw_data() -> bool:
-    """Fetch all schedule data from KEP and store in memory. Returns True on success."""
-    global raw_schedule_data, raw_schedule_last_fetch, cached_groups_list, last_groups_fetch
-    try:
-        data = await asyncio.to_thread(fetch_schedule_sync)
-        if data:
-            raw_schedule_data = data
-            import time as _time
-            raw_schedule_last_fetch = _time.time()
-            # Also update groups list
-            raw_groups = []
-            for k in data.keys():
-                if str(k).strip():
-                    parts = str(k).replace('/', '|').replace(',', '|').split('|')
-                    for part in parts:
-                        clean = part.strip()
-                        if clean:
-                            raw_groups.append(clean)
-            cached_groups_list = sorted(list(set(raw_groups)))
-            last_groups_fetch = raw_schedule_last_fetch
-            logger.info(f"Schedule data refreshed: {len(data)} groups, {len(cached_groups_list)} individual groups")
-            return True
-    except Exception as e:
-        logger.error(f"Failed to refresh schedule data: {e}")
-    return False
-
-async def background_refresh_loop() -> None:
-    """Background task: refresh schedule data every 30 minutes."""
-    while True:
-        await asyncio.sleep(1800)  # 30 min
-        logger.info("Background refresh: fetching schedule data...")
-        await refresh_raw_data()
-
-def get_academic_week(target_date: date) -> int:
-    base_monday = date(2026, 8, 31)
-    delta_days = (target_date - base_monday).days
-    if delta_days < 0: return 1
-    return (delta_days // 7 % 4) + 1
-
-def is_lesson_active(weeks_str: str, current_week: int) -> bool:
-    try:
-        if not weeks_str: return True
-        w_str = str(weeks_str).lower().strip()
-        
-        if not w_str or "всі" in w_str or "усі" in w_str or "1-4" in w_str or "щотижня" in w_str: 
-            return True
-        
-        w_str = w_str.replace("/", ",").replace("\\", ",").replace(".", ",").replace(";", ",")
-        w_str = w_str.replace(" та ", ",").replace(" і ", ",")
-        
-        clean_str = re.sub(r'[^0-9,\-]', '', w_str)
-        if not clean_str: return True
-
-        for part in [p.strip() for p in clean_str.split(",") if p.strip()]:
-            if "-" in part:
-                s, e = map(int, part.split("-"))
-                if s <= current_week <= e: return True
-            else:
-                if int(part) == current_week: return True
-        return False
-    except Exception as e:
-        logger.warning(f"Error filtering active week '{weeks_str}': {e}. Defaulting to True.")
-        return True 
-
-def build_group_schedule(group_name: str, duration1: int, duration2: int) -> Optional[Dict[str, Any]]:
-    """Build schedule for a single group from the in-memory raw data. No network calls."""
-    if not raw_schedule_data:
-        return None
-    
-    group_schedule = {}
-    search_group = group_name.lower().replace("-", "").strip()
-    
-    for key, value in raw_schedule_data.items():
-        if search_group in str(key).lower().replace("-", "").strip():
-            group_schedule = value
-            break
-
-    if not group_schedule: 
-        return {}
-    
-    normalized_schedule = {str(k).lower().strip(): v for k, v in group_schedule.items()}
-
-    now = datetime.now()
-    current_weekday = now.weekday()
-    reference_date = now
-    
-    if current_weekday == 6:
-        reference_date = now + timedelta(days=1)
-    elif current_weekday == 5 and now.hour > 15:
-        reference_date = now + timedelta(days=2)
-
-    base_monday = reference_date - timedelta(days=reference_date.weekday())
-    days_to_check = {
-        "понеділок": base_monday,
-        "вівторок": base_monday + timedelta(days=1),
-        "середа": base_monday + timedelta(days=2),
-        "четвер": base_monday + timedelta(days=3),
-        "п'ятниця": base_monday + timedelta(days=4),
-        "субота": base_monday + timedelta(days=5)
-    }
-
-    shift1_80 = {"1": "08:00 - 09:20", "2": "09:30 - 10:50", "3": "11:10 - 12:30", "4": "12:40 - 14:00"}
-    shift1_60 = {"1": "08:00 - 09:00", "2": "09:10 - 10:10", "3": "10:30 - 11:30", "4": "11:40 - 12:40"}
-    shift2_80 = {"5": "14:10 - 15:30", "6": "15:40 - 17:00", "7": "17:10 - 18:30", "8": "18:40 - 20:00"}
-    shift2_60 = {"5": "14:10 - 15:10", "6": "15:20 - 16:20", "7": "16:30 - 17:30", "8": "17:40 - 18:40"}
-    
-    time_mapping = {}
-    time_mapping.update(shift1_80 if int(duration1) == 80 else shift1_60)
-    time_mapping.update(shift2_80 if int(duration2) == 80 else shift2_60)
-
-    full_week_schedule = {}
-    for day_name, day_date in days_to_check.items():
-        week_num = get_academic_week(day_date.date())
-        formatted_day = []
-        
-        for lesson in normalized_schedule.get(day_name, []):
-            week_val = lesson.get("week", lesson.get("weeks", ""))
-            
-            if not is_lesson_active(week_val, week_num): 
-                continue
-                
-            num = str(lesson.get("number"))
-            formatted_day.append({
-                "lesson": int(num) if num.isdigit() else 0,
-                "time": time_mapping.get(num, "00:00 - 00:00"),
-                "subject": lesson.get("subject", ""),
-                "teacher": lesson.get("teacher", ""),
-                "room": lesson.get("cabinet", "")
-            })
-            
-        formatted_day.sort(key=lambda x: x["lesson"])
-        full_week_schedule[day_name] = formatted_day
-
-    return full_week_schedule
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    await init_db()
+@asynccontextmanager
+async def lifespan(app):
+    await init_database()
     await analytics.init_analytics_db()
-    logger.info("Database initialized.")
-    
-    # Fetch ALL schedule data on startup
-    logger.info("Fetching initial schedule data from KEP...")
-    success = await refresh_raw_data()
-    if success:
-        logger.info("Initial schedule data loaded successfully.")
-    else:
-        logger.error("Failed to load initial schedule data! Will retry in background.")
-    
-    # Start background refresh
-    asyncio.create_task(background_refresh_loop())
-    
-    if BOT_TOKEN:
-        asyncio.create_task(bot.start_bot(BOT_TOKEN))
-        logger.info("Telegram bot task created.")
-    else:
-        logger.warning("TELEGRAM_BOT_TOKEN not set, bot disabled.")
-
-@app.get("/api/schedule")
-async def get_schedule(
-    request: Request,
-    background_tasks: BackgroundTasks, 
-    group: str = Query("ПІ-24-02"), 
-    duration1: int = Query(80),
-    duration2: int = Query(60),
-    uid: Optional[str] = Query(None)
-) -> JSONResponse:
-    ua = request.headers.get("user-agent", "")
-    background_tasks.add_task(analytics.log_request, uid, group, "/api/schedule", ua)
-
-    # Build schedule from in-memory cache (instant, no network)
-    data = build_group_schedule(group, duration1, duration2)
-    
-    if data is not None:
-        return JSONResponse({"status": "success", "data": data})
-    
-    # Raw data not loaded yet, try fetching
-    logger.warning("No raw data in memory, attempting fresh fetch...")
+    await analytics.start_writer()
+    tasks = []
     try:
-        await refresh_raw_data()
-        data = build_group_schedule(group, duration1, duration2)
-        if data is not None:
-            return JSONResponse({"status": "success", "data": data})
-    except Exception as e:
-        logger.error(f"Emergency fetch failed: {e}")
-    
-    return JSONResponse(
-        status_code=503, 
-        content={"status": "error", "message": "Schedule temporarily unavailable. Try again in a minute."}
-    )
+        await schedule.load()
+        # Start serving immediately from last good data. A cold start returns 503
+        # promptly rather than starting one upstream request for every visitor.
+        tasks.append(asyncio.create_task(schedule.run(), name='schedule-refresh'))
+        if BOT_MODE == 'embedded':
+            import os
+            if os.getenv('TELEGRAM_BOT_TOKEN'):
+                import bot
+                tasks.append(asyncio.create_task(bot.start_bot(os.environ['TELEGRAM_BOT_TOKEN']), name='telegram-bot'))
+        yield
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await analytics.stop_writer()
 
-@app.get("/api/groups")
-async def get_groups(request: Request, background_tasks: BackgroundTasks) -> JSONResponse:
-    if not cached_groups_list:
-        await refresh_raw_data()
-    
-    if not cached_groups_list:
-        return JSONResponse(status_code=503, content={"status": "error", "message": "Groups temporarily unavailable"})
-    
-    ua = request.headers.get("user-agent", "")
-    background_tasks.add_task(analytics.log_request, None, "", "/api/groups", ua)
-    return JSONResponse({"status": "success", "data": cached_groups_list})
 
-app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+@app.middleware('http')
+async def response_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    if request.url.path.startswith('/api/'):
+        response.headers['Cache-Control'] = 'no-store'
+    elif request.url.path.endswith(('.html', '.js', '.css', '.json')) or request.url.path == '/':
+        response.headers['Cache-Control'] = 'no-cache'
+    return response
+
+
+@app.get('/api/health')
+async def health():
+    ready = bool(schedule.raw)
+    return JSONResponse(status_code=200 if ready else 503, content={
+        'status': 'ok' if ready else 'warming_up',
+        'schedule': schedule.metadata(),
+        'analytics': analytics.writer_status(),
+    })
+
+
+@app.get('/api/schedule')
+async def get_schedule(request: Request,
+                       group: str = Query('ПІ-24-02', min_length=2, max_length=64),
+                       duration1: int = Query(80),
+                       duration2: int = Query(60),
+                       uid: Optional[str] = Query(None, max_length=128)):
+    if duration1 not in (60, 80) or duration2 not in (60, 80):
+        return JSONResponse(status_code=422, content={'status': 'error', 'message': 'Тривалість має бути 60 або 80 хвилин.'})
+    if not schedule.raw:
+        return JSONResponse(status_code=503, headers={'Retry-After': '30'}, content={
+            'status': 'error', 'message': 'Розклад тимчасово недоступний. Спробуйте за хвилину.'})
+    data = schedule.build(group, duration1, duration2)
+    if data is None:
+        return JSONResponse(status_code=404, content={'status': 'error', 'message': 'Групу не знайдено. Перевірте назву в налаштуваннях.'})
+    analytics.record_request(uid, group, '/api/schedule', request.headers.get('user-agent', ''))
+    return {'status': 'success', 'data': data, 'meta': schedule.metadata()}
+
+
+@app.get('/api/groups')
+async def get_groups():
+    if not schedule.groups:
+        return JSONResponse(status_code=503, headers={'Retry-After': '30'}, content={
+            'status': 'error', 'message': 'Список груп тимчасово недоступний.'})
+    # Group pickers are not schedule views and must not inflate bot statistics.
+    return {'status': 'success', 'data': schedule.groups, 'meta': schedule.metadata()}
+
+
+app.mount('/', StaticFiles(directory=str(BASE_DIR / 'static'), html=True), name='static')
+
+if __name__ == '__main__':
+    import uvicorn
+    uvicorn.run('main:app', host='0.0.0.0', port=8000, reload=False, access_log=False)

@@ -23,17 +23,17 @@ function renderScheduleList(schedule) {
         const cardHtml = `
             <div class="lesson-card" style="animation: fadeIn var(--transition-normal) forwards; animation-delay: ${delay}s; opacity: 0;">
                 <div class="lesson-top">
-                    <span>${lesson.lesson}-${getLessonSuffix(lesson.lesson)} пара</span>
-                    <span>${lesson.time}</span>
+                    <span>${escapeHTML(lesson.lesson)}-${getLessonSuffix(lesson.lesson)} пара</span>
+                    <span>${escapeHTML(lesson.time)}</span>
                 </div>
-                <div class="lesson-title">${lesson.subject}</div>
+                <div class="lesson-title">${escapeHTML(lesson.subject)}</div>
                 <div class="lesson-divider"></div>
                 <div class="lesson-bottom">
                     <div class="teacher-name">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                        ${lesson.teacher}
+                        ${escapeHTML(lesson.teacher)}
                     </div>
-                    ${lesson.room && lesson.room.trim() !== '' ? `<div class="room-badge">${lesson.room}</div>` : ''}
+                    ${lesson.room && String(lesson.room).trim() !== '' ? `<div class="room-badge">${escapeHTML(lesson.room)}</div>` : ''}
                 </div>
             </div>
         `;
@@ -58,7 +58,7 @@ function initSchedulePage(scheduleDict) {
     }
 
     const todayMap = ["неділя", "понеділок", "вівторок", "середа", "четвер", "п'ятниця", "субота"];
-    let todayId = todayMap[new Date().getDay()];
+    let todayId = todayMap[getKyivNow().getDay()];
     if (todayId === 'неділя') todayId = 'понеділок'; 
 
     let html = '';
