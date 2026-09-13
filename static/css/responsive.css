@@ -116,3 +116,11 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+/* Stop boundary gestures without changing viewport/nav geometry. */
+html, body, .app-container,
+.main-content, .schedule-list, .day-picker,
+.modal-container, .modal-list, .group-options,
+.onboarding-overlay, .onboarding-card, .pwa-overlay, .pwa-card {
+    overscroll-behavior: none;
+}
