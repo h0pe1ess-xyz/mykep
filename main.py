@@ -37,6 +37,9 @@ URL = "https://kep.nung.edu.ua/pages/education/schedule"
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 
+# In-memory cache for ALL schedule data (fetched once from KEP)
+raw_schedule_data: Dict[str, Any] = {}
+raw_schedule_last_fetch: float = 0
 cached_groups_list = []
 last_groups_fetch = 0
 
@@ -52,14 +55,12 @@ async def init_db() -> None:
         ''')
         await db.commit()
 
-
-
 def fetch_schedule_sync() -> Dict[str, Any]:
     scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
     last_error = None
     for attempt in range(3):
         try:
-            timeout = 15 + attempt * 10
+            timeout = 20 + attempt * 15
             response = scraper.get(URL, timeout=timeout)
             response.raise_for_status()
             match = re.search(r'normalizeScheduleGroups\s*\(\s*\{', response.text)
@@ -70,9 +71,42 @@ def fetch_schedule_sync() -> Dict[str, Any]:
             last_error = e
             logger.warning(f"KEP fetch attempt {attempt+1}/3 failed: {e}")
             if attempt < 2:
-                import time
-                time.sleep(2)
+                import time as _time
+                _time.sleep(3)
     raise last_error
+
+async def refresh_raw_data() -> bool:
+    """Fetch all schedule data from KEP and store in memory. Returns True on success."""
+    global raw_schedule_data, raw_schedule_last_fetch, cached_groups_list, last_groups_fetch
+    try:
+        data = await asyncio.to_thread(fetch_schedule_sync)
+        if data:
+            raw_schedule_data = data
+            import time as _time
+            raw_schedule_last_fetch = _time.time()
+            # Also update groups list
+            raw_groups = []
+            for k in data.keys():
+                if str(k).strip():
+                    parts = str(k).replace('/', '|').replace(',', '|').split('|')
+                    for part in parts:
+                        clean = part.strip()
+                        if clean:
+                            raw_groups.append(clean)
+            cached_groups_list = sorted(list(set(raw_groups)))
+            last_groups_fetch = raw_schedule_last_fetch
+            logger.info(f"Schedule data refreshed: {len(data)} groups, {len(cached_groups_list)} individual groups")
+            return True
+    except Exception as e:
+        logger.error(f"Failed to refresh schedule data: {e}")
+    return False
+
+async def background_refresh_loop() -> None:
+    """Background task: refresh schedule data every 30 minutes."""
+    while True:
+        await asyncio.sleep(1800)  # 30 min
+        logger.info("Background refresh: fetching schedule data...")
+        await refresh_raw_data()
 
 def get_academic_week(target_date: date) -> int:
     base_monday = date(2026, 8, 31)
@@ -105,19 +139,21 @@ def is_lesson_active(weeks_str: str, current_week: int) -> bool:
         logger.warning(f"Error filtering active week '{weeks_str}': {e}. Defaulting to True.")
         return True 
 
-async def update_schedule_cache(group_name: str, duration1: int, duration2: int, cache_key: str) -> Optional[Dict[str, Any]]:
-    raw_data = await asyncio.to_thread(fetch_schedule_sync)
-    if not raw_data: return None
-        
+def build_group_schedule(group_name: str, duration1: int, duration2: int) -> Optional[Dict[str, Any]]:
+    """Build schedule for a single group from the in-memory raw data. No network calls."""
+    if not raw_schedule_data:
+        return None
+    
     group_schedule = {}
     search_group = group_name.lower().replace("-", "").strip()
     
-    for key, value in raw_data.items():
+    for key, value in raw_schedule_data.items():
         if search_group in str(key).lower().replace("-", "").strip():
             group_schedule = value
             break
 
-    if not group_schedule: return {}
+    if not group_schedule: 
+        return {}
     
     normalized_schedule = {str(k).lower().strip(): v for k, v in group_schedule.items()}
 
@@ -140,21 +176,10 @@ async def update_schedule_cache(group_name: str, duration1: int, duration2: int,
         "субота": base_monday + timedelta(days=5)
     }
 
-    # 1st shift: 1-4 lessons
-    shift1_80 = {
-        "1": "08:00 - 09:20", "2": "09:30 - 10:50", "3": "11:10 - 12:30", "4": "12:40 - 14:00"
-    }
-    shift1_60 = {
-        "1": "08:00 - 09:00", "2": "09:10 - 10:10", "3": "10:30 - 11:30", "4": "11:40 - 12:40"
-    }
-    
-    # 2nd shift: 5-8 lessons
-    shift2_80 = {
-        "5": "14:10 - 15:30", "6": "15:40 - 17:00", "7": "17:10 - 18:30", "8": "18:40 - 20:00"
-    }
-    shift2_60 = {
-        "5": "14:10 - 15:10", "6": "15:20 - 16:20", "7": "16:30 - 17:30", "8": "17:40 - 18:40"
-    }
+    shift1_80 = {"1": "08:00 - 09:20", "2": "09:30 - 10:50", "3": "11:10 - 12:30", "4": "12:40 - 14:00"}
+    shift1_60 = {"1": "08:00 - 09:00", "2": "09:10 - 10:10", "3": "10:30 - 11:30", "4": "11:40 - 12:40"}
+    shift2_80 = {"5": "14:10 - 15:30", "6": "15:40 - 17:00", "7": "17:10 - 18:30", "8": "18:40 - 20:00"}
+    shift2_60 = {"5": "14:10 - 15:10", "6": "15:20 - 16:20", "7": "16:30 - 17:30", "8": "17:40 - 18:40"}
     
     time_mapping = {}
     time_mapping.update(shift1_80 if int(duration1) == 80 else shift1_60)
@@ -183,13 +208,6 @@ async def update_schedule_cache(group_name: str, duration1: int, duration2: int,
         formatted_day.sort(key=lambda x: x["lesson"])
         full_week_schedule[day_name] = formatted_day
 
-    today_str = now.strftime("%Y-%m-%d")
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("DELETE FROM schedule WHERE group_name = ? AND date = ?", (cache_key, today_str))
-        await db.execute("INSERT INTO schedule (group_name, date, data) VALUES (?, ?, ?)", 
-                         (cache_key, today_str, json.dumps(full_week_schedule, ensure_ascii=False)))
-        await db.commit()
-        
     return full_week_schedule
 
 @app.on_event("startup")
@@ -197,6 +215,18 @@ async def startup_event() -> None:
     await init_db()
     await analytics.init_analytics_db()
     logger.info("Database initialized.")
+    
+    # Fetch ALL schedule data on startup
+    logger.info("Fetching initial schedule data from KEP...")
+    success = await refresh_raw_data()
+    if success:
+        logger.info("Initial schedule data loaded successfully.")
+    else:
+        logger.error("Failed to load initial schedule data! Will retry in background.")
+    
+    # Start background refresh
+    asyncio.create_task(background_refresh_loop())
+    
     if BOT_TOKEN:
         asyncio.create_task(bot.start_bot(BOT_TOKEN))
         logger.info("Telegram bot task created.")
@@ -215,64 +245,34 @@ async def get_schedule(
     ua = request.headers.get("user-agent", "")
     background_tasks.add_task(analytics.log_request, uid, group, "/api/schedule", ua)
 
-    today = datetime.now().strftime("%Y-%m-%d")
-    cache_key = f"{group}_{duration1}_{duration2}" 
+    # Build schedule from in-memory cache (instant, no network)
+    data = build_group_schedule(group, duration1, duration2)
     
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT data FROM schedule WHERE group_name = ? AND date = ?", (cache_key, today)) as cursor:
-            row = await cursor.fetchone()
-            if row:
-                return JSONResponse({"status": "success", "data": json.loads(row[0])})
+    if data is not None:
+        return JSONResponse({"status": "success", "data": data})
     
+    # Raw data not loaded yet, try fetching
+    logger.warning("No raw data in memory, attempting fresh fetch...")
     try:
-        data = await update_schedule_cache(group, duration1, duration2, cache_key)
+        await refresh_raw_data()
+        data = build_group_schedule(group, duration1, duration2)
         if data is not None:
             return JSONResponse({"status": "success", "data": data})
-        return JSONResponse(
-            {"status": "error", "message": "Schedule not found or empty"}, 
-            status_code=404
-        )
     except Exception as e:
-        logger.error(f"Error parsing schedule: {traceback.format_exc()}")
-        # Fall back to ANY cached data for this group (even old dates)
-        async with aiosqlite.connect(DB_PATH) as db:
-            async with db.execute(
-                "SELECT data FROM schedule WHERE group_name = ? ORDER BY date DESC LIMIT 1", 
-                (cache_key,)
-            ) as cursor:
-                row = await cursor.fetchone()
-                if row:
-                    logger.info(f"Serving stale cache for {cache_key}")
-                    return JSONResponse({"status": "success", "data": json.loads(row[0])})
-        return JSONResponse(
-            status_code=500, 
-            content={"status": "error", "message": "Schedule temporarily unavailable. Try again later."}
-        )
+        logger.error(f"Emergency fetch failed: {e}")
+    
+    return JSONResponse(
+        status_code=503, 
+        content={"status": "error", "message": "Schedule temporarily unavailable. Try again in a minute."}
+    )
 
 @app.get("/api/groups")
 async def get_groups(request: Request, background_tasks: BackgroundTasks) -> JSONResponse:
-    global cached_groups_list, last_groups_fetch
-    import time
-    now = time.time()
+    if not cached_groups_list:
+        await refresh_raw_data()
     
-    if not cached_groups_list or (now - last_groups_fetch > 3600):
-        try:
-            raw_data = await asyncio.to_thread(fetch_schedule_sync)
-            if raw_data:
-                raw_groups = []
-                for k in raw_data.keys():
-                    if str(k).strip():
-                        parts = str(k).replace('/', '|').replace(',', '|').split('|')
-                        for part in parts:
-                            clean = part.strip()
-                            if clean:
-                                raw_groups.append(clean)
-                cached_groups_list = sorted(list(set(raw_groups)))
-                last_groups_fetch = now
-        except Exception as e:
-            logger.error(f"Failed to fetch groups: {e}")
-            if not cached_groups_list:
-                return JSONResponse(status_code=500, content={"status": "error", "message": "Could not fetch groups"})
+    if not cached_groups_list:
+        return JSONResponse(status_code=503, content={"status": "error", "message": "Groups temporarily unavailable"})
     
     ua = request.headers.get("user-agent", "")
     background_tasks.add_task(analytics.log_request, None, "", "/api/groups", ua)
