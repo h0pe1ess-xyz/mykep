@@ -1,8 +1,0 @@
-=== MyKep API Statistics ===
-Updated: 2026-09-11 13:28:30
-------------------------
-Unique Users: 4
-Total API Requests: 85
-------------------------
-Group Popularity:
-  - ПІ-24-02: 85 requests
