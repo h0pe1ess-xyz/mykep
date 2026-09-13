@@ -8,13 +8,15 @@ async function fetchSchedule() {
         const response = await fetch(`/api/schedule?group=${encodeURIComponent(group)}&duration1=${duration1}&duration2=${duration2}&uid=${uid}`);
         const result = await response.json();
         
-        if (result.status === "success") {
+        if (result.status === "success" && result.data) {
             localStorage.setItem('mykep_schedule', JSON.stringify(result.data));
             return result.data;
         } else {
+            console.warn('API returned error:', result.message);
             return fallbackCache();
         }
     } catch (error) {
+        console.warn('Fetch failed:', error);
         return fallbackCache();
     }
 }

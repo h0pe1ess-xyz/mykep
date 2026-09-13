@@ -56,12 +56,23 @@ async def init_db() -> None:
 
 def fetch_schedule_sync() -> Dict[str, Any]:
     scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
-    response = scraper.get(URL, timeout=15)
-    response.raise_for_status() 
-    match = re.search(r'normalizeScheduleGroups\s*\(\s*\{', response.text)
-    if match:
-        return chompjs.parse_js_object(response.text[match.end() - 1:])
-    raise ValueError("Failed to locate schedule data in page source.")
+    last_error = None
+    for attempt in range(3):
+        try:
+            timeout = 15 + attempt * 10
+            response = scraper.get(URL, timeout=timeout)
+            response.raise_for_status()
+            match = re.search(r'normalizeScheduleGroups\s*\(\s*\{', response.text)
+            if match:
+                return chompjs.parse_js_object(response.text[match.end() - 1:])
+            raise ValueError("Failed to locate schedule data in page source.")
+        except Exception as e:
+            last_error = e
+            logger.warning(f"KEP fetch attempt {attempt+1}/3 failed: {e}")
+            if attempt < 2:
+                import time
+                time.sleep(2)
+    raise last_error
 
 def get_academic_week(target_date: date) -> int:
     base_monday = date(2026, 8, 31)
@@ -223,9 +234,19 @@ async def get_schedule(
         )
     except Exception as e:
         logger.error(f"Error parsing schedule: {traceback.format_exc()}")
+        # Fall back to ANY cached data for this group (even old dates)
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute(
+                "SELECT data FROM schedule WHERE group_name = ? ORDER BY date DESC LIMIT 1", 
+                (cache_key,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    logger.info(f"Serving stale cache for {cache_key}")
+                    return JSONResponse({"status": "success", "data": json.loads(row[0])})
         return JSONResponse(
             status_code=500, 
-            content={"status": "error", "message": str(e)}
+            content={"status": "error", "message": "Schedule temporarily unavailable. Try again later."}
         )
 
 @app.get("/api/groups")
