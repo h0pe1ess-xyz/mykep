@@ -6,8 +6,8 @@ function initSettings() {
     const duration2Desc = document.getElementById('duration2-desc');
     const resetDurationBtn = document.getElementById('reset-duration-btn');
 
-    const savedDuration1 = localStorage.getItem('mykep_duration1') || '80'; 
-    const savedDuration2 = localStorage.getItem('mykep_duration2') || '60'; 
+    const savedDuration1 = storage.get('mykep_duration1') || '80'; 
+    const savedDuration2 = storage.get('mykep_duration2') || '60'; 
 
     if (duration1Toggle) {
         if (savedDuration1 === '80') duration1Toggle.classList.add('active');
@@ -21,6 +21,14 @@ function initSettings() {
     }
     if (duration2Desc) duration2Desc.innerText = `Поточна: ${savedDuration2} хвилин`;
 
+    [duration1Toggle, duration2Toggle].forEach(toggle => {
+        if (toggle) toggle.setAttribute('aria-checked', String(toggle.classList.contains('active')));
+    });
+    const installHelp = document.getElementById('show-install-help');
+    if (installHelp) {
+        if (isPWA()) { installHelp.textContent = 'Встановлено'; installHelp.disabled = true; }
+        else installHelp.onclick = () => showPWAGuide(true);
+    }
     initGroupModal();
 
     const confirmModal = document.getElementById('confirm-modal');
@@ -59,8 +67,8 @@ function initSettings() {
 
     function confirmDurationChange(callback) {
         showConfirmModal(
-            "Увага!", 
-            "Це рекомендовані настройки MyKep.<br>Так як у нас пари зараз проходять іменно в такому форматі, краще тут нічого не міняти<br><br>Чи точно ви хочете змінити це?", 
+            "Зміна тривалості занять", 
+            "Рекомендована тривалість занять: 80 хвилин для першої зміни та 60 хвилин для другої.<br><br>Зміна цих параметрів вплине на час початку й завершення пар та роботу таймера в MyKep. Офіційний розклад коледжу при цьому не зміниться.<br><br>Змінюйте тривалість лише тоді, коли для вашої групи діє інший розклад дзвінків. Продовжити?", 
             "Змінити", 
             callback
         );
@@ -78,8 +86,8 @@ function initSettings() {
             const performChange = () => {
                 duration1Toggle.classList.toggle('active'); 
                 const newDuration = duration1Toggle.classList.contains('active') ? '80' : '60'; 
-                localStorage.setItem('mykep_duration1', newDuration);
-                localStorage.removeItem('mykep_schedule'); 
+                storage.set('mykep_duration1', newDuration);
+                storage.remove('mykep_schedule'); 
                 window.location.reload();
             };
 
@@ -96,8 +104,8 @@ function initSettings() {
             const performChange = () => {
                 duration2Toggle.classList.toggle('active'); 
                 const newDuration = duration2Toggle.classList.contains('active') ? '80' : '60'; 
-                localStorage.setItem('mykep_duration2', newDuration);
-                localStorage.removeItem('mykep_schedule'); 
+                storage.set('mykep_duration2', newDuration);
+                storage.remove('mykep_schedule'); 
                 window.location.reload();
             };
 
@@ -111,9 +119,9 @@ function initSettings() {
 
     if (resetDurationBtn) {
         resetDurationBtn.addEventListener('click', () => {
-            localStorage.setItem('mykep_duration1', '80');
-            localStorage.setItem('mykep_duration2', '60');
-            localStorage.removeItem('mykep_schedule');
+            storage.set('mykep_duration1', '80');
+            storage.set('mykep_duration2', '60');
+            storage.remove('mykep_schedule');
             window.location.reload();
         });
     }
@@ -125,7 +133,7 @@ function initSettings() {
                 "Видалити збережений розклад? Це змусить додаток завантажити розклад з сервера заново.",
                 "Видалити",
                 () => {
-                    localStorage.removeItem('mykep_schedule');
+                    storage.remove('mykep_schedule');
                     window.location.reload();
                 }
             );
@@ -144,36 +152,40 @@ function initGroupModal() {
     if (!modal || !openBtn || !closeBtn || !searchInput || !groupList) return;
 
     let groupsData = [];
-    const savedGroup = localStorage.getItem('mykep_group') || 'ПІ-24-02';
+    const savedGroup = storage.get('mykep_group') || 'ПІ-24-02';
     
     if (currentGroupDisplay) {
         currentGroupDisplay.innerText = `Поточна: ${savedGroup}`;
     }
 
     async function loadGroups() {
+        groupList.textContent = 'Завантаження груп…';
         try {
-            const resp = await fetch('/api/groups');
-            const data = await resp.json();
-            if (data.status === 'success') {
-                groupsData = data.data;
-                renderGroups(groupsData);
-            }
-        } catch (e) {
-            console.error('Failed to load groups', e);
+            groupsData = await fetchGroups();
+            renderGroups(groupsData.filter(g => g.toLowerCase().includes(searchInput.value.toLowerCase().trim())));
+        } catch (_) {
+            groupList.textContent = 'Не вдалося завантажити групи. ';
+            const retry = document.createElement('button');
+            retry.className = 'settings-btn';
+            retry.textContent = 'Спробувати ще раз';
+            retry.onclick = loadGroups;
+            groupList.appendChild(retry);
         }
     }
 
     function renderGroups(list) {
         groupList.innerHTML = '';
+        if (!list.length) groupList.textContent = 'Груп не знайдено. Спробуйте інший запит.';
         list.forEach(grp => {
-            const div = document.createElement('div');
+            const div = document.createElement('button');
+            div.type = 'button';
             div.className = 'modal-item';
             if (grp === savedGroup) div.classList.add('selected');
             div.innerText = grp;
             div.addEventListener('click', () => {
                 if (grp !== savedGroup) {
-                    localStorage.setItem('mykep_group', grp);
-                    localStorage.removeItem('mykep_schedule');
+                    storage.set('mykep_group', grp);
+                    storage.remove('mykep_schedule');
                     window.location.reload();
                 } else {
                     modal.classList.remove('active');
@@ -210,7 +222,7 @@ function checkOnboarding() {
     const mainApp = document.getElementById('main-app');
     if (!onboarding) return false;
 
-    if (localStorage.getItem('mykep_onboarded') === 'true') {
+    if (storage.get('mykep_onboarded') === 'true') {
         onboarding.style.display = 'none';
         if (mainApp) mainApp.style.opacity = '1';
         return false;
@@ -224,16 +236,94 @@ window.obNextSlide = function(step) {
     document.querySelectorAll('.onboarding-slide').forEach(el => el.classList.remove('active'));
     const nextSlide = document.getElementById('ob-slide-' + step);
     if (nextSlide) nextSlide.classList.add('active');
+    if (step === 3) initOnboardingGroups();
+}
+
+let onboardingGroups = [];
+let onboardingGroupsLoaded = false;
+let onboardingGroupsLoading = false;
+let onboardingSelectedGroup = '';
+
+function renderOnboardingGroups() {
+    const search = document.getElementById('ob-group-search');
+    const list = document.getElementById('ob-group-options');
+    const query = search.value.toLocaleLowerCase('uk').trim();
+    const groups = onboardingGroups.filter(group => group.toLocaleLowerCase('uk').includes(query));
+    list.replaceChildren();
+    groups.forEach(group => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'modal-item';
+        button.textContent = group;
+        button.setAttribute('aria-pressed', String(group === onboardingSelectedGroup));
+        if (group === onboardingSelectedGroup) button.classList.add('selected');
+        button.onclick = () => {
+            onboardingSelectedGroup = group;
+            document.getElementById('ob-group-value').textContent = group;
+            document.getElementById('ob-group-picker').open = false;
+            document.getElementById('ob-group-status').textContent = '';
+            search.value = '';
+            renderOnboardingGroups();
+            document.getElementById('ob-group-select').focus();
+        };
+        list.appendChild(button);
+    });
+    if (!groups.length && onboardingGroupsLoaded) {
+        const empty = document.createElement('p');
+        empty.className = 'help-text';
+        empty.textContent = 'Груп не знайдено. Спробуйте інший пошук.';
+        list.appendChild(empty);
+    }
+}
+
+async function initOnboardingGroups(force = false) {
+    const picker = document.getElementById('ob-group-picker');
+    const search = document.getElementById('ob-group-search');
+    const status = document.getElementById('ob-group-status');
+    const retry = document.getElementById('ob-group-retry');
+    if (!picker || onboardingGroupsLoading || (onboardingGroupsLoaded && !force)) return;
+    onboardingGroupsLoading = true;
+    search.disabled = true;
+    status.textContent = 'Завантаження груп…';
+    retry.hidden = true;
+    search.oninput = renderOnboardingGroups;
+    picker.onkeydown = event => {
+        if (event.key === 'Escape') {
+            picker.open = false;
+            document.getElementById('ob-group-select').focus();
+        }
+    };
+    // Do not auto-focus search: opening the list should not raise the iPhone keyboard.
+    retry.onclick = () => initOnboardingGroups(true);
+    try {
+        onboardingGroups = await fetchGroups(force);
+        if (!onboardingGroups.length) throw new Error('Empty group list');
+        onboardingGroupsLoaded = true;
+        search.disabled = false;
+        status.textContent = '';
+        renderOnboardingGroups();
+    } catch (_) {
+        status.textContent = 'Не вдалося завантажити групи. Спробуйте ще раз.';
+        retry.hidden = false;
+    } finally { onboardingGroupsLoading = false; }
 }
 
 window.obFinish = function() {
-    const groupInput = document.getElementById('ob-group-input');
-    const groupValue = groupInput && groupInput.value.trim() ? groupInput.value.trim() : 'ПІ-24-02';
-    localStorage.setItem('mykep_group', groupValue.toUpperCase());
-    localStorage.setItem('mykep_duration1', '80');
-    localStorage.setItem('mykep_duration2', '60');
-    localStorage.setItem('mykep_onboarded', 'true');
-    localStorage.removeItem('mykep_schedule');
-    
-    window.location.reload(); 
-}
+    const status = document.getElementById('ob-group-status');
+    const group = onboardingSelectedGroup;
+    if (!onboardingGroupsLoaded || !onboardingGroups.includes(group)) {
+        status.textContent = onboardingGroupsLoading ? 'Зачекайте, групи завантажуються…' : 'Оберіть вашу групу зі списку.';
+        document.getElementById('ob-group-picker').open = true;
+        document.getElementById('ob-group-select').focus();
+        return;
+    }
+    if (!storage.set('mykep_group', group)) {
+        status.textContent = 'Браузер заборонив збереження даних. Дозвольте сховище для цього сайту або відкрийте його в іншому браузері.';
+        return;
+    }
+    storage.set('mykep_duration1', '80');
+    storage.set('mykep_duration2', '60');
+    storage.set('mykep_onboarded', 'true');
+    storage.remove('mykep_schedule');
+    window.location.reload();
+};

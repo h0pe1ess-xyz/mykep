@@ -1,0 +1,11 @@
+{
+  "scope": "synthetic service-layer + real temporary SQLite; no HTTP, upstream, Telegram or browser",
+  "concurrent_tasks": 200,
+  "operations": 2000,
+  "groups": 200,
+  "elapsed_including_flush_s": 0.639,
+  "build_errors": 0,
+  "persisted_views": 2000,
+  "unique_test_users": 200,
+  "dropped_events": 0
+}

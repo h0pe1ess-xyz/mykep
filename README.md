@@ -1,10 +1,16 @@
+> **iOS PWA navbar patch 2.6.2:** [опис та перевірка на iPhone](docs/NAVBAR_2.6.2_UK.md). Результат на фізичному iPhone ще не підтверджено; інший інтерфейс збережено з 2.6.1.
+
+> **UI hotfix 2.6.1:** спрощено початковий екран і вибір групи, змінено розміщення навбара. Опис і обмеження перевірок: [docs/HOTFIX_2.6.1_UK.md](docs/HOTFIX_2.6.1_UK.md). Серверна основа — 2.6.0.
+
+> **Оновлення 2.6.0:** збережений дизайн, вибір групи зі списку, адаптація малих екранів, PWA/Telegram-підказки, новий кеш і стабілізація статистики. Деталі: [зміни](CHANGELOG_UK.md), [перевірки та обмеження](docs/QA_UK.md), [розгортання](docs/DEPLOYMENT_UK.md). Архів не містить робочої бази, `.env` або `.venv`. GitHub push не дорівнює розгортанню VPS.
+
 <div align="center">
   <img alt="mykep" src="https://github.com/user-attachments/assets/58265975-c92d-46bf-bcec-cd4ea7f56cad" width="80" height="80" />
   <h1>MyKep 🎓</h1>
   <p><strong>PWA-клієнт розкладу для студентів ВСП «ФКЕП ІФНТУНГ» з підтримкою офлайн-режиму</strong></p>
   
   <p>
-    <img src="https://img.shields.io/badge/Python-3.12+-blue.svg?logo=python&logoColor=white" alt="Python">
+    <img src="https://img.shields.io/badge/Python-3.11+-blue.svg?logo=python&logoColor=white" alt="Python">
     <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI">
     <img src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white" alt="SQLite">
     <img src="https://img.shields.io/badge/PWA-5A0FC8?logo=pwa&logoColor=white" alt="PWA">
@@ -38,7 +44,7 @@
 
 ### Frontend & PWA
 * **Автономний режим:** завдяки Service Worker (`sw.js`) та `localStorage` збережений розклад залишається доступним за повної відсутності мережі
-* **Оптимізація під мобільні платформи:** адаптація під системні вирізи Safe Area на iOS та Android, тематизація статус-бара і робота в режимі SPA без зайвих перезавантажень
+* **Оптимізація під мобільні платформи:** адаптація під системні вирізи Safe Area на iOS та Android, тематизація статус-бара і багатосторінковий інтерфейс зі спільним кешем ресурсів
 * **Інтерфейс:** темна тема, плавні переходи та компактне відображення розкладу на поточний день і тиждень
 
 ---

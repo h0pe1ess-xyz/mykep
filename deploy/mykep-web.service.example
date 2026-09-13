@@ -1,0 +1,23 @@
+[Unit]
+Description=MyKep web service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mykep
+Group=mykep
+WorkingDirectory=/srv/mykep
+EnvironmentFile=/srv/mykep/.env
+# This template uses a separate bot service. For embedded mode, remove this
+# override, set BOT_MODE=embedded in .env and DO NOT start mykep-bot.service.
+Environment=BOT_MODE=external
+ExecStart=/srv/mykep/.venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000 --workers 1 --timeout-graceful-shutdown 45 --no-access-log
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=50
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

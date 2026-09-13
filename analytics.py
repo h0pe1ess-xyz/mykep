@@ -1,243 +1,207 @@
-import aiosqlite
+"""Anonymous schedule-view counters. A bounded queue prevents per-request SQLite writers."""
+import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
-from pathlib import Path
+
+from config import KYIV
+from database import connect
 
 logger = logging.getLogger(__name__)
+_queue = None
+_writer = None
+_dropped = 0
+_last_write_error = False
 
-DB_PATH = str(Path(__file__).resolve().parent / "schedule.db")
 
-
-async def init_analytics_db() -> None:
-    """Create the analytics table if it doesn't exist."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute('''
-            CREATE TABLE IF NOT EXISTS analytics (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT NOT NULL,
-                uid TEXT,
-                group_name TEXT,
-                endpoint TEXT,
-                user_agent TEXT
-            )
-        ''')
-        await db.execute('''
-            CREATE INDEX IF NOT EXISTS idx_analytics_timestamp 
-            ON analytics(timestamp)
-        ''')
-        await db.execute('''
-            CREATE INDEX IF NOT EXISTS idx_analytics_uid 
-            ON analytics(uid)
-        ''')
+async def init_analytics_db():
+    async with connect() as db:
+        await db.execute('''CREATE TABLE IF NOT EXISTS analytics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL,
+            uid TEXT, group_name TEXT, endpoint TEXT, user_agent TEXT)''')
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_analytics_timestamp ON analytics(timestamp)')
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_analytics_uid ON analytics(uid)')
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_analytics_group ON analytics(group_name)')
+        await db.execute('''CREATE TABLE IF NOT EXISTS bot_reports (
+            report_date TEXT NOT NULL, admin_id INTEGER NOT NULL,
+            PRIMARY KEY (report_date, admin_id))''')
         await db.commit()
-    logger.info("Analytics DB initialized.")
 
 
-async def log_request(
-    uid: Optional[str],
-    group_name: str,
-    endpoint: str,
-    user_agent: str = ""
-) -> None:
-    """Log a single API request to the analytics table."""
+async def start_writer():
+    global _queue, _writer, _dropped, _last_write_error
+    if _writer and not _writer.done():
+        return
+    _queue = asyncio.Queue(maxsize=10000)
+    _dropped = 0
+    _last_write_error = False
+    _writer = asyncio.create_task(_write_loop(), name='analytics-writer')
+
+
+def record_request(uid, group_name, endpoint, user_agent=''):
+    global _dropped
+    row = (datetime.now(KYIV).strftime('%Y-%m-%d %H:%M:%S'),
+           str(uid or '')[:128], str(group_name).strip().upper()[:64],
+           str(endpoint)[:64], str(user_agent)[:512])
     try:
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                "INSERT INTO analytics (timestamp, uid, group_name, endpoint, user_agent) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (now, uid or "", group_name, endpoint, user_agent)
-            )
-            await db.commit()
-    except Exception as e:
-        logger.warning(f"Failed to log analytics: {e}")
+        if _queue is None:
+            raise asyncio.QueueFull
+        _queue.put_nowait(row)
+    except asyncio.QueueFull:
+        _dropped += 1
+        if _dropped == 1 or _dropped % 100 == 0:
+            logger.warning('Analytics queue unavailable/full: %s events dropped', _dropped)
 
 
-def _parse_platform(ua: str) -> str:
-    """Determine platform from user-agent string."""
-    ua_lower = ua.lower()
-    if "iphone" in ua_lower or "ipad" in ua_lower:
-        return "iOS"
-    if "android" in ua_lower:
-        return "Android"
-    if "macintosh" in ua_lower or "mac os" in ua_lower:
-        return "macOS"
-    if "windows" in ua_lower:
-        return "Windows"
-    if "linux" in ua_lower:
-        return "Linux"
-    return "Other"
+async def log_request(uid, group_name, endpoint, user_agent=''):
+    """Compatibility wrapper for integrations using the previous async API."""
+    record_request(uid, group_name, endpoint, user_agent)
 
 
-async def get_today_stats() -> Dict[str, Any]:
-    """Get today's summary: requests, unique users, top groups."""
-    today = datetime.now().strftime("%Y-%m-%d")
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
+async def _write_loop():
+    global _last_write_error, _dropped
+    while True:
+        first = await _queue.get()
+        if first is None:
+            _queue.task_done()
+            return
+        batch = [first]
+        # Small batching window turns a traffic burst into a handful of commits.
+        await asyncio.sleep(0.05)
+        stopping = False
+        while len(batch) < 200:
+            try:
+                item = _queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+            if item is None:
+                _queue.task_done()
+                stopping = True
+                break
+            batch.append(item)
+        for attempt in range(3):
+            try:
+                async with connect() as db:
+                    await db.executemany('INSERT INTO analytics (timestamp, uid, group_name, endpoint, user_agent) VALUES (?, ?, ?, ?, ?)', batch)
+                    await db.commit()
+                _last_write_error = False
+                break
+            except Exception as exc:
+                _last_write_error = True
+                logger.warning('Analytics batch write failed (%s)', type(exc).__name__)
+                if attempt == 2:
+                    _dropped += len(batch)
+                else:
+                    await asyncio.sleep(0.2 * (attempt + 1))
+        for _ in batch:
+            _queue.task_done()
+        if stopping:
+            return
 
-        row = await db.execute_fetchall(
-            "SELECT COUNT(*) as cnt FROM analytics WHERE timestamp LIKE ?",
-            (f"{today}%",)
-        )
-        total_requests = row[0][0] if row else 0
 
-        row = await db.execute_fetchall(
-            "SELECT COUNT(DISTINCT uid) as cnt FROM analytics "
-            "WHERE timestamp LIKE ? AND uid != ''",
-            (f"{today}%",)
-        )
-        unique_users = row[0][0] if row else 0
-
-        rows = await db.execute_fetchall(
-            "SELECT group_name, COUNT(*) as cnt FROM analytics "
-            "WHERE timestamp LIKE ? AND group_name != '' "
-            "GROUP BY group_name ORDER BY cnt DESC LIMIT 5",
-            (f"{today}%",)
-        )
-        top_groups = [(r[0], r[1]) for r in rows]
-
-    return {
-        "date": today,
-        "total_requests": total_requests,
-        "unique_users": unique_users,
-        "top_groups": top_groups
-    }
+async def stop_writer():
+    global _writer, _queue
+    if _writer and not _writer.done():
+        try:
+            await asyncio.wait_for(_queue.put(None), timeout=5)
+            await asyncio.wait_for(asyncio.shield(_writer), timeout=25)
+        except asyncio.TimeoutError:
+            logger.warning('Analytics shutdown timed out; pending events may be lost')
+            _writer.cancel()
+            await asyncio.gather(_writer, return_exceptions=True)
+    _writer = None
+    _queue = None
 
 
-async def get_week_stats() -> List[Dict[str, Any]]:
-    """Get daily breakdown for the last 7 days."""
-    results = []
+def writer_status():
+    return {'running': bool(_writer and not _writer.done()),
+            'pending': _queue.qsize() if _queue else 0,
+            'dropped': _dropped, 'write_error': _last_write_error}
+
+
+async def _rows(query, params=()):
+    async with connect() as db:
+        return await db.execute_fetchall(query, params)
+
+
+def _today():
+    return datetime.now(KYIV).strftime('%Y-%m-%d')
+
+
+def _next_day(day):
+    return (datetime.strptime(day, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+
+
+# Old /api/groups rows are intentionally excluded from reports, not deleted.
+VIEWS = "endpoint = '/api/schedule'"
+
+
+async def get_today_stats():
+    today = _today()
+    params = (today, _next_day(today))
+    counts = (await _rows(f"SELECT COUNT(*), COUNT(DISTINCT NULLIF(uid, '')) FROM analytics WHERE {VIEWS} AND timestamp >= ? AND timestamp < ?", params))[0]
+    groups = await _rows(f"SELECT group_name, COUNT(*) AS cnt FROM analytics WHERE {VIEWS} AND timestamp >= ? AND timestamp < ? AND group_name != '' GROUP BY group_name ORDER BY cnt DESC LIMIT 5", params)
+    return {'date': today, 'total_requests': counts[0], 'unique_users': counts[1], 'top_groups': groups}
+
+
+async def get_week_stats():
+    today = datetime.now(KYIV).date()
+    start = (today - timedelta(days=6)).isoformat()
+    rows = await _rows(f"SELECT SUBSTR(timestamp,1,10), COUNT(*), COUNT(DISTINCT NULLIF(uid,'')) FROM analytics WHERE {VIEWS} AND timestamp >= ? AND timestamp < ? GROUP BY SUBSTR(timestamp,1,10)", (start, (today + timedelta(days=1)).isoformat()))
+    by_day = {r[0]: r[1:] for r in rows}
+    result = []
     for i in range(6, -1, -1):
-        day = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
-        async with aiosqlite.connect(DB_PATH) as db:
-            row = await db.execute_fetchall(
-                "SELECT COUNT(*) FROM analytics WHERE timestamp LIKE ?",
-                (f"{day}%",)
-            )
-            requests = row[0][0] if row else 0
-
-            row = await db.execute_fetchall(
-                "SELECT COUNT(DISTINCT uid) FROM analytics "
-                "WHERE timestamp LIKE ? AND uid != ''",
-                (f"{day}%",)
-            )
-            users = row[0][0] if row else 0
-
-        results.append({"date": day, "requests": requests, "users": users})
-    return results
+        day = (today - timedelta(days=i)).isoformat()
+        requests, users = by_day.get(day, (0, 0))
+        result.append({'date': day, 'requests': requests, 'users': users})
+    return result
 
 
-async def get_top_groups(limit: int = 10) -> List[tuple]:
-    """Get top groups by total request count (all time)."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        rows = await db.execute_fetchall(
-            "SELECT group_name, COUNT(*) as cnt FROM analytics "
-            "WHERE group_name != '' "
-            "GROUP BY group_name ORDER BY cnt DESC LIMIT ?",
-            (limit,)
-        )
-    return [(r[0], r[1]) for r in rows]
+async def get_top_groups(limit=10):
+    return await _rows(f"SELECT group_name, COUNT(*) AS cnt FROM analytics WHERE {VIEWS} AND group_name != '' GROUP BY group_name ORDER BY cnt DESC LIMIT ?", (max(1, min(limit, 50)),))
 
 
-async def get_user_counts() -> Dict[str, int]:
-    """Get unique user counts for different periods."""
-    now = datetime.now()
-    today = now.strftime("%Y-%m-%d")
-    week_ago = (now - timedelta(days=7)).strftime("%Y-%m-%d")
-    month_ago = (now - timedelta(days=30)).strftime("%Y-%m-%d")
-
-    async with aiosqlite.connect(DB_PATH) as db:
-        row = await db.execute_fetchall(
-            "SELECT COUNT(DISTINCT uid) FROM analytics "
-            "WHERE timestamp LIKE ? AND uid != ''",
-            (f"{today}%",)
-        )
-        dau = row[0][0] if row else 0
-
-        row = await db.execute_fetchall(
-            "SELECT COUNT(DISTINCT uid) FROM analytics "
-            "WHERE timestamp >= ? AND uid != ''",
-            (week_ago,)
-        )
-        wau = row[0][0] if row else 0
-
-        row = await db.execute_fetchall(
-            "SELECT COUNT(DISTINCT uid) FROM analytics "
-            "WHERE timestamp >= ? AND uid != ''",
-            (month_ago,)
-        )
-        mau = row[0][0] if row else 0
-
-        row = await db.execute_fetchall(
-            "SELECT COUNT(DISTINCT uid) FROM analytics WHERE uid != ''"
-        )
-        total = row[0][0] if row else 0
-
-    return {"dau": dau, "wau": wau, "mau": mau, "total": total}
+async def get_user_counts():
+    now = datetime.now(KYIV)
+    # Rolling 7/30-day windows; DAU uses the Kyiv calendar day.
+    bounds = (_today(), (now-timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S'), (now-timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S'))
+    row = (await _rows(f"""SELECT
+        COUNT(DISTINCT CASE WHEN timestamp >= ? THEN NULLIF(uid,'') END),
+        COUNT(DISTINCT CASE WHEN timestamp >= ? THEN NULLIF(uid,'') END),
+        COUNT(DISTINCT CASE WHEN timestamp >= ? THEN NULLIF(uid,'') END),
+        COUNT(DISTINCT NULLIF(uid,'')) FROM analytics WHERE {VIEWS}""", bounds))[0]
+    return dict(zip(('dau', 'wau', 'mau', 'total'), row))
 
 
-async def get_hourly_activity() -> List[Dict[str, Any]]:
-    """Get request counts per hour for today."""
-    today = datetime.now().strftime("%Y-%m-%d")
-    async with aiosqlite.connect(DB_PATH) as db:
-        rows = await db.execute_fetchall(
-            "SELECT SUBSTR(timestamp, 12, 2) as hour, COUNT(*) as cnt "
-            "FROM analytics WHERE timestamp LIKE ? "
-            "GROUP BY hour ORDER BY hour",
-            (f"{today}%",)
-        )
-    return [{"hour": f"{r[0]}:00", "requests": r[1]} for r in rows]
+async def get_hourly_activity():
+    rows = await _rows(f"SELECT SUBSTR(timestamp,12,2), COUNT(*) FROM analytics WHERE {VIEWS} AND timestamp >= ? AND timestamp < ? GROUP BY SUBSTR(timestamp,12,2) ORDER BY 1", (_today(), _next_day(_today())))
+    return [{'hour': f'{r[0]}:00', 'requests': r[1]} for r in rows]
 
 
-async def get_platform_breakdown() -> List[Dict[str, Any]]:
-    """Get platform breakdown from user-agent data (all time)."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        rows = await db.execute_fetchall(
-            "SELECT user_agent FROM analytics WHERE user_agent != ''"
-        )
-
-    platforms: Dict[str, int] = {}
-    for row in rows:
-        platform = _parse_platform(row[0])
-        platforms[platform] = platforms.get(platform, 0) + 1
-
-    total = sum(platforms.values()) or 1
-    result = sorted(platforms.items(), key=lambda x: x[1], reverse=True)
-    return [
-        {"platform": p, "count": c, "percent": round(c / total * 100, 1)}
-        for p, c in result
-    ]
+async def get_platform_breakdown():
+    # Aggregate in SQL: don't load every historical User-Agent into Python.
+    rows = await _rows(f"""SELECT CASE
+      WHEN LOWER(user_agent) LIKE '%iphone%' OR LOWER(user_agent) LIKE '%ipad%' THEN 'iOS'
+      WHEN LOWER(user_agent) LIKE '%android%' THEN 'Android'
+      WHEN LOWER(user_agent) LIKE '%macintosh%' OR LOWER(user_agent) LIKE '%mac os%' THEN 'macOS'
+      WHEN LOWER(user_agent) LIKE '%windows%' THEN 'Windows'
+      WHEN LOWER(user_agent) LIKE '%linux%' THEN 'Linux' ELSE 'Other' END AS platform,
+      COUNT(*) AS cnt FROM analytics WHERE {VIEWS} AND user_agent != '' GROUP BY platform ORDER BY cnt DESC""")
+    total = sum(r[1] for r in rows) or 1
+    return [{'platform': r[0], 'count': r[1], 'percent': round(r[1]/total*100, 1)} for r in rows]
 
 
-async def get_live_activity(minutes: int = 60) -> Dict[str, Any]:
-    """Get activity for the last N minutes."""
-    cutoff = (datetime.now() - timedelta(minutes=minutes)).strftime("%Y-%m-%d %H:%M:%S")
-    async with aiosqlite.connect(DB_PATH) as db:
-        row = await db.execute_fetchall(
-            "SELECT COUNT(*) FROM analytics WHERE timestamp >= ?",
-            (cutoff,)
-        )
-        requests = row[0][0] if row else 0
+async def get_live_activity(minutes=60):
+    cutoff = (datetime.now(KYIV)-timedelta(minutes=minutes)).strftime('%Y-%m-%d %H:%M:%S')
+    counts = (await _rows(f"SELECT COUNT(*), COUNT(DISTINCT NULLIF(uid,'')) FROM analytics WHERE {VIEWS} AND timestamp >= ?", (cutoff,)))[0]
+    top = await _rows(f"SELECT group_name, COUNT(*) AS cnt FROM analytics WHERE {VIEWS} AND timestamp >= ? AND group_name != '' GROUP BY group_name ORDER BY cnt DESC LIMIT 3", (cutoff,))
+    return {'period_minutes': minutes, 'requests': counts[0], 'unique_users': counts[1], 'top_groups': top}
 
-        row = await db.execute_fetchall(
-            "SELECT COUNT(DISTINCT uid) FROM analytics "
-            "WHERE timestamp >= ? AND uid != ''",
-            (cutoff,)
-        )
-        users = row[0][0] if row else 0
 
-        rows = await db.execute_fetchall(
-            "SELECT group_name, COUNT(*) as cnt FROM analytics "
-            "WHERE timestamp >= ? AND group_name != '' "
-            "GROUP BY group_name ORDER BY cnt DESC LIMIT 3",
-            (cutoff,)
-        )
-        top = [(r[0], r[1]) for r in rows]
+async def report_sent(day, admin_id):
+    return bool(await _rows('SELECT 1 FROM bot_reports WHERE report_date=? AND admin_id=?', (day, admin_id)))
 
-    return {
-        "period_minutes": minutes,
-        "requests": requests,
-        "unique_users": users,
-        "top_groups": top
-    }
+
+async def mark_report_sent(day, admin_id):
+    async with connect() as db:
+        await db.execute('INSERT OR IGNORE INTO bot_reports VALUES (?, ?)', (day, admin_id))
+        await db.commit()

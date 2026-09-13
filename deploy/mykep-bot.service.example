@@ -1,0 +1,20 @@
+[Unit]
+Description=MyKep statistics bot (single poller)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mykep
+Group=mykep
+WorkingDirectory=/srv/mykep
+EnvironmentFile=/srv/mykep/.env
+ExecStart=/srv/mykep/.venv/bin/python bot.py
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=45
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

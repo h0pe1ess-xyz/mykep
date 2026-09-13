@@ -1,4 +1,5 @@
 function updateTimerDisplay(percentage) {
+    percentage = Math.max(0, Math.min(100, percentage));
     const arc = document.getElementById('progress-arc');
     const knob = document.getElementById('timer-knob');
     if (!arc || !knob) return; 
@@ -31,7 +32,7 @@ function renderDashboard(schedule) {
         return; 
     }
 
-    const now = new Date();
+    const now = getKyivNow();
     const currentMins = now.getHours() * 60 + now.getMinutes();
     let currentLesson = null, nextLesson = null;
 
@@ -44,7 +45,7 @@ function renderDashboard(schedule) {
         const start = timeToMins(startStr);
         const end = timeToMins(endStr);
 
-        if (currentMins >= start && currentMins <= end) {
+        if (currentMins >= start && currentMins < end) {
             currentLesson = { ...lesson, start, end };
             nextLesson = schedule[i + 1] || null;
             break;
@@ -54,7 +55,9 @@ function renderDashboard(schedule) {
         }
     }
 
+    if (nextCard) nextCard.style.display = "";
     if (currentLesson) {
+        if (currentCard) currentCard.style.display = "";
         const totalDuration = currentLesson.end - currentLesson.start;
         const passedTime = currentMins - currentLesson.start;
         const minutesLeft = totalDuration - passedTime;
@@ -62,7 +65,7 @@ function renderDashboard(schedule) {
 
         updateTimerDisplay(progressPercent);
         if (gaugeMain) gaugeMain.innerHTML = `${minutesLeft}<span class="timer-unit">хв</span>`;
-        if (gaugeSub) gaugeSub.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg> Ауд. ${currentLesson.room}`;
+        if (gaugeSub) gaugeSub.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg> Ауд. ${escapeHTML(currentLesson.room)}`;
         if (statusText) statusText.innerText = `Зараз йде ${currentLesson.lesson}-${getLessonSuffix(currentLesson.lesson)} пара, залишайтесь сфокусованими.`;
         
         document.getElementById('current-subject').innerText = currentLesson.subject;

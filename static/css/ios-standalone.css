@@ -1,0 +1,41 @@
+/* iOS Home Screen ONLY. The vertical geometry from 2.6.2 is unchanged.
+ * 2.6.3: make the shell/nav background full-width while keeping the header
+ * and scrollable content at their previous centered width.
+ */
+html.ios-standalone body,
+html.ios-standalone .app-container {
+    height: 100vh;
+    height: 100lvh;
+}
+
+html.ios-standalone .app-container {
+    /* The former max-width:400px also clipped the navigation background. */
+    width: 100%;
+    max-width: none;
+    /* Unchanged from 2.6.2: space for 48px buttons + 20px padding + home inset. */
+    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Keep the same card/header width and horizontal placement as in 2.6.2.
+ * --app-gutter remains 20px, or 16px at the existing small-width breakpoint.
+ * Width includes padding because the existing global box-sizing is border-box.
+ */
+html.ios-standalone .app-container > .app-header,
+html.ios-standalone .app-container > .main-content {
+    width: 100%;
+    max-width: calc(400px - 2 * var(--app-gutter, 20px));
+    align-self: center;
+}
+
+html.ios-standalone .bottom-nav {
+    /* Same vertical positioning and padding as 2.6.2; only its containing
+     * block is now full-width. Existing centered buttons/gap are unchanged.
+     */
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    margin: 0;
+    padding-top: 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+}
