@@ -1,9 +1,3 @@
-> **iOS PWA navbar patch 2.6.2:** [опис та перевірка на iPhone](docs/NAVBAR_2.6.2_UK.md). Результат на фізичному iPhone ще не підтверджено; інший інтерфейс збережено з 2.6.1.
-
-> **UI hotfix 2.6.1:** спрощено початковий екран і вибір групи, змінено розміщення навбара. Опис і обмеження перевірок: [docs/HOTFIX_2.6.1_UK.md](docs/HOTFIX_2.6.1_UK.md). Серверна основа — 2.6.0.
-
-> **Оновлення 2.6.0:** збережений дизайн, вибір групи зі списку, адаптація малих екранів, PWA/Telegram-підказки, новий кеш і стабілізація статистики. Деталі: [зміни](CHANGELOG_UK.md), [перевірки та обмеження](docs/QA_UK.md), [розгортання](docs/DEPLOYMENT_UK.md). Архів не містить робочої бази, `.env` або `.venv`. GitHub push не дорівнює розгортанню VPS.
-
 <div align="center">
   <img alt="mykep" src="https://github.com/user-attachments/assets/58265975-c92d-46bf-bcec-cd4ea7f56cad" width="80" height="80" />
   <h1>MyKep 🎓</h1>
