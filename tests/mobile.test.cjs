@@ -55,7 +55,7 @@ test('cache manifest files all exist and new scripts are precached',()=>{
     const context={self:{addEventListener(){}}};vm.createContext(context);
     vm.runInContext(read('static/sw.js')+'\nthis.shell=APP_SHELL;this.cache=CACHE_NAME;',context);
     for(const url of context.shell) assert.ok(fs.existsSync(path.join(root,'static',url==='/'?'index.html':url.split('?')[0])),url);
-    assert.equal(context.cache,'mykep-cache-v2.6.5-mobile4');
+    assert.equal(context.cache,'mykep-cache-v2.6.5-mobile5');
     for(const name of ['teacher-hints.js','mobile-fit.js','mobile-fit.css'])assert.ok(context.shell.some(s=>s.includes(name)));
 });
 test('all pages load teacher helpers before rendering modules',()=>{

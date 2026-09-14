@@ -1,0 +1,19 @@
+/* Android only. Keep iOS standalone rules exactly as before. */
+html.android-viewport:not(.ios-standalone) body,
+html.android-viewport:not(.ios-standalone) .app-container {
+    height: var(--android-viewport-height, 100vh);
+    max-height: var(--android-viewport-height, 100vh);
+}
+html.android-viewport:not(.ios-standalone) .app-container {
+    /* Space for the entire measured nav, including its existing bottom inset. */
+    padding-bottom: var(--android-nav-height, 68px);
+}
+html.android-viewport:not(.ios-standalone) .app-container > nav.bottom-nav {
+    /* Escape the content grid so long lists cannot displace the navigation. */
+    grid-area: auto;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    margin: 0;
+}

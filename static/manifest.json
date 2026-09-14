@@ -20,7 +20,7 @@
       "purpose": "any"
     },
     {
-      "src": "icons/maskable-512.png",
+      "src": "icons/maskable-orange-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
