@@ -1,0 +1,63 @@
+/* 2.6.5 mobile revision. Existing safe-area values and iOS shell stay intact. */
+/* Definite grid tracks keep long lists from pushing navigation outside the shell. */
+html:not(.ios-standalone) .app-container {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+html:not(.ios-standalone) .app-container > .app-header { grid-area: 1 / 1; }
+html:not(.ios-standalone) .app-container > .schedule-notice { grid-area: 2 / 1; }
+html:not(.ios-standalone) .app-container > main { grid-area: 3 / 1; }
+html:not(.ios-standalone) .app-container > .bottom-nav { grid-area: 4 / 1; }
+html:not(.ios-standalone) .page-schedule .app-container {
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+}
+html:not(.ios-standalone) .page-schedule .app-container > .day-picker { grid-area: 3 / 1; }
+html:not(.ios-standalone) .page-schedule .app-container > main { grid-area: 4 / 1; }
+html:not(.ios-standalone) .page-schedule .app-container > .bottom-nav { grid-area: 5 / 1; }
+.app-container > main { min-width: 0; min-height: 0; }
+.schedule-main { overflow: hidden; }
+.schedule-list { flex: 1 1 0; min-height: 0; }
+/* No scroll chaining to an overflow:hidden ancestor via scrollIntoView. */
+@supports (overflow: clip) {
+    html, body, .app-container { overflow: clip; }
+}
+/* Compact the lower cards, never the timer. Keep subject names as wrapping text. */
+#dashboard-main { overflow: hidden; }
+#dashboard-main .lesson-card-detailed { padding: 16px 18px; }
+#dashboard-main .card-header { margin-bottom: 12px; }
+#dashboard-main .card-body { margin-bottom: 12px; }
+#dashboard-main .card-footer { margin-top: 10px; gap: 4px 8px; }
+#dashboard-main .progress-section { margin-top: 12px; padding-top: 10px; }
+#dashboard-main .lesson-subject { line-height: 1.3; }
+#dashboard-main:not([data-density="0"]) {
+    justify-content: space-evenly; gap: 10px; padding-top: 4px; padding-bottom: 8px;
+}
+#dashboard-main:not([data-density="0"]) .lesson-card-detailed { padding: 12px 16px; }
+#dashboard-main:not([data-density="0"]) .card-header,
+#dashboard-main:not([data-density="0"]) .card-body { margin-bottom: 8px; }
+#dashboard-main:not([data-density="0"]) .card-footer { margin-top: 6px; }
+#dashboard-main:not([data-density="0"]) .progress-section { margin-top: 8px; padding-top: 6px; }
+#dashboard-main:not([data-density="0"]) .progress-bar-container { margin-top: 3px; }
+#dashboard-main[data-density="2"],
+#dashboard-main[data-density="3"],
+#dashboard-main[data-density="4"] { gap: 6px; padding-top: 2px; padding-bottom: 6px; }
+#dashboard-main[data-density="2"] .lesson-card-detailed { padding: 10px 14px; }
+#dashboard-main[data-density="2"] .lesson-subject { font-size: 16px; line-height: 1.25; }
+#dashboard-main[data-density="3"] .lesson-card-detailed { padding: 8px 12px; }
+#dashboard-main[data-density="3"] .lesson-subject { font-size: 15px; line-height: 1.25; }
+#dashboard-main[data-density="4"] .lesson-card-detailed { padding: 6px 10px; }
+#dashboard-main[data-density="4"] .lesson-subject { font-size: 14px; line-height: 1.25; }
+#dashboard-main[data-density="3"] .card-header,
+#dashboard-main[data-density="3"] .card-body,
+#dashboard-main[data-density="4"] .card-header,
+#dashboard-main[data-density="4"] .card-body { margin-bottom: 4px; }
+#dashboard-main[data-density="3"] .card-footer,
+#dashboard-main[data-density="4"] .card-footer { margin-top: 4px; }
+#dashboard-main[data-density="3"] .progress-section,
+#dashboard-main[data-density="4"] .progress-section { margin-top: 6px; padding-top: 4px; }
+#dashboard-main[data-density="4"] .progress-section > .info-label { display: none; }
+/* Teacher names are ordinary text, with natural wrapping and no popup. */
+.teacher-label { color: inherit; font: inherit; line-height: 1.4; overflow-wrap: anywhere; }
+#dashboard-main .lesson-teacher { min-width: 0; flex: 1 1 150px; }
+.teacher-name { min-width: 0; flex: 1 1 180px; }
+.teacher-name > span { min-width: 0; }

@@ -1,10 +1,12 @@
-@import url('css/base.css?v=2.6.4');
-@import url('css/layout.css?v=2.6.4');
-@import url('css/dashboard.css?v=2.6.4');
-@import url('css/schedule.css?v=2.6.4');
-@import url('css/settings.css?v=2.6.4');
-@import url('css/components.css?v=2.6.4');
+@import url('css/base.css?v=2.6.5-mobile4');
+@import url('css/layout.css?v=2.6.5-mobile4');
+@import url('css/dashboard.css?v=2.6.5-mobile4');
+@import url('css/schedule.css?v=2.6.5-mobile4');
+@import url('css/settings.css?v=2.6.5-mobile4');
+@import url('css/components.css?v=2.6.5-mobile4');
 
-@import url('css/responsive.css?v=2.6.4');
+@import url('css/responsive.css?v=2.6.5-mobile4');
 
-@import url('css/ios-standalone.css?v=2.6.4');
+@import url('css/ios-standalone.css?v=2.6.5-mobile4');
+
+@import url('css/mobile-fit.css?v=2.6.5-mobile4');

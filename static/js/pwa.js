@@ -1,6 +1,7 @@
 /* Manual instructions always work; beforeinstallprompt is only an enhancement. */
 let deferredInstallPrompt = null;
 let finishPWAGuide = null;
+let pwaInstalledThisPage = false;
 function isPWA() {
     return window.matchMedia('(display-mode: standalone)').matches ||
         window.matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
@@ -27,12 +28,30 @@ window.addEventListener('beforeinstallprompt', event => {
     event.preventDefault();
     deferredInstallPrompt = event;
     const button = document.getElementById('pwa-install');
-    if (button && !browserContext().embedded) button.hidden = false;
+    if (button && window.isSecureContext && !browserContext().embedded) button.hidden = false;
 });
 window.addEventListener('appinstalled', () => {
     deferredInstallPrompt = null;
-    if (finishPWAGuide) finishPWAGuide();
+    pwaInstalledThisPage = true;
+    // Installation does not turn the current browser tab into a standalone app.
+    updatePWAInstallStatus();
 });
+
+function updatePWAInstallStatus() {
+    const guide = document.getElementById('pwa-guide');
+    if (!guide || !pwaInstalledThisPage) return;
+    const title = guide.querySelector('#pwa-title');
+    const status = guide.querySelector('#pwa-install-status');
+    const instructions = guide.querySelector('.pwa-instructions');
+    const lead = guide.querySelector('#pwa-lead');
+    const install = guide.querySelector('#pwa-install');
+    title.textContent = 'MyKep встановлено';
+    status.textContent = 'Відкрийте MyKep з головного екрана. Ця вкладка залишиться у браузері.';
+    status.hidden = false;
+    if (instructions) instructions.hidden = true;
+    if (lead) lead.hidden = true;
+    install.hidden = true;
+}
 
 async function showPWAGuide(force = false) {
     if (isPWA() || (!force && browserModeAccepted())) return;
@@ -45,6 +64,7 @@ async function showPWAGuide(force = false) {
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-labelledby', 'pwa-title');
+    const insecure = window.isSecureContext === false;
     const instructions = ctx.ios
         ? 'Натисніть «Поділитися» у Safari → <span class="pwa-accent">«На початковий екран»</span>.'
         : ctx.android
@@ -52,13 +72,14 @@ async function showPWAGuide(force = false) {
             : 'У Chrome або Edge натисніть значок встановлення в адресному рядку.';
     overlay.innerHTML = `
         <section class="pwa-card">
-            <img src="/favicon.png" alt="MyKep" class="pwa-icon">
+            <img src="/icons/icon-192.png" alt="MyKep" class="pwa-icon" width="80" height="80">
             <h2 id="pwa-title" tabindex="-1">${ctx.embedded ? 'Відкрийте у браузері' : 'Встанови MyKep'}</h2>
+            <p id="pwa-install-status" role="status" aria-live="polite" hidden></p>
             <div id="pwa-intro">
-                <p>${ctx.embedded ? `Щоб встановити MyKep, відкрийте сайт у ${ctx.ios ? 'Safari' : ctx.android ? 'Chrome' : 'Chrome або Edge'}.` : 'Додай MyKep на головний екран, щоб розклад завжди був під рукою.'}</p>
+                <p id="pwa-lead">${ctx.embedded ? `Щоб встановити MyKep, відкрийте сайт у ${ctx.ios ? 'Safari' : ctx.android ? 'Chrome' : 'Chrome або Edge'}.` : 'Додай MyKep на головний екран, щоб розклад завжди був під рукою.'}</p>
                 ${ctx.embedded ? '' : `<div class="pwa-instructions">
                     <strong>${ctx.ios ? 'Для iOS (Safari)' : ctx.android ? 'Для Android' : 'Для комп’ютера'}</strong>
-                    <p>${instructions}</p>
+                    <p>${insecure ? 'Для встановлення PWA потрібне захищене з’єднання HTTPS. За цією HTTP-адресою браузер може додати лише ярлик сайту.' : instructions}</p>
                 </div>`}
                 <details class="pwa-external-help" id="pwa-external-help" ${ctx.embedded ? 'open' : ''}>
                     <summary>${ctx.embedded ? 'Як відкрити у браузері' : 'Відкрили через Telegram?'}</summary>
@@ -67,7 +88,7 @@ async function showPWAGuide(force = false) {
                     <input class="text-input pwa-url" id="pwa-url" readonly aria-label="Посилання на MyKep" hidden>
                     <span id="pwa-copy-status" class="help-text" role="status"></span>
                 </details>
-                <button class="btn btn-primary" id="pwa-install" type="button" ${deferredInstallPrompt && !ctx.embedded ? '' : 'hidden'}>Встановити MyKep</button>
+                <button class="btn btn-primary" id="pwa-install" type="button" ${deferredInstallPrompt && !insecure && !ctx.embedded ? '' : 'hidden'}>Встановити MyKep</button>
             </div>
             <div id="pwa-confirm" hidden>
                 <p><strong>Продовжити без встановлення?</strong></p>
@@ -78,6 +99,7 @@ async function showPWAGuide(force = false) {
             <button class="pwa-browser-link" id="pwa-browser" type="button">Продовжити у браузері</button>
         </section>`;
     document.body.appendChild(overlay);
+    updatePWAInstallStatus();
     const previousFocus = document.activeElement;
     const appNodes = [...document.body.children].filter(node => node !== overlay && node.tagName !== 'SCRIPT');
     appNodes.forEach(node => { node.inert = true; });

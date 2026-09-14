@@ -31,7 +31,7 @@ function renderScheduleList(schedule) {
                 <div class="lesson-bottom">
                     <div class="teacher-name">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                        ${escapeHTML(lesson.teacher)}
+                        <span>${renderTeacherLabel(lesson.teacher)}</span>
                     </div>
                     ${lesson.room && String(lesson.room).trim() !== '' ? `<div class="room-badge">${escapeHTML(lesson.room)}</div>` : ''}
                 </div>
@@ -141,7 +141,7 @@ function initSchedulePage(scheduleDict) {
     items.forEach(item => {
         item.addEventListener('click', () => {
             isProgrammaticScroll = true;
-            item.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            picker.scrollTo({ left: item.offsetLeft + item.clientWidth / 2 - picker.clientWidth / 2, behavior: 'smooth' });
             renderForDay(item.getAttribute('data-day'));
         });
     });
@@ -149,7 +149,7 @@ function initSchedulePage(scheduleDict) {
     // initial setup
     const initialItem = Array.from(items).find(i => i.getAttribute('data-day') === todayId) || items[0];
     if (initialItem) {
-        initialItem.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
+        picker.scrollTo({ left: initialItem.offsetLeft + initialItem.clientWidth / 2 - picker.clientWidth / 2, behavior: 'auto' });
         renderForDay(initialItem.getAttribute('data-day'));
     }
     

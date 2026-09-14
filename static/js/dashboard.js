@@ -69,7 +69,7 @@ function renderDashboard(schedule) {
         if (statusText) statusText.innerText = `Зараз йде ${currentLesson.lesson}-${getLessonSuffix(currentLesson.lesson)} пара, залишайтесь сфокусованими.`;
         
         document.getElementById('current-subject').innerText = currentLesson.subject;
-        document.getElementById('current-teacher').innerText = currentLesson.teacher;
+        document.getElementById('current-teacher').innerHTML = renderTeacherLabel(currentLesson.teacher);
         document.getElementById('current-time').innerText = currentLesson.time;
     } else {
         if (currentCard) currentCard.style.display = "none";
@@ -98,7 +98,7 @@ function renderDashboard(schedule) {
     if (nextLesson) {
         document.getElementById('next-subject').innerText = nextLesson.subject;
         document.getElementById('next-room').innerText = nextLesson.room;
-        document.getElementById('next-teacher').innerText = nextLesson.teacher;
+        document.getElementById('next-teacher').innerHTML = renderTeacherLabel(nextLesson.teacher);
         document.getElementById('next-time').innerText = nextLesson.time;
     } else {
         document.getElementById('next-subject').innerText = "Пари завершились";
@@ -151,6 +151,7 @@ function startDashboard(schedule) {
     
     // Оновлюємо дашборд миттєво при першому виклику
     renderDashboard(currentGlobalSchedule);
+    window.requestDashboardFit?.();
     
     // Очищаємо старий інтервал, якщо функція викликається повторно
     if (dashboardInterval) clearInterval(dashboardInterval);
@@ -159,6 +160,7 @@ function startDashboard(schedule) {
     dashboardInterval = setInterval(() => {
         if (currentGlobalSchedule && currentGlobalSchedule.length > 0) {
             renderDashboard(currentGlobalSchedule);
+    window.requestDashboardFit?.();
         }
     }, 10000);
 }
