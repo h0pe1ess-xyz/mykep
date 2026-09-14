@@ -20,11 +20,11 @@
 ## 📱 Інтерфейс
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/f4d58cb6-d6d8-4fe9-9fe4-043ed57dfd80" alt="Dashboard" width="22%">
+  <img src="https://github.com/user-attachments/assets/8c60ae7b-194b-4dcf-b4ad-f5d635949c8f" alt="Dashboard" width="22%">
   &nbsp;
-  <img src="https://github.com/user-attachments/assets/4c4c9d6c-6d96-459d-9772-8d85799d8598" alt="Schedule" width="22%">
+  <img src="https://github.com/user-attachments/assets/872ddbcc-8e70-4cac-a844-8450b4e793cb" alt="Schedule" width="22%">
   &nbsp;
-  <img src="https://github.com/user-attachments/assets/41cfa07c-ff31-47b6-b5eb-e6dad7de0d8d" alt="Settings" width="22%">
+  <img src="https://github.com/user-attachments/assets/d2b0f416-0fc6-46d5-ac1b-8b46c690d621" alt="Settings" width="22%">
   &nbsp;
 </div>
 
