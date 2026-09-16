@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 
@@ -56,8 +56,11 @@ async def response_headers(request: Request, call_next):
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     if request.url.path.startswith('/api/'):
         response.headers['Cache-Control'] = 'no-store'
-    elif request.url.path.endswith(('.html', '.js', '.css', '.json')) or request.url.path == '/':
+        response.headers['X-Robots-Tag'] = 'noindex'
+    elif request.url.path.endswith(('.html', '.js', '.css', '.json', '.txt', '.xml')) or request.url.path == '/':
         response.headers['Cache-Control'] = 'no-cache'
+    if request.url.path in ('/docs', '/redoc', '/openapi.json', '/docs/oauth2-redirect', '/llms.txt', '/llms-full.txt', '/robots.txt', '/sitemap.xml'):
+        response.headers['X-Robots-Tag'] = 'noindex'
     return response
 
 
@@ -96,6 +99,13 @@ async def get_groups():
             'status': 'error', 'message': 'Список груп тимчасово недоступний.'})
     # Group pickers are not schedule views and must not inflate bot statistics.
     return {'status': 'success', 'data': schedule.groups, 'meta': schedule.metadata()}
+
+
+@app.api_route('/index.html', methods=['GET', 'HEAD'], include_in_schema=False)
+async def canonical_home(request: Request):
+    # Preserve launch parameters; use a relative target independent of Host headers.
+    target = '/' + ('?' + request.url.query if request.url.query else '')
+    return RedirectResponse(url=target, status_code=308)
 
 
 app.mount('/', StaticFiles(directory=str(BASE_DIR / 'static'), html=True), name='static')

@@ -123,3 +123,8 @@ html, body, .app-container,
 .onboarding-overlay, .onboarding-card, .pwa-overlay, .pwa-card {
     overscroll-behavior: none;
 }
+
+/* The project link occupies the existing heading, not an extra dashboard row. */
+.project-context-link { text-decoration: underline; text-decoration-color: var(--text-muted); text-underline-offset: 4px; }
+.pwa-about-link { display: inline-block; padding: 12px 0; min-height: 44px; color: var(--text-main); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+a:focus-visible { outline: 2px solid var(--accent-orange); outline-offset: 3px; }

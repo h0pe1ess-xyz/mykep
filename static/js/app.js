@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (match) linkPath = match[1];
         }
         
+        if (linkPath) linkPath = linkPath.split('/').pop() || 'index.html';
         if (linkPath === currentPath) {
             link.classList.add('active');
             link.setAttribute('aria-current', 'page');

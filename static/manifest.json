@@ -5,7 +5,7 @@
   "display": "standalone",
   "background_color": "#110c0a",
   "theme_color": "#110c0a",
-  "description": "Твій ідеальний розклад КЕП",
+  "description": "Розклад пар КЕП ІФНТУНГ: заняття, аудиторії, викладачі та таймер. Незалежний студентський PWA-застосунок.",
   "icons": [
     {
       "src": "icons/icon-192.png",
@@ -28,5 +28,9 @@
   ],
   "id": "/",
   "scope": "/",
-  "lang": "uk"
+  "lang": "uk",
+  "categories": [
+    "education",
+    "utilities"
+  ]
 }

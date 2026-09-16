@@ -61,6 +61,8 @@ async function showPWAGuide(force = false) {
     const overlay = document.createElement('div');
     overlay.id = 'pwa-guide';
     overlay.className = 'pwa-overlay';
+    // Exclude installation UI, not the public project description, from snippets.
+    overlay.setAttribute('data-nosnippet', '');
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-labelledby', 'pwa-title');
@@ -75,6 +77,8 @@ async function showPWAGuide(force = false) {
             <img src="/icons/icon-192.png" alt="MyKep" class="pwa-icon" width="80" height="80">
             <h2 id="pwa-title" tabindex="-1">${ctx.embedded ? 'Відкрийте у браузері' : 'Встанови MyKep'}</h2>
             <p id="pwa-install-status" role="status" aria-live="polite" hidden></p>
+            <p>MyKep - незалежний студентський застосунок з розкладом пар КЕП ІФНТУНГ.</p>
+            <a href="/about.html" class="pwa-about-link">Про MyKep та джерело розкладу</a>
             <div id="pwa-intro">
                 <p id="pwa-lead">${ctx.embedded ? `Щоб встановити MyKep, відкрийте сайт у ${ctx.ios ? 'Safari' : ctx.android ? 'Chrome' : 'Chrome або Edge'}.` : 'Додай MyKep на головний екран, щоб розклад завжди був під рукою.'}</p>
                 ${ctx.embedded ? '' : `<div class="pwa-instructions">
@@ -152,7 +156,7 @@ async function showPWAGuide(force = false) {
     };
     overlay.addEventListener('keydown', event => {
         if (event.key !== 'Tab') return;
-        const nodes = [...overlay.querySelectorAll('button, input, summary')].filter(node => node.getClientRects().length && !node.disabled);
+        const nodes = [...overlay.querySelectorAll('button, input, summary, a[href]')].filter(node => node.getClientRects().length && !node.disabled);
         const first = nodes[0], last = nodes[nodes.length - 1];
         if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }

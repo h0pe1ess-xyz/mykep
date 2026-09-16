@@ -45,7 +45,7 @@ function renderTeacherLabel(value) {
     }
     function load() {
         if (!loading) loading = Promise.all([
-            loadURL('/data/teacher-hints.json?v=2.6.5-mobile5'),
+            loadURL('/data/teacher-hints.json?v=2.6.6'),
             loadURL('/api/teacher-hints')
         ]);
         return loading;
