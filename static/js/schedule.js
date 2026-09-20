@@ -2,10 +2,7 @@ function renderScheduleList(schedule) {
     const listContainer = document.getElementById('dynamic-schedule-list');
     if (!listContainer) return;
     
-    listContainer.innerHTML = ''; 
-    listContainer.classList.remove('animate-enter'); 
-    void listContainer.offsetWidth; 
-    listContainer.classList.add('animate-enter');
+    // A single DOM write; optional entrance never blocks rendering or navigation.
 
     if (!schedule || schedule.length === 0) {
         listContainer.innerHTML = `
@@ -18,10 +15,11 @@ function renderScheduleList(schedule) {
         return;
     }
 
+    listContainer.innerHTML = '';
     schedule.forEach((lesson, index) => {
-        const delay = index * 0.06; 
+        const delay = Math.min(index * 0.06, 0.36); 
         const cardHtml = `
-            <div class="lesson-card" style="animation: fadeIn var(--transition-normal) forwards; animation-delay: ${delay}s; opacity: 0;">
+            <div class="lesson-card" style="animation: fadeIn var(--transition-normal) both; animation-delay: ${delay}s;">
                 <div class="lesson-top">
                     <span>${escapeHTML(lesson.lesson)}-${getLessonSuffix(lesson.lesson)} пара</span>
                     <span>${escapeHTML(lesson.time)}</span>
@@ -41,118 +39,100 @@ function renderScheduleList(schedule) {
     });
 }
 
+let schedulePageData = null;
+let schedulePickerState = null;
+function setSchedulePending() {
+    schedulePageData = null;
+    document.querySelectorAll('.day-picker button').forEach(button => { button.disabled = true; });
+}
 function initSchedulePage(scheduleDict) {
     const picker = document.querySelector('.day-picker');
     if (!picker) return;
-
+    schedulePageData = scheduleDict;
+    document.querySelectorAll('.day-picker button').forEach(button => { button.disabled = false; });
     const days = [
         { id: 'понеділок', short: 'Пн', name: 'Понеділок' },
         { id: 'вівторок', short: 'Вт', name: 'Вівторок' },
         { id: 'середа', short: 'Ср', name: 'Середа' },
         { id: 'четвер', short: 'Чт', name: 'Четвер' },
-        { id: 'п\'ятниця', short: 'Пт', name: 'П\'ятниця' }
+        { id: "п'ятниця", short: 'Пт', name: "П'ятниця" }
     ];
-
-    if (scheduleDict['субота'] && scheduleDict['субота'].length > 0) {
-        days.push({ id: 'субота', short: 'Сб', name: 'Субота' });
+    if (scheduleDict['субота']?.length) days.push({ id: 'субота', short: 'Сб', name: 'Субота' });
+    const signature = days.map(day => day.id).join('|');
+    if (schedulePickerState?.signature === signature) {
+        // Background updates and week selection keep the chosen day and scroll.
+        renderScheduleList(scheduleDict[schedulePickerState.activeDay] || []);
+        return;
     }
-
-    const todayMap = ["неділя", "понеділок", "вівторок", "середа", "четвер", "п'ятниця", "субота"];
-    let todayId = todayMap[getKyivNow().getDay()];
-    if (todayId === 'неділя') todayId = 'понеділок'; 
-
-    let html = '';
-    days.forEach(d => {
-        const isActive = d.id === todayId ? 'active' : '';
-        html += `
-            <div class="day-item ${isActive}" data-day="${d.id}">
-                <div class="day-num">${d.short}</div>
-                <div class="day-name">${d.name}</div>
-            </div>
-        `;
-    });
-    picker.innerHTML = html;
-
-    const items = picker.querySelectorAll('.day-item');
-    let activeDayId = null;
-
-    function renderForDay(dayId) {
-        if (activeDayId === dayId) return; 
-        activeDayId = dayId;
-        
+    const todayMap = ['неділя', 'понеділок', 'вівторок', 'середа', 'четвер', "п'ятниця", 'субота'];
+    const preferredDay = schedulePickerState?.activeDay || todayMap[getKyivNow().getDay()];
+    if (schedulePickerState) {
+        cancelAnimationFrame(schedulePickerState.frame);
+        clearTimeout(schedulePickerState.scrollTimeout);
+    }
+    const state = { signature, activeDay: null, frame: 0, scrollTimeout: 0, programmatic: false };
+    schedulePickerState = state;
+    picker.innerHTML = days.map(day => `
+        <button type="button" class="day-item" data-day="${escapeHTML(day.id)}" aria-label="${escapeHTML(day.name)}" aria-pressed="false">
+            <span class="day-num">${day.short}</span>
+            <span class="day-name">${day.name}</span>
+        </button>`).join('');
+    const items = [...picker.querySelectorAll('.day-item')];
+    function renderForDay(dayId, vibrate = false) {
+        if (state.activeDay === dayId) return;
+        state.activeDay = dayId;
         items.forEach(item => {
-            if (item.getAttribute('data-day') === dayId) {
-                item.classList.add('active');
-            } else {
-                item.classList.remove('active');
-            }
+            const active = item.dataset.day === dayId;
+            item.classList.toggle('active', active);
+            item.setAttribute('aria-pressed', String(active));
         });
-
-        renderScheduleList(scheduleDict[dayId] || []);
-        if (navigator.vibrate) navigator.vibrate(10); 
+        if (schedulePageData) renderScheduleList(schedulePageData[dayId] || []);
+        if (vibrate && navigator.vibrate) navigator.vibrate(10);
     }
-
     function updateArc() {
-        const pickerCenter = picker.scrollLeft + picker.clientWidth / 2;
-        let closestItem = null;
-        let minDistance = Infinity;
-
-        items.forEach(item => {
-            const itemCenter = item.offsetLeft + item.clientWidth / 2;
-            const distance = itemCenter - pickerCenter;
-            const absDistance = Math.abs(distance);
-            
-            if (absDistance < minDistance) {
-                minDistance = absDistance;
-                closestItem = item;
-            }
-            
-            const normalizedDist = Math.min(absDistance / (picker.clientWidth / 2), 1);
-            const scale = 1 - normalizedDist * 0.15;
-            const translateY = normalizedDist * 15;
-            const opacity = 1 - normalizedDist * 0.6;
-            
-            item.style.transform = `translateY(${translateY}px) scale(${scale})`;
-            item.style.opacity = opacity;
-        });
-
-        if (closestItem && !isProgrammaticScroll) {
-            const dayId = closestItem.getAttribute('data-day');
-            if (dayId !== activeDayId) {
-                activeDayId = dayId;
-                items.forEach(i => i.classList.remove('active'));
-                closestItem.classList.add('active');
-                renderScheduleList(scheduleDict[dayId] || []);
-                if (navigator.vibrate) navigator.vibrate(10);
-            }
+        state.frame = 0;
+        const width = picker.clientWidth;
+        if (!width) return;
+        const center = picker.scrollLeft + width / 2;
+        // Batch all layout reads before writing styles.
+        const positions = items.map(item => ({ item,
+            distance: Math.abs(item.offsetLeft + item.clientWidth / 2 - center) }));
+        let closest = positions[0];
+        for (const position of positions) {
+            if (position.distance < closest.distance) closest = position;
+            const distance = Math.min(position.distance / (width / 2), 1);
+            position.item.style.transform = `translateY(${distance * 15}px) scale(${1 - distance * 0.15})`;
+            position.item.style.opacity = 1 - distance * 0.6;
         }
+        if (!state.programmatic && closest) renderForDay(closest.item.dataset.day, true);
     }
-
-    let isProgrammaticScroll = false;
-    let scrollTimeout;
-    picker.addEventListener('scroll', () => {
-        updateArc();
-        clearTimeout(scrollTimeout);
-        scrollTimeout = setTimeout(() => {
-            isProgrammaticScroll = false;
+    function requestArc() {
+        if (!state.frame) state.frame = requestAnimationFrame(updateArc);
+    }
+    picker.onscroll = () => {
+        requestArc();
+        clearTimeout(state.scrollTimeout);
+        state.scrollTimeout = setTimeout(() => {
+            state.programmatic = false;
+            requestArc();
         }, 150);
-    });
-
+    };
     items.forEach(item => {
-        item.addEventListener('click', () => {
-            isProgrammaticScroll = true;
-            picker.scrollTo({ left: item.offsetLeft + item.clientWidth / 2 - picker.clientWidth / 2, behavior: 'smooth' });
-            renderForDay(item.getAttribute('data-day'));
-        });
+        item.onclick = () => {
+            state.programmatic = true;
+            const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            picker.scrollTo({ left: item.offsetLeft + item.clientWidth / 2 - picker.clientWidth / 2,
+                behavior: reducedMotion ? 'auto' : 'smooth' });
+            renderForDay(item.dataset.day, true);
+            // Also release the guard when tapping an already centered item.
+            clearTimeout(state.scrollTimeout);
+            state.scrollTimeout = setTimeout(() => { state.programmatic = false; }, 200);
+        };
     });
-
-    // initial setup
-    const initialItem = Array.from(items).find(i => i.getAttribute('data-day') === todayId) || items[0];
-    if (initialItem) {
-        picker.scrollTo({ left: initialItem.offsetLeft + initialItem.clientWidth / 2 - picker.clientWidth / 2, behavior: 'auto' });
-        renderForDay(initialItem.getAttribute('data-day'));
+    const initial = items.find(item => item.dataset.day === preferredDay) || items[0];
+    if (initial) {
+        picker.scrollTo({ left: initial.offsetLeft + initial.clientWidth / 2 - picker.clientWidth / 2, behavior: 'auto' });
+        renderForDay(initial.dataset.day);
     }
-    
-    // trigger arc update on next frame to ensure layout is ready
-    requestAnimationFrame(() => updateArc());
+    requestArc();
 }

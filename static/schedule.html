@@ -32,20 +32,26 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#110c0a">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <script src="js/display-mode.js?v=2.6.8"></script>
-    <script src="js/android-layout.js?v=2.6.8"></script>
-    <script src="js/gesture-guard.js?v=2.6.8"></script>
-    <link rel="stylesheet" href="style.css?v=2.6.8">
+    <script src="js/display-mode.js?v=2.6.10"></script>
+    <script src="js/android-layout.js?v=2.6.10"></script>
+    <script src="js/gesture-guard.js?v=2.6.10"></script>
+    <link rel="stylesheet" href="style.css?v=2.6.10">
 </head>
 <body class="page-schedule">
     <h1 class="sr-only page-heading">MyKep - розклад занять вашої групи</h1>
     <div class="app-container">
         <header class="app-header">
             <h2 class="app-title">MyKep</h2>
-            <div class="location-badge">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                <span id="header-group-text">Завантаження...</span>
-            </div>
+            <label class="location-badge week-control" for="schedule-week">
+                <span class="sr-only">Тиждень для перегляду розкладу</span>
+                <select id="schedule-week" class="week-select">
+                    <option value="auto">Авто</option>
+                    <option value="1">1-й тиждень</option>
+                    <option value="2">2-й тиждень</option>
+                    <option value="3">3-й тиждень</option>
+                    <option value="4">4-й тиждень</option>
+                </select>
+            </label>
         </header>
 
         <div class="day-picker">
@@ -65,14 +71,15 @@
             <a class="nav-btn" aria-label="Налаштування" href="/settings.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></a>
         </nav>
     </div>
-    <script src="js/utils.js?v=2.6.8"></script>
-    <script src="js/pwa.js?v=2.6.8"></script>
-    <script src="js/api.js?v=2.6.8"></script>
-    <script src="js/teacher-hints.js?v=2.6.8"></script>
-    <script src="js/mobile-fit.js?v=2.6.8"></script>
-    <script src="js/dashboard.js?v=2.6.8"></script>
-    <script src="js/schedule.js?v=2.6.8"></script>
-    <script src="js/settings.js?v=2.6.8"></script>
-    <script src="js/app.js?v=2.6.8"></script>
+    <script src="js/utils.js?v=2.6.10"></script>
+    <script src="js/pwa.js?v=2.6.10"></script>
+    <script src="js/api.js?v=2.6.10"></script>
+    <script src="js/teacher-hints.js?v=2.6.10"></script>
+    <script src="js/mobile-fit.js?v=2.6.10"></script>
+    
+    <script src="js/dashboard.js?v=2.6.10"></script>
+    <script src="js/schedule.js?v=2.6.10"></script>
+    <script src="js/settings.js?v=2.6.10"></script>
+    <script src="js/app.js?v=2.6.10"></script>
 </body>
 </html>

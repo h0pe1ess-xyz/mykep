@@ -24,19 +24,28 @@ function getUserId() {
 }
 
 function animateValue(obj, start, end, duration) {
+    if (!obj) return;
+    if (obj._mykepAnimFrame) cancelAnimationFrame(obj._mykepAnimFrame);
+    
+    if (start === end || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || document.visibilityState === 'hidden') {
+        obj.textContent = Math.floor(end) + '%';
+        return;
+    }
+
     let startTimestamp = null;
     const step = (timestamp) => {
         if (!startTimestamp) startTimestamp = timestamp;
         const progress = Math.min((timestamp - startTimestamp) / duration, 1);
         const easeProgress = progress * (2 - progress); 
-        obj.innerText = Math.floor(start + easeProgress * (end - start)) + '%';
+        obj.textContent = Math.floor(start + easeProgress * (end - start)) + '%';
         if (progress < 1) {
-            window.requestAnimationFrame(step);
+            obj._mykepAnimFrame = window.requestAnimationFrame(step);
         } else {
-            obj.innerText = Math.floor(end) + '%';
+            obj.textContent = Math.floor(end) + '%';
+            obj._mykepAnimFrame = null;
         }
     };
-    window.requestAnimationFrame(step);
+    obj._mykepAnimFrame = window.requestAnimationFrame(step);
 }
 
 function getLessonSuffix(num) {
@@ -79,11 +88,9 @@ function getAcademicWeek() {
 function updateHeaderDisplays() {
     const savedGroup = storage.get('mykep_group') || 'ПІ-24-02';
     const headerDisplay = document.getElementById('header-group-text');
-    if (headerDisplay) {
-        if (document.querySelector('.day-picker')) {
-            headerDisplay.innerText = `${getAcademicWeek()}-й тиждень`;
-        } else {
-            headerDisplay.innerText = `Група ${savedGroup}`;
-        }
+    if (headerDisplay) headerDisplay.innerText = `Група ${savedGroup}`;
+    const weekSelect = document.getElementById('schedule-week');
+    if (weekSelect) {
+        weekSelect.options[0].textContent = `Авто · ${getAcademicWeek()}-й тиждень`;
     }
 }

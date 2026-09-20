@@ -1,40 +1,41 @@
-const CACHE_NAME = 'mykep-cache-v2.6.8';
+const CACHE_NAME = 'mykep-cache-v2.6.10';
 const APP_SHELL = [
-  "/css/android-layout.css?v=2.6.8",
-  "/js/android-layout.js?v=2.6.8",
-  "/css/mobile-fit.css?v=2.6.8",
-  "/js/mobile-fit.js?v=2.6.8",
-  "/js/teacher-hints.js?v=2.6.8",
-  "/data/teacher-hints.json?v=2.6.8",
+  "/css/android-layout.css?v=2.6.10",
+  "/js/android-layout.js?v=2.6.10",
+  "/css/mobile-fit.css?v=2.6.10",
+  "/js/mobile-fit.js?v=2.6.10",
+  "/js/teacher-hints.js?v=2.6.10",
+  "/data/teacher-hints.json?v=2.6.10",
   "/",
   "/index.html",
   "/schedule.html",
   "/settings.html",
   "/about.html",
-  "/css/about.css?v=2.6.8",
+  "/css/about.css?v=2.6.10",
   "/manifest.json",
   "/favicon.png",
   "/favicon.ico",
   "/pfp/1.png",
   "/pfp/2.gif",
-  "/style.css?v=2.6.8",
-  "/js/api.js?v=2.6.8",
-  "/js/app.js?v=2.6.8",
-  "/js/display-mode.js?v=2.6.8",
-  "/js/gesture-guard.js?v=2.6.8",
-  "/js/dashboard.js?v=2.6.8",
-  "/js/pwa.js?v=2.6.8",
-  "/js/schedule.js?v=2.6.8",
-  "/js/settings.js?v=2.6.8",
-  "/js/utils.js?v=2.6.8",
-  "/css/base.css?v=2.6.8",
-  "/css/components.css?v=2.6.8",
-  "/css/dashboard.css?v=2.6.8",
-  "/css/layout.css?v=2.6.8",
-  "/css/ios-standalone.css?v=2.6.8",
-  "/css/responsive.css?v=2.6.8",
-  "/css/schedule.css?v=2.6.8",
-  "/css/settings.css?v=2.6.8",
+  "/style.css?v=2.6.10",
+  "/js/api.js?v=2.6.10",
+  "/js/app.js?v=2.6.10",
+  "/js/display-mode.js?v=2.6.10",
+  "/js/gesture-guard.js?v=2.6.10",
+  "/js/motion.js?v=2.6.10",
+  "/js/dashboard.js?v=2.6.10",
+  "/js/pwa.js?v=2.6.10",
+  "/js/schedule.js?v=2.6.10",
+  "/js/settings.js?v=2.6.10",
+  "/js/utils.js?v=2.6.10",
+  "/css/base.css?v=2.6.10",
+  "/css/components.css?v=2.6.10",
+  "/css/dashboard.css?v=2.6.10",
+  "/css/layout.css?v=2.6.10",
+  "/css/ios-standalone.css?v=2.6.10",
+  "/css/responsive.css?v=2.6.10",
+  "/css/schedule.css?v=2.6.10",
+  "/css/settings.css?v=2.6.10",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/icons/maskable-512.png",
@@ -60,14 +61,15 @@ self.addEventListener('fetch', event => {
     const url = new URL(request.url);
     if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
     if (request.mode === 'navigate') {
+        const shellPages = ['/', '/index.html', '/schedule.html', '/settings.html', '/about.html'];
+        if (!shellPages.includes(url.pathname)) return;
         event.respondWith((async () => {
-            try {
-                const response = await fetch(request);
-                if (response.ok) return response;
-                if (response.status < 500) return response;
-            } catch (_) {}
             const cache = await caches.open(CACHE_NAME);
-            return await cache.match(url.pathname) || await cache.match('/index.html');
+            const path = url.pathname === '/index.html' ? '/' : url.pathname;
+            const cached = await cache.match(path);
+            if (cached) return cached;
+            // A missing page must not silently become the dashboard.
+            return fetch(request);
         })());
         return;
     }

@@ -79,13 +79,14 @@ async def get_schedule(request: Request,
                        group: str = Query('ПІ-24-02', min_length=2, max_length=64),
                        duration1: int = Query(80),
                        duration2: int = Query(60),
-                       uid: Optional[str] = Query(None, max_length=128)):
+                       uid: Optional[str] = Query(None, max_length=128),
+                       week: Optional[int] = Query(None, ge=1, le=4)):
     if duration1 not in (60, 80) or duration2 not in (60, 80):
         return JSONResponse(status_code=422, content={'status': 'error', 'message': 'Тривалість має бути 60 або 80 хвилин.'})
     if not schedule.raw:
         return JSONResponse(status_code=503, headers={'Retry-After': '30'}, content={
             'status': 'error', 'message': 'Розклад тимчасово недоступний. Спробуйте за хвилину.'})
-    data = schedule.build(group, duration1, duration2)
+    data = schedule.build(group, duration1, duration2, week=week)
     if data is None:
         return JSONResponse(status_code=404, content={'status': 'error', 'message': 'Групу не знайдено. Перевірте назву в налаштуваннях.'})
     analytics.record_request(uid, group, '/api/schedule', request.headers.get('user-agent', ''))

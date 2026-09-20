@@ -32,10 +32,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
      <meta name="theme-color" content="#110c0a">
      <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <script src="js/display-mode.js?v=2.6.8"></script>
-    <script src="js/android-layout.js?v=2.6.8"></script>
-    <script src="js/gesture-guard.js?v=2.6.8"></script>
-    <link rel="stylesheet" href="style.css?v=2.6.8">
+    <script src="js/display-mode.js?v=2.6.10"></script>
+    <script src="js/android-layout.js?v=2.6.10"></script>
+    <script src="js/gesture-guard.js?v=2.6.10"></script>
+    <link rel="stylesheet" href="style.css?v=2.6.10">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -159,7 +159,13 @@
                             <span id="ob-group-value">Оберіть групу</span><span aria-hidden="true">⌄</span>
                         </summary>
                         <div class="group-picker-panel">
-                            <input type="search" id="ob-group-search" class="modal-search" placeholder="Пошук групи…" aria-label="Пошук у списку груп" autocomplete="off">
+                            <div class="search-container">
+                                <label for="ob-group-search" class="search-label">Пошук групи</label>
+                                <div class="search-input-wrapper">
+                                    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                    <input type="search" id="ob-group-search" class="modal-search" placeholder="Введіть назву групи..." aria-label="Пошук у списку груп" autocomplete="off">
+                                </div>
+                            </div>
                             <div id="ob-group-options" class="group-options" role="group" aria-label="Доступні групи"></div>
                         </div>
                     </details>
@@ -274,14 +280,15 @@
             <a class="nav-btn" aria-label="Налаштування" href="/settings.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></a>
         </nav>
     </div>
-    <script src="js/utils.js?v=2.6.8"></script>
-    <script src="js/pwa.js?v=2.6.8"></script>
-    <script src="js/api.js?v=2.6.8"></script>
-    <script src="js/teacher-hints.js?v=2.6.8"></script>
-    <script src="js/mobile-fit.js?v=2.6.8"></script>
-    <script src="js/dashboard.js?v=2.6.8"></script>
-    <script src="js/schedule.js?v=2.6.8"></script>
-    <script src="js/settings.js?v=2.6.8"></script>
-    <script src="js/app.js?v=2.6.8"></script>
+    <script src="js/utils.js?v=2.6.10"></script>
+    <script src="js/pwa.js?v=2.6.10"></script>
+    <script src="js/api.js?v=2.6.10"></script>
+    <script src="js/teacher-hints.js?v=2.6.10"></script>
+    <script src="js/mobile-fit.js?v=2.6.10"></script>
+    
+    <script src="js/dashboard.js?v=2.6.10"></script>
+    <script src="js/schedule.js?v=2.6.10"></script>
+    <script src="js/settings.js?v=2.6.10"></script>
+    <script src="js/app.js?v=2.6.10"></script>
 </body>
 </html>
