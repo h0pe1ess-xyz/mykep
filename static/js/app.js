@@ -31,8 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    const mainContainers = document.querySelectorAll('.main-content');
-    mainContainers.forEach(container => container.classList.add('animate-enter'));
+    // Content is visible immediately; do not fade the whole page on every tab.
 
 
 });
@@ -53,29 +52,82 @@ async function initApplication() {
 
     if (!document.getElementById('dashboard-main') && !document.getElementById('dynamic-schedule-list')) return;
 
-    let scheduleData = await fetchSchedule();
-    if (Array.isArray(scheduleData)) {
-        storage.remove('mykep_schedule');
-        scheduleData = await fetchSchedule();
+    const weekSelect = document.getElementById('schedule-week');
+    if (weekSelect) {
+        weekSelect.value = getScheduleWeekSelection();
+        weekSelect.addEventListener('change', () => {
+            storage.set('mykep_schedule_week', normalizeWeekSelection(weekSelect.value));
+            updateHeaderDisplays();
+            loadScheduleView();
+        });
     }
+    await loadScheduleView();
+}
 
-    if (scheduleData === null) {
-        showScheduleError();
+let scheduleLoadId = 0;
+let renderedScheduleKey = '';
+let renderedScheduleJSON = '';
+let lastVisibleRefresh = 0;
+let scheduleViewReady = false;
+function scheduleWeekForPage() {
+    // The live timer always uses the automatic week, never the preview setting.
+    return document.getElementById('schedule-week')?.value || 'auto';
+}
+function renderScheduleView(data, key) {
+    const json = JSON.stringify(data);
+    if (key === renderedScheduleKey && json === renderedScheduleJSON) return;
+    renderedScheduleKey = key;
+    renderedScheduleJSON = json;
+    const dashboard = document.getElementById('dashboard-main');
+    if (dashboard) {
+        dashboard.hidden = false;
+        const days = ['неділя', 'понеділок', 'вівторок', 'середа', 'четвер', "п'ятниця", 'субота'];
+        startDashboard(data[days[getKyivNow().getDay()]] || []);
+    }
+    if (document.getElementById('dynamic-schedule-list')) initSchedulePage(data);
+}
+async function loadScheduleView() {
+    const loadId = ++scheduleLoadId;
+    scheduleViewReady = true;
+    lastVisibleRefresh = Date.now();
+    const week = scheduleWeekForPage();
+    // Include the day in the render identity so midnight refreshes the dashboard.
+    const key = `${scheduleRequestContext(week).key}|day:${getKyivNow().getDay()}`;
+    const cached = getCachedSchedule(week);
+    const list = document.getElementById('dynamic-schedule-list');
+    if (cached) {
+        scheduleNotice = Date.now() - cached.savedAt > 120000 ?
+            'Показано збережений розклад. Перевіряємо оновлення…' : staleScheduleNotice(cached.meta);
+        renderScheduleView(cached.data, key);
+    } else if (key !== renderedScheduleKey) {
+        scheduleNotice = 'Завантаження розкладу…';
+        if (list) {
+            list.replaceChildren();
+            if (typeof setSchedulePending === 'function') setSchedulePending();
+        }
+        const dashboard = document.getElementById('dashboard-main');
+        if (dashboard) dashboard.hidden = true;
+        // Do not retain another week's cards beneath the new week label.
+        renderedScheduleKey = '';
+        renderedScheduleJSON = '';
+    } else {
+        scheduleNotice = 'Перевіряємо оновлення розкладу…';
+    }
+    showScheduleNotice();
+    list?.setAttribute('aria-busy', 'true');
+    const result = await fetchSchedule(week);
+    if (loadId !== scheduleLoadId) return; // Rapid week changes: latest selection wins.
+    list?.setAttribute('aria-busy', 'false');
+    scheduleNotice = result.notice;
+    showScheduleNotice();
+    if (result.data === null) {
+        renderedScheduleKey = '';
+        renderedScheduleJSON = '';
+        if (typeof setSchedulePending === 'function') setSchedulePending();
+        showScheduleError(loadScheduleView);
         return;
     }
-
-    const daysMap = ["неділя", "понеділок", "вівторок", "середа", "четвер", "п'ятниця", "субота"];
-    const currentDayName = daysMap[getKyivNow().getDay()];
-
-    const dashboardMain = document.getElementById('dashboard-main');
-    if (dashboardMain) {
-        startDashboard(scheduleData[currentDayName] || []);
-    }
-
-    const scheduleList = document.getElementById('dynamic-schedule-list');
-    if (scheduleList) {
-        initSchedulePage(scheduleData);
-    }
+    renderScheduleView(result.data, key);
 }
 
 document.addEventListener('DOMContentLoaded', initApplication);
@@ -93,13 +145,16 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-let lastVisibleRefresh = Date.now();
-function refreshOnResume() {
-    if (document.visibilityState !== 'visible' || storage.get('mykep_onboarded') !== 'true' || document.getElementById('pwa-guide')) return;
-    if (!document.getElementById('dashboard-main') && !document.getElementById('dynamic-schedule-list')) return;
-    if (Date.now() - lastVisibleRefresh >= 5 * 60 * 1000) window.location.reload();
+function refreshOnResume(force = false) {
+    if (!scheduleViewReady || document.visibilityState !== 'visible' ||
+        storage.get('mykep_onboarded') !== 'true' || document.getElementById('pwa-guide')) return;
+    if (force || Date.now() - lastVisibleRefresh >= 5 * 60 * 1000) {
+        updateHeaderDisplays();
+        loadScheduleView();
+    }
 }
-document.addEventListener('visibilitychange', refreshOnResume);
-window.addEventListener('pageshow', event => { if (event.persisted) refreshOnResume(); });
-// A tab left open over midnight/30-minute upstream refresh must not show yesterday forever.
+document.addEventListener('visibilitychange', () => refreshOnResume());
+window.addEventListener('pageshow', event => { if (event.persisted) refreshOnResume(true); });
+window.addEventListener('online', () => refreshOnResume(true));
+// Revalidate in place, without reloading the shell/nav every five minutes.
 setInterval(refreshOnResume, 5 * 60 * 1000);

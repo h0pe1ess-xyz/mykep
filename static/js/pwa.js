@@ -74,7 +74,7 @@ async function showPWAGuide(force = false) {
             : 'У Chrome або Edge натисніть значок встановлення в адресному рядку.';
     overlay.innerHTML = `
         <section class="pwa-card">
-            <img src="/icons/icon-192.png" alt="MyKep" class="pwa-icon" width="80" height="80">
+            <img src="/icons/icon-192.png" alt="MyKep" class="pwa-icon" width="80" height="80" title="MyKep" loading="eager" decoding="async">
             <h2 id="pwa-title" tabindex="-1">${ctx.embedded ? 'Відкрийте у браузері' : 'Встанови MyKep'}</h2>
             <p id="pwa-install-status" role="status" aria-live="polite" hidden></p>
             <p>MyKep - незалежний студентський застосунок з розкладом пар КЕП ІФНТУНГ.</p>

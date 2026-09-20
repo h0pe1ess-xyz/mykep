@@ -4,15 +4,39 @@ function updateTimerDisplay(percentage) {
     const knob = document.getElementById('timer-knob');
     if (!arc || !knob) return; 
     
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const isFirstPaint = document.getElementById('dashboard-main')?.dataset.ready !== 'true';
+    
     const totalLength = 130 * Math.PI; 
-    const offset = totalLength - (percentage / 100) * totalLength;
-    arc.style.strokeDashoffset = offset;
+    
+    const applyState = (pct) => {
+        const offset = totalLength - (pct / 100) * totalLength;
+        arc.style.strokeDasharray = totalLength;
+        arc.style.strokeDashoffset = offset;
+        const rotation = (pct / 100) * 180 - 90;
+        knob.style.transform = `rotate(${rotation}deg)`;
+    };
 
-    const rotation = (percentage / 100) * 180 - 90;
-    knob.style.transform = `rotate(${rotation}deg)`;
+    if (isFirstPaint && !reducedMotion && document.visibilityState !== 'hidden') {
+        arc.style.transition = 'none';
+        knob.style.transition = 'none';
+        applyState(0);
+        
+        void arc.getBoundingClientRect(); // Force layout
+
+        arc.style.transition = 'stroke-dashoffset 1s ease';
+        knob.style.transition = 'transform 1s ease';
+        
+        requestAnimationFrame(() => {
+            applyState(percentage);
+        });
+    } else {
+        applyState(percentage);
+    }
 }
 
 function renderDashboard(schedule) {
+    const main = document.getElementById('dashboard-main');
     const gaugeMain = document.getElementById('minutes-left');
     const gaugeSub = document.getElementById('current-room');
     const statusText = document.getElementById('status-text');
@@ -26,15 +50,16 @@ function renderDashboard(schedule) {
         updateTimerDisplay(100);
         if (gaugeMain) { gaugeMain.innerHTML = `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`; }
         if (gaugeSub) gaugeSub.innerHTML = `Вихідний`;
-        if (statusText) statusText.innerText = "На сьогодні пар немає.";
+        if (statusText) statusText.innerText = "На сьогодні пар не заплановано.";
         if (currentCard) currentCard.style.display = "none";
         if (nextCard) nextCard.style.display = "none";
+        if (main) main.dataset.ready = 'true';
         return; 
     }
 
     const now = getKyivNow();
     const currentMins = now.getHours() * 60 + now.getMinutes();
-    let currentLesson = null, nextLesson = null;
+    let currentLesson = null, nextLesson = null, previousLessonEnd = null;
 
     for (let i = 0; i < schedule.length; i++) {
         const lesson = schedule[i];
@@ -45,6 +70,7 @@ function renderDashboard(schedule) {
         const start = timeToMins(startStr);
         const end = timeToMins(endStr);
 
+        if (currentMins >= end) previousLessonEnd = end;
         if (currentMins >= start && currentMins < end) {
             currentLesson = { ...lesson, start, end };
             nextLesson = schedule[i + 1] || null;
@@ -77,10 +103,11 @@ function renderDashboard(schedule) {
             const start = timeToMins(nextLesson.time.split(' - ')[0]);
             const minsToNext = start - currentMins;
             if (minsToNext > 0 && minsToNext <= 90) {
-                updateTimerDisplay((minsToNext / 20) * 100); 
+                const breakDuration = previousLessonEnd === null ? 0 : start - previousLessonEnd;
+                updateTimerDisplay(breakDuration > 0 ? (minsToNext / breakDuration) * 100 : 100); 
                 if (gaugeMain) gaugeMain.innerHTML = `${minsToNext}<span class="timer-unit">хв</span>`;
                 if (gaugeSub) gaugeSub.innerHTML = `до ${nextLesson.lesson}-ї пари`;
-                if (statusText) statusText.innerText = "Перерва.";
+                if (statusText) statusText.innerText = previousLessonEnd === null ? "Пари ще не почалися." : "Перерва.";
             } else {
                 updateTimerDisplay(100);
                 if (gaugeMain) { gaugeMain.innerHTML = `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`; }
@@ -118,49 +145,75 @@ function renderDashboard(schedule) {
         dayProgress = ((currentMins - firstLessonStart) / totalDayMins) * 100;
     }
     
-    if (progressFill) progressFill.style.width = `${dayProgress}%`;
-    if (progressThumb) {
-        const thumbWidth = progressThumb.offsetWidth;
-        const containerWidth = progressThumb.parentElement.offsetWidth;
-        let minPct = 8;
-        let maxPct = 92;
-        if (containerWidth > 0 && thumbWidth > 0) {
-            minPct = (thumbWidth / 2 / containerWidth) * 100;
-            maxPct = 100 - minPct;
+    const targetProgress = Math.floor(dayProgress);
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const isFirstPaint = document.getElementById('dashboard-main')?.dataset.ready !== 'true';
+
+    if (progressFill && progressThumb && progressText) {
+        const setStyles = (val) => {
+            progressFill.style.width = `${val}%`;
+            
+            const thumbWidth = progressThumb.offsetWidth || 50;
+            const containerWidth = progressThumb.parentElement.offsetWidth || 300;
+            let minPct = 8;
+            let maxPct = 92;
+            if (containerWidth > 0 && thumbWidth > 0) {
+                minPct = (thumbWidth / 2 / containerWidth) * 100;
+                maxPct = 100 - minPct;
+            }
+            const clampedLeft = Math.max(minPct, Math.min(val, maxPct));
+            progressThumb.style.left = `${clampedLeft}%`;
+            progressThumb.style.transform = `translateX(-50%)`;
+        };
+
+        if (isFirstPaint && !reducedMotion && document.visibilityState !== 'hidden') {
+            progressFill.style.transition = 'none';
+            progressThumb.style.transition = 'none';
+            setStyles(0);
+            animateValue(progressText, 0, targetProgress, 1000);
+            
+            // Force reflow to ensure the browser registers the 0% state
+            void progressFill.offsetWidth;
+            
+            progressFill.style.transition = 'width 1s ease';
+            progressThumb.style.transition = 'left 1s ease';
+            
+            // The browser needs a tiny delay to start the transition after forcing layout
+            // in some edge cases, especially on mobile WebKit.
+            requestAnimationFrame(() => {
+                setStyles(dayProgress);
+            });
+        } else {
+            setStyles(dayProgress);
+            const currentProgress = parseInt(progressText.textContent) || 0;
+            if (currentProgress !== targetProgress && !isFirstPaint) {
+                animateValue(progressText, currentProgress, targetProgress, 1000);
+            } else {
+                progressText.textContent = `${targetProgress}%`;
+            }
         }
-        const clampedLeft = Math.max(minPct, Math.min(dayProgress, maxPct));
-        progressThumb.style.left = `${clampedLeft}%`;
-        progressThumb.style.transform = `translateX(-50%)`;
     }
-    if (progressText) {
-        const targetProgress = Math.floor(dayProgress);
-        const currentProgress = parseInt(progressText.innerText) || 0;
-        if (currentProgress !== targetProgress) {
-            animateValue(progressText, currentProgress, targetProgress, 1000);
-        }
-    }
+    
+    if (main) main.dataset.ready = 'true';
 }
 
-// --- ДОДАНИЙ БЛОК: Запуск інтервалу оновлення ---
 let currentGlobalSchedule = null;
 let dashboardInterval = null;
-
-// Викликай startDashboard(schedule) замість renderDashboard(schedule) там, де отримуєш дані
-function startDashboard(schedule) {
-    currentGlobalSchedule = schedule;
-    
-    // Оновлюємо дашборд миттєво при першому виклику
+let lastDashboardMinute = '';
+function tickDashboard(force = false) {
+    if (document.visibilityState === 'hidden' || !currentGlobalSchedule) return;
+    const now = getKyivNow();
+    const minute = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}-${now.getMinutes()}`;
+    if (!force && minute === lastDashboardMinute) return;
+    lastDashboardMinute = minute;
     renderDashboard(currentGlobalSchedule);
     window.requestDashboardFit?.();
-    
-    // Очищаємо старий інтервал, якщо функція викликається повторно
-    if (dashboardInterval) clearInterval(dashboardInterval);
-    
-    // Запускаємо оновлення кожні 10 секунд
-    dashboardInterval = setInterval(() => {
-        if (currentGlobalSchedule && currentGlobalSchedule.length > 0) {
-            renderDashboard(currentGlobalSchedule);
-    window.requestDashboardFit?.();
-        }
-    }, 10000);
 }
+function startDashboard(schedule) {
+    currentGlobalSchedule = schedule;
+    tickDashboard(true);
+    if (dashboardInterval) clearInterval(dashboardInterval);
+    dashboardInterval = setInterval(tickDashboard, 10000);
+}
+document.addEventListener('visibilitychange', () => tickDashboard());
+window.addEventListener('pageshow', () => tickDashboard());

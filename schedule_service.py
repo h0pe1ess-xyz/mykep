@@ -15,7 +15,7 @@ URL = "https://kep.nung.edu.ua/pages/education/schedule"
 
 
 def normalize_group(value):
-    return re.sub(r"[\s\-–—]", "", str(value)).casefold()
+    return re.sub(r"[\s\-–-]", "", str(value)).casefold()
 
 
 def split_groups(value):
@@ -107,11 +107,11 @@ class ScheduleService:
         return {"updated_at": datetime.fromtimestamp(self.updated_at, KYIV).isoformat() if self.updated_at else None,
                 "stale": bool(self.raw) and (self.last_error or time.time() - self.updated_at > REFRESH_SECONDS * 2)}
 
-    def build(self, group, duration1, duration2):
+    def build(self, group, duration1, duration2, week=None):
         # Minute bucket handles the Saturday rollover; bound memory explicitly.
-        key = (normalize_group(group), duration1, duration2, int(time.time() // 60))
+        key = (normalize_group(group), duration1, duration2, week, int(time.time() // 60))
         if key not in self._built:
-            result = build_group_schedule(self.raw, group, duration1, duration2)
+            result = build_group_schedule(self.raw, group, duration1, duration2, week=week)
             if result is None:
                 return None
             if len(self._built) >= 1024:
@@ -151,8 +151,11 @@ def is_lesson_active(weeks_str: str, current_week: int) -> bool:
         logger.warning(f"Error filtering active week '{weeks_str}': {e}. Defaulting to True.")
         return True 
 
-def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: int, duration2: int) -> Optional[Dict[str, Any]]:
+def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: int, duration2: int,
+                         week: Optional[int] = None) -> Optional[Dict[str, Any]]:
     """Build schedule for a single group from the in-memory raw data. No network calls."""
+    if week is not None and (type(week) is not int or week not in (1, 2, 3, 4)):
+        raise ValueError("Week must be an integer from 1 to 4")
     if not raw_schedule_data:
         return None
     
@@ -197,7 +200,7 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
 
     full_week_schedule = {}
     for day_name, day_date in days_to_check.items():
-        week_num = get_academic_week(day_date.date())
+        week_num = week if week is not None else get_academic_week(day_date.date())
         formatted_day = []
         
         for lesson in normalized_schedule.get(day_name, []):
