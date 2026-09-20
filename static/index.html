@@ -27,13 +27,15 @@
      <link rel="icon" type="image/png" href="favicon.png">
      <link rel="apple-touch-icon" href="favicon.png">
      <link rel="manifest" href="manifest.json">
-     <meta name="apple-mobile-web-app-capable" content="yes">
+     <meta name="mobile-web-app-capable" content="yes">
+    <!-- Retained for older iOS Home Screen support. -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
      <meta name="theme-color" content="#110c0a">
      <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <script src="js/display-mode.js?v=2.6.6"></script>
-    <script src="js/android-layout.js?v=2.6.6"></script>
-    <script src="js/gesture-guard.js?v=2.6.6"></script>
-    <link rel="stylesheet" href="style.css?v=2.6.6">
+    <script src="js/display-mode.js?v=2.6.8"></script>
+    <script src="js/android-layout.js?v=2.6.8"></script>
+    <script src="js/gesture-guard.js?v=2.6.8"></script>
+    <link rel="stylesheet" href="style.css?v=2.6.8">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -91,10 +93,10 @@
     </script>
 </head>
 <body>
+    <h1 class="sr-only page-heading">MyKep - розклад пар КЕП ІФНТУНГ</h1>
     <noscript>
-        <style>#main-app { display: none; } .no-js-info { max-width: 42rem; padding: 32px 24px; overflow-y: auto; line-height: 1.6; } .no-js-info a { text-decoration: underline; }</style>
+        <style>body { flex-direction: column; align-items: center; justify-content: flex-start; overflow-y: auto; } .page-heading { position: static; width: auto; height: auto; margin: 24px 24px 0; clip: auto; clip-path: none; overflow: visible; white-space: normal; flex-shrink: 0; } #main-app { display: none; } .no-js-info { max-width: 42rem; padding: 32px 24px; overflow-y: auto; line-height: 1.6; } .no-js-info a { text-decoration: underline; }</style>
         <main class="no-js-info">
-            <h1>MyKep - розклад пар КЕП ІФНТУНГ</h1>
             <p>Незалежний студентський PWA-застосунок для ВСП «Фаховий коледж електронних приладів ІФНТУНГ». Розклад на сьогодні й тиждень, аудиторії, викладачі та таймер пари.</p>
             <p>Для інтерактивного розкладу увімкніть JavaScript. <a href="/about.html">Про MyKep та джерело розкладу</a> можна прочитати без JavaScript.</p>
         </main>
@@ -131,11 +133,11 @@
                 <p>Створено студентами для студентів.</p>
                 <div class="authors-grid">
                     <div class="author-profile">
-                        <div class="avatar"><img src="pfp/1.png" alt="h0pe1esss"></div>
+                        <div class="avatar"><img src="pfp/1.png" alt="h0pe1esss" width="460" height="460" loading="lazy" decoding="async" title="Аватар h0pe1esss"></div>
                         <div class="author-name">@h0pe1esss</div>
                     </div>
                     <div class="author-profile">
-                        <div class="avatar"><img src="pfp/2.gif" alt="ODDxq"></div>
+                        <div class="avatar"><img src="pfp/2.gif" alt="ODDxq" width="184" height="184" loading="lazy" decoding="async" title="Аватар ODDxq"></div>
                         <div class="author-name">@ODDxq</div>
                     </div>
                 </div>
@@ -179,7 +181,7 @@
     <!-- ОСНОВНИЙ ДОДАТОК -->
     <div class="app-container" id="main-app" style="opacity: 1;">
         <header class="app-header">
-            <h1 class="app-title">MyKep</h1>
+            <h2 class="app-title">MyKep</h2>
             <div class="location-badge">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                 <span id="header-group-text">Група ПІ-24-02</span>
@@ -272,14 +274,14 @@
             <a class="nav-btn" aria-label="Налаштування" href="/settings.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></a>
         </nav>
     </div>
-    <script src="js/utils.js?v=2.6.6"></script>
-    <script src="js/pwa.js?v=2.6.6"></script>
-    <script src="js/api.js?v=2.6.6"></script>
-    <script src="js/teacher-hints.js?v=2.6.6"></script>
-    <script src="js/mobile-fit.js?v=2.6.6"></script>
-    <script src="js/dashboard.js?v=2.6.6"></script>
-    <script src="js/schedule.js?v=2.6.6"></script>
-    <script src="js/settings.js?v=2.6.6"></script>
-    <script src="js/app.js?v=2.6.6"></script>
+    <script src="js/utils.js?v=2.6.8"></script>
+    <script src="js/pwa.js?v=2.6.8"></script>
+    <script src="js/api.js?v=2.6.8"></script>
+    <script src="js/teacher-hints.js?v=2.6.8"></script>
+    <script src="js/mobile-fit.js?v=2.6.8"></script>
+    <script src="js/dashboard.js?v=2.6.8"></script>
+    <script src="js/schedule.js?v=2.6.8"></script>
+    <script src="js/settings.js?v=2.6.8"></script>
+    <script src="js/app.js?v=2.6.8"></script>
 </body>
 </html>

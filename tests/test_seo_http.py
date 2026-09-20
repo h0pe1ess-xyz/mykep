@@ -51,7 +51,7 @@ class SEOHTTPTests(unittest.IsolatedAsyncioTestCase):
     async def test_precache_resources_are_all_fetchable(self):
         import json
         import re
-        source = (Path(__file__).resolve().parents[1] / 'static/sw.js').read_text()
+        source = (Path(__file__).resolve().parents[1] / 'static/sw.js').read_text(encoding='utf-8')
         shell = json.loads(re.search(r'const APP_SHELL = (\[.*?\]);', source, re.S)[1])
         for path in shell:
             response = await self.client.get(path, follow_redirects=True)
@@ -72,7 +72,7 @@ class SEOHTTPTests(unittest.IsolatedAsyncioTestCase):
         response = await self.client.get('/sw.js')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers['cache-control'], 'no-cache')
-        self.assertIn('mykep-cache-v2.6.6', response.text)
+        self.assertIn('mykep-cache-v2.6.8', response.text)
 
 
 if __name__ == '__main__':

@@ -61,3 +61,8 @@ html:not(.ios-standalone) .page-schedule .app-container > .bottom-nav { grid-are
 #dashboard-main .lesson-teacher { min-width: 0; flex: 1 1 150px; }
 .teacher-name { min-width: 0; flex: 1 1 180px; }
 .teacher-name > span { min-width: 0; }
+
+/* Last resort for short viewports / long names: scroll content, never clip it. */
+#dashboard-main[data-overflow="true"] {
+    overflow-y: auto; justify-content: flex-start;
+}

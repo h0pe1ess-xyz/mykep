@@ -62,7 +62,7 @@ class SEOStaticTests(unittest.TestCase):
         for name in ['index.html', 'about.html', 'schedule.html', 'settings.html']:
             robots = page(name).find('meta', name='robots')[0]['content']
             self.assertEqual('noindex' in robots, name in ['schedule.html', 'settings.html'])
-        robots = (STATIC / 'robots.txt').read_text()
+        robots = (STATIC / 'robots.txt').read_text(encoding='utf-8')
         self.assertIn('Sitemap: ' + ORIGIN + '/sitemap.xml', robots)
         self.assertNotIn('Disallow:', robots)
 
@@ -103,13 +103,13 @@ class SEOStaticTests(unittest.TestCase):
         self.assertNotIn('data-nosnippet', raw)
 
 
-        self.assertNotIn('project-summary', (STATIC / 'index.html').read_text())
+        self.assertNotIn('project-summary', (STATIC / 'index.html').read_text(encoding='utf-8'))
         main = page('index.html').find('div', id='main-app')[0]
         self.assertNotIn('opacity: 0', main.get('style', ''))
 
     def test_installation_excluded_from_snippets(self):
         self.assertIn('data-nosnippet', page('index.html').find('div', id='onboarding')[0])
-        source = (STATIC / 'js/pwa.js').read_text()
+        source = (STATIC / 'js/pwa.js').read_text(encoding='utf-8')
         self.assertIn("overlay.setAttribute('data-nosnippet', '')", source)
         self.assertIn("button, input, summary, a[href]", source)
 
@@ -138,24 +138,24 @@ class SEOStaticTests(unittest.TestCase):
                         self.assertTrue((STATIC / path).is_file(), path)
 
     def test_pwa_shell_version_and_resources(self):
-        source = (STATIC / 'sw.js').read_text()
-        self.assertIn("const CACHE_NAME = 'mykep-cache-v2.6.6'", source)
+        source = (STATIC / 'sw.js').read_text(encoding='utf-8')
+        self.assertIn("const CACHE_NAME = 'mykep-cache-v2.6.8'", source)
         shell = json.loads(re.search(r'const APP_SHELL = (\[.*?\]);', source, re.S)[1])
         self.assertEqual(len(shell), len(set(shell)))
         for url in shell:
             parsed = urlsplit(url)
             self.assertTrue((STATIC / (parsed.path.lstrip('/') or 'index.html')).is_file(), url)
             if parsed.path.endswith(('.css', '.js')):
-                self.assertEqual(parsed.query, 'v=2.6.6', url)
+                self.assertEqual(parsed.query, 'v=2.6.8', url)
         for path in list(STATIC.glob('*.html')) + [STATIC / 'style.css']:
-            for url in re.findall(r'(?:src|href)="([^"]+)"|url\(\x27([^\x27]+)\x27\)', path.read_text()):
+            for url in re.findall(r'(?:src|href)="([^"]+)"|url\(\x27([^\x27]+)\x27\)', path.read_text(encoding='utf-8')):
                 resource = next(x for x in url if x)
                 if '?v=' in resource:
-                    self.assertIn('v=2.6.6', resource)
+                    self.assertIn('v=2.6.8', resource)
                     self.assertIn('/' + resource.lstrip('/'), shell)
 
     def test_manifest_preserves_installed_app_identity(self):
-        manifest = json.loads((STATIC / 'manifest.json').read_text())
+        manifest = json.loads((STATIC / 'manifest.json').read_text(encoding='utf-8'))
         self.assertEqual(manifest['id'], '/')
         self.assertEqual(manifest['start_url'], '/index.html')
         self.assertEqual(manifest['scope'], '/')

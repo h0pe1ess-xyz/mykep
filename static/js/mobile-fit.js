@@ -5,6 +5,8 @@
         frame = 0;
         const main = document.getElementById('dashboard-main');
         if (!main || !main.clientHeight) return;
+        main.dataset.overflow = 'false';
+        let fits = false;
         for (let density = 0; density <= 4; density++) {
             main.dataset.density = String(density);
             const style = getComputedStyle(main);
@@ -14,8 +16,9 @@
                 return height + node.getBoundingClientRect().height + parseFloat(css.marginTop || 0) + parseFloat(css.marginBottom || 0);
             }, 0) + Math.max(0, children.length - 1) * (parseFloat(style.rowGap) || 0)
                 + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
-            if (needed <= main.clientHeight + 1) break;
+            if (needed <= main.clientHeight + 1) { fits = true; break; }
         }
+        main.dataset.overflow = String(!fits);
     }
     window.requestDashboardFit = () => {
         if (!frame) frame = requestAnimationFrame(fit);

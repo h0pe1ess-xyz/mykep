@@ -13,7 +13,7 @@ async function testServiceWorker() {
     const entries = new Map([
         ['/index.html', { label: 'offline-home' }],
         ['/about.html', { label: 'offline-about' }],
-        ['/js/pwa.js?v=2.6.6', { label: 'cached-js' }],
+        ['/js/pwa.js?v=2.6.8', { label: 'cached-js' }],
     ]);
     const context = {
         URL,
@@ -28,7 +28,7 @@ async function testServiceWorker() {
                 addAll: async (urls) => { precached = [...urls]; },
                 match: async key => entries.get(typeof key === 'string' ? key : new URL(key.url).pathname + new URL(key.url).search),
             }),
-            keys: async () => ['mykep-cache-v2.6.5-mobile5', 'mykep-cache-v2.6.6', 'unrelated-cache'],
+            keys: async () => ['mykep-cache-v2.6.5-mobile5', 'mykep-cache-v2.6.8', 'unrelated-cache'],
             delete: async name => { deleted.push(name); },
         },
         fetch: async () => {
@@ -43,7 +43,7 @@ async function testServiceWorker() {
         await pending;
     }
     assert.ok(precached.includes('/about.html'));
-    assert.ok(precached.includes('/css/about.css?v=2.6.6'));
+    assert.ok(precached.includes('/css/about.css?v=2.6.8'));
     assert.deepEqual(deleted, ['mykep-cache-v2.6.5-mobile5']);
     async function request(url, mode = 'navigate', method = 'GET') {
         let pending;
@@ -55,7 +55,7 @@ async function testServiceWorker() {
     assert.equal((await request('https://mykep.pp.ua/about.html')).label, 'offline-about');
     assert.equal((await request('https://mykep.pp.ua/')).label, 'offline-home');
     assert.equal((await request('https://mykep.pp.ua/index.html')).label, 'offline-home');
-    assert.equal((await request('https://mykep.pp.ua/js/pwa.js?v=2.6.6', 'cors')).label, 'cached-js');
+    assert.equal((await request('https://mykep.pp.ua/js/pwa.js?v=2.6.8', 'cors')).label, 'cached-js');
     assert.equal(await request('https://mykep.pp.ua/api/schedule'), 'bypassed');
     assert.equal(await request('https://example.org/'), 'bypassed');
     assert.equal(await request('https://mykep.pp.ua/', 'navigate', 'POST'), 'bypassed');

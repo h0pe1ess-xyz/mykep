@@ -42,7 +42,7 @@ window.mykepViewportReport = function() {
     }
     probe.remove();
     const viewport = window.visualViewport;
-    return { version: '2.6.6', mode: getMyKepDisplayMode(),
+    return { version: '2.6.8', mode: getMyKepDisplayMode(),
         iosFixActive: document.documentElement.classList.contains('ios-standalone'),
         innerHeight: window.innerHeight, clientHeight: document.documentElement.clientHeight,
         visualViewport: viewport ? { height: viewport.height, offsetTop: viewport.offsetTop, scale: viewport.scale } : null,
