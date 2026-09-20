@@ -77,7 +77,7 @@ async function showPWAGuide(force = false) {
             <img src="/icons/icon-192.png" alt="MyKep" class="pwa-icon" width="80" height="80" title="MyKep" loading="eager" decoding="async">
             <h2 id="pwa-title" tabindex="-1">${ctx.embedded ? 'Відкрийте у браузері' : 'Встанови MyKep'}</h2>
             <p id="pwa-install-status" role="status" aria-live="polite" hidden></p>
-            <p>MyKep - незалежний студентський застосунок з розкладом пар КЕП ІФНТУНГ.</p>
+            <p>MyKep - незалежний студентський застосунок з розкладом пар ФКЕП ІФНТУНГ.</p>
             <a href="/about.html" class="pwa-about-link">Про MyKep та джерело розкладу</a>
             <div id="pwa-intro">
                 <p id="pwa-lead">${ctx.embedded ? `Щоб встановити MyKep, відкрийте сайт у ${ctx.ios ? 'Safari' : ctx.android ? 'Chrome' : 'Chrome або Edge'}.` : 'Додай MyKep на головний екран, щоб розклад завжди був під рукою.'}</p>
