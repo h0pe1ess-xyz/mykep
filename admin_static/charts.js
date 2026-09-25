@@ -6,8 +6,7 @@
     const NS = 'http://www.w3.org/2000/svg';
     const nf = new Intl.NumberFormat('uk-UA');
     const nf1 = new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 1 });
-    let uid = 0;
-    const PALETTE = ['#ff5500', '#ffb020', '#2dd4bf', '#60a5fa', '#a78bfa', '#f472b6', '#4ade80', '#dfd1c9', '#94a3b8', '#fb7185'];
+    const PALETTE = ['#ff702e', '#92b5ce', '#75c9c0', '#ffbf69', '#d7b7a4', '#b5c799', '#c2bacd', '#e1a7a7', '#a8afb6', '#eee1b7'];
 
     function svg(tag, attrs = {}, parent) {
         const node = document.createElementNS(NS, tag);
@@ -62,17 +61,64 @@
     }
 
     function prepare(container, opts, render) {
+        if (container.isConnected === false) return;
         container.classList.add('chart');
         container._chart = { opts, render };
         if (!container._observer && 'ResizeObserver' in window) {
             let lastWidth = 0;
             container._observer = new ResizeObserver(() => {
                 const w = Math.round(container.clientWidth);
-                if (w && Math.abs(w - lastWidth) > 4) { lastWidth = w; container._chart.render(container, container._chart.opts); }
+                if (container._chart && w && Math.abs(w - lastWidth) > 4) {
+                    lastWidth = w;
+                    const previous = container.querySelector('.chart-data');
+                    const expanded = previous && previous.open;
+                    container._chart.render(container, container._chart.opts);
+                    const current = container.querySelector('.chart-data');
+                    if (current && expanded) current.open = true;
+                }
             });
             container._observer.observe(container);
         }
         render(container, opts);
+    }
+
+    // Tables expose exact values without requiring a hover or precise touch.
+    function dataTable(container, headings, rows) {
+        const details = el('details', 'chart-data');
+        const summary = el('summary', null, 'Показати значення');
+        const scroller = el('div', 'chart-data-scroll');
+        scroller.tabIndex = 0;
+        scroller.setAttribute('role', 'region');
+        scroller.setAttribute('aria-label', 'Значення графіка');
+        const table = el('table');
+        const caption = el('caption', 'sr-only', 'Дані графіка');
+        const head = el('thead'), tr = el('tr');
+        headings.forEach(name => {
+            const th = el('th', null, name);
+            th.setAttribute('scope', 'col');
+            tr.appendChild(th);
+        });
+        head.appendChild(tr);
+        const body = el('tbody');
+        rows.forEach(values => {
+            const row = el('tr');
+            values.forEach((v, i) => {
+                const cell = el(i ? 'td' : 'th', null, v);
+                if (!i) cell.setAttribute('scope', 'row');
+                row.appendChild(cell);
+            });
+            body.appendChild(row);
+        });
+        table.append(caption, head, body);
+        scroller.appendChild(table);
+        details.append(summary, scroller);
+        container.appendChild(details);
+    }
+
+    function seriesTable(container, o, series) {
+        dataTable(container, ['Період', ...series.map(s => s.name)], o.labels.map((label, i) => [
+            (o.titles || o.labels)[i], ...series.map(s => s.values[i] == null ? 'Немає даних' : (o.tipFmt || fmt)(s.values[i]))
+        ]));
     }
 
     function legend(container, series) {
@@ -108,7 +154,7 @@
                 if (left + tw > cw) left = x - tw - 12;
                 left = Math.max(0, Math.min(left, cw - tw));
                 tip.style.left = left + 'px';
-                tip.style.top = Math.max(0, y - 10) + 'px';
+                tip.style.top = Math.max(0, Math.min(y + 12, container.clientHeight - tip.offsetHeight)) + 'px';
             },
             hide() { tip.hidden = true; }
         };
@@ -129,7 +175,7 @@
         const n = labels.length;
         const every = Math.max(1, Math.ceil(n / maxTicks));
         for (let i = 0; i < n; i += every) {
-            const t = svg('text', { x: xAt(i), y: H - pad.b + 16, 'text-anchor': 'middle', class: 'axis' }, g);
+            const t = svg('text', { x: xAt(i), y: H - pad.b + 16, 'text-anchor': i === 0 ? 'start' : i >= n - every ? 'end' : 'middle', class: 'axis' }, g);
             t.textContent = labels[i];
         }
     }
@@ -139,19 +185,18 @@
         container.replaceChildren();
         const series = o.series.filter(s => s && s.values);
         legend(container, series);
-        const W = Math.max(280, container.clientWidth || 600), H = o.height || 220;
-        const pad = { l: 38, r: 12, t: 12, b: 26 };
+        const W = Math.max(120, container.clientWidth || 320), H = o.height || 220;
+        const pad = { l: 38, r: 20, t: 12, b: 30 };
         const n = o.labels.length;
         const maxV = Math.max(0, ...series.flatMap(s => s.values.filter(v => Number.isFinite(v))));
         const yMax = niceMax(maxV * 1.08);
         const x = i => pad.l + (n <= 1 ? (W - pad.l - pad.r) / 2 : (W - pad.l - pad.r) * i / (n - 1));
         const y = v => H - pad.b - (H - pad.t - pad.b) * (v / yMax);
         const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H, role: 'img', 'aria-label': o.aria || 'Графік' });
-        const defs = svg('defs', {}, root);
         const g = svg('g', {}, root);
         // Optional highlighted bands (e.g. lesson times).
         (o.bands || []).forEach(b => {
-            const x1 = x(b.from), x2 = x(b.to);
+            const x1 = x(Math.max(0, Math.min(n - 1, b.from))), x2 = x(Math.max(0, Math.min(n - 1, b.to)));
             svg('rect', { x: x1, y: pad.t, width: Math.max(1, x2 - x1), height: H - pad.t - pad.b, class: 'band' }, g);
             if (b.label && x2 - x1 > 14) {
                 const t = svg('text', { x: (x1 + x2) / 2, y: pad.t + 10, 'text-anchor': 'middle', class: 'band-label' }, g);
@@ -163,18 +208,11 @@
         series.forEach(s => {
             const pts = s.values.map((v, i) => [x(i), y(v || 0)]);
             const d = monotonePath(pts);
-            if (s.area !== false) {
-                const id = 'lg' + (++uid);
-                const grad = svg('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
-                svg('stop', { offset: '0%', 'stop-color': s.color, 'stop-opacity': s.dashed ? 0 : 0.35 }, grad);
-                svg('stop', { offset: '100%', 'stop-color': s.color, 'stop-opacity': 0 }, grad);
-                if (pts.length) svg('path', { d: d + `L${pts[pts.length - 1][0]} ${H - pad.b}L${pts[0][0]} ${H - pad.b}Z`, fill: `url(#${id})` }, g);
-            }
             svg('path', { d, fill: 'none', stroke: s.color, 'stroke-width': s.width || 2.2, 'stroke-linecap': 'round',
                 'stroke-linejoin': 'round', 'stroke-dasharray': s.dashed ? '5 5' : null, class: 'line-path' }, g);
         });
         const cursor = svg('line', { y1: pad.t, y2: H - pad.b, class: 'cursor', visibility: 'hidden' }, g);
-        const dots = series.map(s => svg('circle', { r: 4, fill: s.color, stroke: '#0e0a08', 'stroke-width': 2, visibility: 'hidden' }, g));
+        const dots = series.map(s => svg('circle', { r: 4, fill: s.color, stroke: '#1b1d1f', 'stroke-width': 2, visibility: 'hidden' }, g));
         const hit = svg('rect', { x: pad.l, y: 0, width: W - pad.l - pad.r, height: H, fill: 'transparent' }, root);
         container.appendChild(root);
         const tip = tooltip(container);
@@ -188,7 +226,7 @@
                 dots[k].setAttribute('cx', x(i)); dots[k].setAttribute('cy', y(v || 0));
                 dots[k].setAttribute('visibility', v === undefined || v === null ? 'hidden' : 'visible');
             });
-            tip.show(x(i) * rect.width / W, (ev.clientY - rect.top), (o.titles || o.labels)[i],
+            tip.show(x(i) * rect.width / W, (ev.clientY - container.getBoundingClientRect().top), (o.titles || o.labels)[i],
                 series.map(s => ({ name: s.name, color: s.color,
                     value: s.values[i] === undefined || s.values[i] === null ? '–' : (o.tipFmt || fmt)(s.values[i]) })));
         };
@@ -196,6 +234,7 @@
         hit.addEventListener('pointermove', move);
         hit.addEventListener('pointerdown', move);
         hit.addEventListener('pointerleave', leave);
+        seriesTable(container, o, series);
     }
 
     /* ----------------------------------------------------------------- bar */
@@ -203,8 +242,8 @@
         container.replaceChildren();
         const series = o.series || [{ name: o.name || 'Значення', values: o.values, color: o.color || PALETTE[0] }];
         legend(container, series);
-        const W = Math.max(280, container.clientWidth || 600), H = o.height || 200;
-        const pad = { l: 38, r: 8, t: 14, b: 26 };
+        const W = Math.max(120, container.clientWidth || 320), H = o.height || 200;
+        const pad = { l: 38, r: 20, t: 14, b: 30 };
         const n = o.labels.length;
         const totals = o.labels.map((_, i) => series.reduce((a, s) => a + (s.values[i] || 0), 0));
         const yMax = niceMax(Math.max(0, ...totals) * 1.08);
@@ -248,20 +287,21 @@
             cursor.setAttribute('x', pad.l + band * i); cursor.setAttribute('visibility', 'visible');
             const rows = series.map(s => ({ name: s.name, color: s.color, value: (o.tipFmt || fmt)(s.values[i] || 0) }));
             if (series.length > 1) rows.push({ name: 'Разом', color: 'transparent', value: (o.tipFmt || fmt)(totals[i]) });
-            tip.show(x(i) * rect.width / W, ev.clientY - rect.top, (o.titles || o.labels)[i], rows);
+            tip.show(x(i) * rect.width / W, ev.clientY - container.getBoundingClientRect().top, (o.titles || o.labels)[i], rows);
         };
         hit.addEventListener('pointermove', move);
         hit.addEventListener('pointerdown', move);
         hit.addEventListener('pointerleave', () => { cursor.setAttribute('visibility', 'hidden'); tip.hide(); });
+        seriesTable(container, o, series);
     }
 
     /* ------------------------------------------------------------- heatmap */
     function renderHeatmap(container, o) {
         container.replaceChildren();
         const rows = o.rows, cols = 24;
-        const W = Math.max(300, container.clientWidth || 600);
+        const W = Math.max(120, container.clientWidth || 320);
         const padL = 28, padT = 6, padB = 20;
-        const cell = Math.max(8, Math.floor((W - padL) / cols));
+        const cell = (W - padL) / cols;
         const gap = cell > 14 ? 3 : 2;
         const H = padT + rows.length * cell + padB;
         const max = Math.max(1, ...o.matrix.flat());
@@ -274,12 +314,12 @@
             row.forEach((v, c) => {
                 const intensity = v / max;
                 const rect = svg('rect', { x: padL + c * cell + gap / 2, y: padT + r * cell + gap / 2, width: cell - gap, height: cell - gap,
-                    rx: Math.min(4, cell / 4), fill: v ? '#ff5500' : '#ffffff', 'fill-opacity': v ? (0.12 + 0.88 * Math.pow(intensity, 0.75)).toFixed(3) : 0.04, class: 'heat-cell' }, g);
+                    rx: Math.min(4, cell / 4), fill: v ? '#ff702e' : '#ffffff', 'fill-opacity': v ? (0.12 + 0.88 * Math.pow(intensity, 0.75)).toFixed(3) : 0.04, class: 'heat-cell' }, g);
                 rect.addEventListener('pointerenter', () => {
                     const box = rect.getBoundingClientRect(), cbox = container.getBoundingClientRect();
                     tip.show(box.left - cbox.left + box.width / 2, box.top - cbox.top,
                         `${rows[r]}, ${String(c).padStart(2, '0')}:00–${String(c + 1).padStart(2, '0')}:00`,
-                        [{ name: o.valueName || 'Переглядів', color: '#ff5500', value: fmt(v) }]);
+                        [{ name: o.valueName || 'Переглядів', color: '#ff702e', value: fmt(v) }]);
                 });
                 rect.addEventListener('pointerleave', () => tip.hide());
             });
@@ -289,6 +329,9 @@
             t.textContent = String(c).padStart(2, '0');
         }
         container.insertBefore(root, container.firstChild);
+        dataTable(container, ['День', 'Година', o.valueName || 'Перегляди'], o.matrix.flatMap((row, r) =>
+            row.map((v, c) => [rows[r], String(c).padStart(2, '0') + ':00', fmt(v)])));
+
     }
 
     /* --------------------------------------------------------------- donut */
@@ -333,7 +376,7 @@
         container.replaceChildren();
         const max = Math.max(1, ...o.items.map(i => i.value));
         const list = el('div', 'hbars');
-        o.items.forEach((item, idx) => {
+        o.items.forEach(item => {
             const row = el('div', 'hbar');
             const head = el('div', 'hbar-head');
             head.append(el('span', 'hbar-label', item.label), el('span', 'hbar-value', fmt(item.value) + (item.suffix || '')));
@@ -361,35 +404,34 @@
             return `${cx + r * Math.cos(a)} ${cy - r * Math.sin(a)}`;
         };
         svg('path', { d: `M${arc(0)} A${r} ${r} 0 0 1 ${arc(1)}`, fill: 'none', stroke: 'rgba(255,255,255,0.08)', 'stroke-width': 14, 'stroke-linecap': 'round' }, root);
-        if (pct > 0) svg('path', { d: `M${arc(0)} A${r} ${r} 0 0 1 ${arc(pct / 100)}`, fill: 'none', stroke: 'url(#gg)', 'stroke-width': 14, 'stroke-linecap': 'round' }, root);
-        const defs = svg('defs', {}, root);
-        const grad = svg('linearGradient', { id: 'gg', x1: 0, y1: 0, x2: 1, y2: 0 }, defs);
-        svg('stop', { offset: '0%', 'stop-color': '#ffb020' }, grad);
-        svg('stop', { offset: '100%', 'stop-color': '#ff5500' }, grad);
+        if (pct > 0) svg('path', { d: `M${arc(0)} A${r} ${r} 0 0 1 ${arc(pct / 100)}`, fill: 'none', stroke: PALETTE[0], 'stroke-width': 14, 'stroke-linecap': 'round' }, root);
         const t = svg('text', { x: cx, y: cy - 16, 'text-anchor': 'middle', class: 'gauge-value' }, root);
         t.textContent = nf1.format(pct) + '%';
         container.appendChild(root);
     }
 
     /* ----------------------------------------------------------- sparkline */
-    function sparkline(container, values, color = '#ff5500') {
+    function sparkline(container, values, color = '#ff702e') {
         container.replaceChildren();
         const W = 120, H = 34;
         const max = Math.max(1, ...values);
         const pts = values.map((v, i) => [values.length > 1 ? i * W / (values.length - 1) : W / 2, H - 3 - (H - 6) * (v / max)]);
         const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H, preserveAspectRatio: 'none', 'aria-hidden': 'true' });
-        const id = 'sp' + (++uid);
-        const defs = svg('defs', {}, root);
-        const grad = svg('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
-        svg('stop', { offset: '0%', 'stop-color': color, 'stop-opacity': 0.3 }, grad);
-        svg('stop', { offset: '100%', 'stop-color': color, 'stop-opacity': 0 }, grad);
         const d = monotonePath(pts);
-        if (pts.length) svg('path', { d: d + `L${W} ${H}L0 ${H}Z`, fill: `url(#${id})` }, root);
         svg('path', { d, fill: 'none', stroke: color, 'stroke-width': 1.8, 'vector-effect': 'non-scaling-stroke' }, root);
         container.appendChild(root);
     }
 
+    function dispose(root) {
+        root.querySelectorAll('.chart').forEach(chart => {
+            if (chart._observer) chart._observer.disconnect();
+            chart._observer = null;
+            chart._chart = null;
+        });
+    }
+
     window.MyKepCharts = Object.freeze({
+        dispose,
         line: (c, o) => prepare(c, o, renderLine),
         bars: (c, o) => prepare(c, o, renderBars),
         heatmap: (c, o) => prepare(c, o, renderHeatmap),

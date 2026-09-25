@@ -10,6 +10,7 @@
     const RANGE_LABELS = [['1', 'Сьогодні'], ['7', '7 днів'], ['14', '14 днів'], ['30', '30 днів'], ['90', '90 днів'], ['all', 'Весь час']];
     const state = { config: null, me: null, csrf: null, view: 'overview', range: '14', timer: null, loading: false,
         groupQuery: '', groupSort: 'views', groupsExpanded: false, dailyMetric: 'both', codeTimer: null, lastData: {} };
+    let loadSequence = 0;
     const $ = id => document.getElementById(id);
     const nf = new Intl.NumberFormat('uk-UA');
     const nf1 = new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 1 });
@@ -56,7 +57,7 @@
     }
     function fmtDate(iso) {
         if (!iso) return '–';
-        const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+        const [, m, d] = iso.slice(0, 10).split('-').map(Number);
         return `${d} ${MONTHS[m - 1]}`;
     }
     function fmtDateTime(iso) {
@@ -90,16 +91,18 @@
             if (state.csrf) headers['X-CSRF-Token'] = state.csrf;
         }
         let response;
+        const controller = new AbortController();
+        const timeout = method === 'GET' ? setTimeout(() => controller.abort(), 15000) : null;
         try {
-            response = await fetch('/api/admin' + path, { method, headers, credentials: 'same-origin', cache: 'no-store',
-                redirect: 'error', referrerPolicy: 'no-referrer', body: body === undefined ? undefined : JSON.stringify(body) });
-        } catch (_) {
-            $('offline-banner') && ($('offline-banner').hidden = false);
-            throw new ApiError(0, "Немає з'єднання з сервером.");
-        }
+            response = await fetch('/api/admin' + path, { method, headers, signal: controller.signal, credentials: 'same-origin', cache: 'no-store',
+                redirect: 'error', referrerPolicy: 'no-referrer', ...(method !== 'GET' && body !== undefined ? { body: JSON.stringify(body) } : {}) });
+        } catch {
+            if ($('offline-banner')) $('offline-banner').hidden = false;
+            throw new ApiError(0, controller.signal.aborted ? 'Сервер не відповів за 15 секунд. Спробуйте ще раз.' : "Немає з'єднання з сервером.");
+        } finally { clearTimeout(timeout); }
         if ($('offline-banner')) $('offline-banner').hidden = true;
         let json = null;
-        try { json = await response.json(); } catch (_) { /* non-JSON */ }
+        try { json = await response.json(); } catch { /* non-JSON */ }
         if (response.status === 401 && !path.startsWith('/auth') && path !== '/me') {
             showLogin('Сесія завершилась. Увійдіть знову.');
             throw new ApiError(401, 'Потрібен вхід.');
@@ -118,7 +121,7 @@
                 createScriptURL: url => { if (url === '/admin/sw.js') return url; throw new TypeError('Blocked script URL'); }
             });
         }
-    } catch (_) { ttPolicy = null; }
+    } catch { ttPolicy = null; }
     function registerSW() {
         if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
         const url = ttPolicy ? ttPolicy.createScriptURL('/admin/sw.js') : '/admin/sw.js';
@@ -141,7 +144,7 @@
             try {
                 const parsed = JSON.parse(base64ToText(decodeURIComponent(hashMatch[1])));
                 if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) payload = parsed;
-            } catch (_) { payload = null; }
+            } catch { payload = null; }
         } else {
             const params = new URLSearchParams(location.search);
             if (params.has('hash') && params.has('id') && params.has('auth_date')) {
@@ -164,6 +167,7 @@
     function showLogin(message) {
         stopTimer();
         state.me = null; state.csrf = null;
+        loadSequence++;
         $('boot').hidden = true;
         $('app').hidden = true;
         $('login').hidden = false;
@@ -247,7 +251,7 @@
     }
     async function logout() {
         if (!confirm('Вийти з адмін-панелі на цьому пристрої?')) return;
-        try { await api('/logout', { method: 'POST', body: {} }); } catch (_) { /* ignore */ }
+        try { await api('/logout', { method: 'POST', body: {} }); } catch { /* ignore */ }
         showLogin();
     }
 
@@ -264,7 +268,7 @@
             b.classList.toggle('active', active);
             if (active) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
         });
-        document.querySelectorAll('.page').forEach(p => { p.hidden = p.dataset.page !== view; });
+        document.querySelectorAll('.page').forEach(p => { p.hidden = p.dataset.page !== view; p.removeAttribute('aria-busy'); });
         $('page-title').textContent = TITLES[view];
         window.scrollTo({ top: 0 });
         load(true);
@@ -273,31 +277,50 @@
     function schedule() {
         stopTimer();
         state.timer = setTimeout(() => {
-            const focused = document.activeElement && document.activeElement.tagName === 'INPUT';
-            if (document.visibilityState === 'visible' && !focused) load(false); else schedule();
+            const focused = document.activeElement && document.activeElement.closest && document.activeElement.closest('#main');
+            const reading = document.querySelector('.page:not([hidden]) details[open]');
+            if (document.visibilityState === 'visible' && !focused && !reading) load(false); else schedule();
         }, REFRESH_MS[state.view]);
     }
     async function load(showSpinner) {
         if (!state.me) return;
+        stopTimer();
+        const sequence = ++loadSequence;
         const view = state.view;
         const page = $('page-' + view);
+        const focusedKey = document.activeElement && document.activeElement.dataset.control;
         if (showSpinner && !page.childElementCount) page.replaceChildren(skeleton());
         $('refresh-btn').classList.add('spinning');
+        page.setAttribute('aria-busy', 'true');
         try {
-            if (view === 'overview') renderOverview(await api('/overview'));
-            else if (view === 'stats') renderStats(await api('/stats?range=' + encodeURIComponent(state.range)));
-            else if (view === 'server') renderServer(await api('/server'));
-            else if (view === 'security') renderSecurity(await Promise.all([api('/sessions'), api('/audit?limit=150'), api('/server')]));
+            let data;
+            if (view === 'overview') data = await api('/overview');
+            else if (view === 'stats') data = await api('/stats?range=' + encodeURIComponent(state.range));
+            else if (view === 'server') data = await api('/server');
+            else data = await Promise.all([api('/sessions'), api('/audit?limit=150'), api('/server')]);
+            if (sequence !== loadSequence || state.view !== view || !state.me) return;
+            if (view === 'overview') renderOverview(data);
+            else if (view === 'stats') renderStats(data);
+            else if (view === 'server') renderServer(data);
+            else renderSecurity(data);
+            if (focusedKey && document.activeElement === document.body) restoreControl(page, focusedKey);
             $('updated-at').textContent = 'Оновлено ' + new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         } catch (e) {
-            if (e.status !== 401) {
+            if (sequence === loadSequence && e.status !== 401) {
                 if (!page.childElementCount || page.querySelector('.skeleton')) page.replaceChildren(errorBox(e.message));
                 else toast(e.message, 'error');
             }
         } finally {
-            $('refresh-btn').classList.remove('spinning');
-            if (state.me && state.view === view) schedule();
+            if (sequence === loadSequence) {
+                page.removeAttribute('aria-busy');
+                $('refresh-btn').classList.remove('spinning');
+                if (state.me && state.view === view) schedule();
+            }
         }
+    }
+    function restoreControl(page, key) {
+        const button = Array.from(page.querySelectorAll('[data-control]')).find(b => b.dataset.control === key);
+        if (button) button.focus({ preventScroll: true });
     }
     function skeleton() {
         return h('div', { class: 'skeleton' }, [h('div', { class: 'sk sk-wide' }), h('div', { class: 'sk-grid' },
@@ -320,13 +343,13 @@
     }
     function kpi(label, value, opts = {}) {
         const spark = opts.spark ? h('div', { class: 'kpi-spark' }) : null;
-        if (spark) C.sparkline(spark, opts.spark, opts.color || '#ff5500');
+        if (spark) C.sparkline(spark, opts.spark, opts.color || '#ff702e');
         let delta = null;
         if (opts.delta !== undefined && opts.delta !== null) {
             const up = opts.delta >= 0;
             delta = h('span', { class: 'delta ' + (up ? 'up' : 'down'), text: (up ? '▲ ' : '▼ ') + nf1.format(Math.abs(opts.delta)) + '%' });
         }
-        return h('div', { class: 'kpi' + (opts.accent ? ' kpi-accent' : '') }, [
+        return h('div', { class: 'kpi' + (opts.accent ? ' kpi-accent' : '') + (opts.wide ? ' kpi-wide' : '') }, [
             h('div', { class: 'kpi-label' }, [opts.live && h('i', { class: 'live-dot' }), label]),
             h('div', { class: 'kpi-value' }, [h('span', { text: value }), delta]),
             opts.hint && h('div', { class: 'kpi-hint', text: opts.hint }),
@@ -340,7 +363,7 @@
         return h('div', { class: 'status-banner s-' + health.status }, [
             h('div', { class: 'status-main' }, [h('i', { class: 'status-dot' }), h('div', {}, [
                 h('b', { text: texts[health.status] || health.status }),
-                h('span', { class: 'muted small', text: `Аптайм ${fmtDuration(health.uptime_seconds)} · v${health.version} · ${fmt(health.rpm)} запит/хв · p95 ${health.p95_ms === null ? '–' : fmt(health.p95_ms) + ' мс'}` })
+                h('span', { class: 'muted small', text: `Без перезапуску ${fmtDuration(health.uptime_seconds)} · v${health.version} · ${fmt(health.rpm)} запит/хв · p95 ${health.p95_ms === null ? '–' : fmt(health.p95_ms) + ' мс'}` })
             ])]),
             h('div', { class: 'checks' }, health.checks.map(c => h('span', { class: 'check c-' + c.level, title: c.detail }, [
                 h('i'), h('b', { text: c.label }), h('span', { text: c.detail })])))
@@ -359,6 +382,7 @@
         state.lastData.overview = d;
         updateStatusPill(d.health);
         const page = $('page-overview');
+        C.dispose(page);
         const hoursNow = new Date(d.now).getHours();
         const todayHours = d.hours_today.slice(0, hoursNow + 1);
         const todayVsYday = chartBox();
@@ -375,7 +399,7 @@
                 kpi('Переглядів сьогодні', fmt(d.today.views), { delta: d.delta_views_same_time_pct,
                     hint: `вчора на цей час: ${fmt(d.yesterday.views_same_time)}`, spark: d.daily_14.map(x => x.views) }),
                 kpi('Користувачів сьогодні', fmt(d.today.users), { hint: `вчора: ${fmt(d.yesterday.users)} · ${fmt(d.today.views_per_user)} перегл./люд.`,
-                    spark: d.daily_14.map(x => x.users), color: '#ffb020' }),
+                    spark: d.daily_14.map(x => x.users), color: '#ffbf69' }),
                 kpi('Нових сьогодні', fmt(d.today.new_users), { hint: d.today.peak_hour !== null ? `пік сьогодні: ${hh(d.today.peak_hour)}` : 'ще немає переглядів' }),
                 kpi('За 7 днів (WAU)', fmt(a.wau), { hint: 'унікальних користувачів' }),
                 kpi('За 30 днів (MAU)', fmt(a.mau), { hint: `залученість DAU/MAU: ${pct(a.stickiness_pct)}` }),
@@ -383,7 +407,7 @@
                 kpi('Всього переглядів', fmt(d.all_time.views), { hint: 'розкладу за весь час' })
             ]),
             h('div', { class: 'grid' }, [
-                card('Сьогодні vs вчора', todayVsYday, { span: 2, sub: 'Перегляди розкладу по годинах' }),
+                card('Сьогодні та вчора', todayVsYday, { span: 2, sub: 'Перегляди розкладу по годинах' }),
                 card('Охоплення коледжу', [gauge, h('p', { class: 'center muted small', text:
                     `${fmt(a.mau)} з ~${fmt(a.college_size)} студентів за 30 днів` }), h('p', { class: 'center muted small', text:
                     `За тиждень: ${pct(a.college_size ? Math.round(a.wau / a.college_size * 1000) / 10 : null)}` })], { sub: 'MAU / кількість студентів' }),
@@ -395,12 +419,12 @@
         );
         after(() => {
             C.line(todayVsYday, { labels: d.hours_today.map((_, i) => hh(i)), height: 230, aria: 'Сьогодні проти вчора',
-                series: [{ name: 'Вчора', values: d.hours_yesterday, color: '#8a7d75', dashed: true, area: false },
-                    { name: 'Сьогодні', values: todayHours, color: '#ff5500' }] });
+                series: [{ name: 'Вчора', values: d.hours_yesterday, color: '#bcc1c6', dashed: true, area: false },
+                    { name: 'Сьогодні', values: todayHours, color: '#ff702e' }] });
             C.bars(lastHour, { labels: d.last_60_minutes.map(x => x.time), values: d.last_60_minutes.map(x => x.views), height: 170, name: 'Переглядів' });
             C.line(days14, { labels: d.daily_14.map(x => fmtDate(x.date)), height: 220,
-                series: [{ name: 'Перегляди', values: d.daily_14.map(x => x.views), color: '#ff5500' },
-                    { name: 'Користувачі', values: d.daily_14.map(x => x.users), color: '#ffb020' }] });
+                series: [{ name: 'Перегляди', values: d.daily_14.map(x => x.views), color: '#ff702e' },
+                    { name: 'Користувачі', values: d.daily_14.map(x => x.users), color: '#ffbf69' }] });
             C.gauge(gauge, { value: a.reach_pct || 0 });
             C.hbars(topGroups, { items: d.top_groups_today.map(g => ({ label: g.group, value: g.views, sub: `${fmt(g.users)} користувачів` })) });
             C.hbars(liveGroups, { color: '#2dd4bf', items: d.live.groups_60m.map(g => ({ label: g.group, value: g.views })) });
@@ -409,13 +433,14 @@
 
     /* -------------------------------------------------------------- stats */
     function rangeControl() {
-        return h('div', { class: 'segmented', role: 'tablist' }, RANGE_LABELS.map(([key, label]) => h('button', {
-            type: 'button', class: state.range === key ? 'active' : '', text: label, role: 'tab', aria: { selected: state.range === key },
+        return h('div', { class: 'segmented', role: 'group', aria: { label: 'Період статистики' } }, RANGE_LABELS.map(([key, label]) => h('button', {
+            type: 'button', class: state.range === key ? 'active' : '', text: label, aria: { pressed: String(state.range === key) }, data: { control: 'range-' + key },
             on: { click: () => { state.range = key; load(true); } } })));
     }
     function renderStats(d) {
         state.lastData.stats = d;
         const page = $('page-stats');
+        C.dispose(page);
         const t = d.totals, r = d.retention, p = d.peaks;
         const single = d.days === 1;
         const main = chartBox(), newRet = chartBox(), growth = chartBox(), hours = chartBox(), profile = chartBox();
@@ -426,8 +451,8 @@
         const slotSum = d.slots.summary;
         page.replaceChildren(
             h('div', { class: 'toolbar' }, [rangeControl(), h('div', { class: 'toolbar-actions' }, [
-                h('a', { class: 'btn btn-ghost small', text: '⬇ CSV по днях', on: { click: ev => download(ev, 'daily') } }),
-                h('a', { class: 'btn btn-ghost small', text: '⬇ CSV по групах', on: { click: ev => download(ev, 'groups') } })])]),
+                h('button', { type: 'button', class: 'btn btn-ghost small', text: 'CSV за днями', on: { click: ev => download(ev, 'daily') } }),
+                h('button', { type: 'button', class: 'btn btn-ghost small', text: 'CSV за групами', on: { click: ev => download(ev, 'groups') } })])]),
             h('p', { class: 'muted small range-note', text: `${fmtDate(d.start)} – ${fmtDate(d.end)} · ${d.days} дн.` }),
             h('div', { class: 'kpi-grid' }, [
                 kpi('Переглядів', fmt(t.views), { accent: true, hint: `≈ ${fmt(t.avg_daily_views)} на день` }),
@@ -437,7 +462,7 @@
                 kpi('Пікова година', peakHourText, { hint: `пік 15 хв: ${p.quarter || '–'}` }),
                 kpi('Найактивніший день', p.weekday || '–', { hint: p.best_day ? `рекорд: ${fmt(p.best_day.views)} (${fmtDate(p.best_day.date)})` : '' }),
                 kpi('Повертаються', pct(r.returning_pct), { hint: 'заходили ≥ 2 днів' }),
-                kpi('Retention D1 / D7', `${pct(r.d1_pct)} / ${pct(r.d7_pct)}`, { hint: `когорти: ${fmt(r.d1_base)} / ${fmt(r.d7_base)} люд.` })
+                kpi('Повернулися на 1-й / 7-й день', `${pct(r.d1_pct)} / ${pct(r.d7_pct)}`, { wide: true, hint: `когорти: ${fmt(r.d1_base)} / ${fmt(r.d7_base)} люд.` })
             ]),
             h('div', { class: 'grid' }, [
                 card(single ? 'Перегляди по годинах' : 'Перегляди та користувачі по днях', main, { span: 3,
@@ -449,7 +474,7 @@
                 card('По днях тижня', weekdays, { sub: 'Середня кількість переглядів за день' }),
                 card('Перегляди по парах', slotBars, { sub: `Під час пар ${fmt(slotSum.lessons)} · перерви ${fmt(slotSum.breaks)} · поза парами ${fmt(slotSum.outside)}` }),
                 !single && card('Нові та повторні користувачі', newRet, { span: 2 }),
-                !single && card('Ріст аудиторії', growth, { span: 2, sub: 'Кумулятивна кількість користувачів' }),
+                !single && card('Зростання аудиторії', growth, { span: 2, sub: 'Загальна кількість користувачів на кожну дату' }),
                 card('Частота відвідувань', freq, { sub: 'Скільки різних днів заходили за період' }),
                 card('Групи', groupsBox, { span: 3, sub: `${d.groups.length} груп з переглядами` }),
                 card('Спеціальності', specs, { sub: 'За префіксом групи' }),
@@ -466,13 +491,13 @@
                 const labels = d.daily.map(x => fmtDate(x.date));
                 const titles = d.daily.map(x => `${x.weekday}, ${fmtDate(x.date)}`);
                 const series = [];
-                if (state.dailyMetric !== 'users') series.push({ name: 'Перегляди', values: d.daily.map(x => x.views), color: '#ff5500' });
-                if (state.dailyMetric !== 'views') series.push({ name: 'Користувачі', values: d.daily.map(x => x.users), color: '#ffb020' });
+                if (state.dailyMetric !== 'users') series.push({ name: 'Перегляди', values: d.daily.map(x => x.views), color: '#ff702e' });
+                if (state.dailyMetric !== 'views') series.push({ name: 'Користувачі', values: d.daily.map(x => x.users), color: '#ffbf69' });
                 C.line(main, { labels, titles, series, height: 260 });
                 C.bars(newRet, { labels, titles, height: 220, series: [
-                    { name: 'Повторні', values: d.daily.map(x => x.returning_users), color: '#ff5500' },
+                    { name: 'Повторні', values: d.daily.map(x => x.returning_users), color: '#ff702e' },
                     { name: 'Нові', values: d.daily.map(x => x.new_users), color: '#2dd4bf' }] });
-                C.line(growth, { labels, titles, height: 220, series: [{ name: 'Всього користувачів', values: d.daily.map(x => x.total_users), color: '#a78bfa' }] });
+                C.line(growth, { labels, titles, height: 220, series: [{ name: 'Всього користувачів', values: d.daily.map(x => x.total_users), color: '#92b5ce' }] });
             }
             C.bars(hours, { labels: d.hours_avg.map((_, i) => String(i).padStart(2, '0')), titles: d.hours_avg.map((_, i) => `${hh(i)}–${hh((i + 1) % 24)}`),
                 values: single ? d.hours_total : d.hours_avg, highlightMax: true, height: 220, name: single ? 'Переглядів' : 'Сер. переглядів' });
@@ -480,21 +505,21 @@
             const q = d.quarter_hours_avg.slice(from, to);
             const qLabels = q.map((_, i) => { const m = (from + i) * 15; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; });
             const toIdx = hm => { const [a, b] = hm.split(':').map(Number); return (a * 60 + b) / 15 - from; };
-            C.line(profile, { labels: qLabels, height: 240, series: [{ name: single ? 'Переглядів' : 'Сер. переглядів', values: single ? d.quarter_hours_avg.slice(from, to) : q, color: '#ff5500' }],
+            C.line(profile, { labels: qLabels, height: 240, series: [{ name: single ? 'Переглядів' : 'Сер. переглядів', values: single ? d.quarter_hours_avg.slice(from, to) : q, color: '#ff702e' }],
                 bands: d.slots.bells.map(b => ({ from: toIdx(b.start), to: toIdx(b.end), label: String(b.lesson) })) });
             C.heatmap(heat, { rows: d.weekdays, matrix: d.heatmap });
-            C.bars(weekdays, { labels: d.weekdays, values: d.weekday_avg, height: 200, highlightMax: true, color: '#ffb020', name: 'Сер. переглядів' });
+            C.bars(weekdays, { labels: d.weekdays, values: d.weekday_avg, height: 200, highlightMax: true, color: '#ffbf69', name: 'Сер. переглядів' });
             C.donut(slotsDonut, { unit: 'переглядів', items: [
-                { label: 'Під час пар', value: slotSum.lessons, color: '#ff5500' },
+                { label: 'Під час пар', value: slotSum.lessons, color: '#ff702e' },
                 { label: 'На перервах', value: slotSum.breaks, color: '#2dd4bf' },
                 { label: 'Поза парами', value: slotSum.outside, color: '#60a5fa' }] });
             C.hbars(slotBars, { items: d.slots.items.map(s => ({ label: s.label, value: s.views, suffix: ` · ${nf1.format(s.percent)}%`,
-                color: s.key === 'break' ? '#2dd4bf' : s.key.startsWith('lesson') ? '#ff5500' : '#60a5fa' })) });
-            C.bars(freq, { labels: r.frequency.map(f => String(f.days)), titles: r.frequency.map(f => `${f.days} дн.`), values: r.frequency.map(f => f.users), height: 190, color: '#a78bfa', name: 'Користувачів' });
+                color: s.key === 'break' ? '#2dd4bf' : s.key.startsWith('lesson') ? '#ff702e' : '#60a5fa' })) });
+            C.bars(freq, { labels: r.frequency.map(f => String(f.days)), titles: r.frequency.map(f => `${f.days} дн.`), values: r.frequency.map(f => f.users), height: 190, color: '#92b5ce', name: 'Користувачів' });
             C.hbars(specs, { items: d.specialties.map(s => ({ label: s.name, value: s.users, suffix: ' люд.', sub: `${fmt(s.views)} переглядів` })) });
-            C.hbars(courses, { color: '#ffb020', items: d.courses.map(c => ({ label: c.label, value: c.users, suffix: ' люд.', sub: `вступ ${c.year} · ${fmt(c.views)} переглядів` })) });
+            C.hbars(courses, { color: '#ffbf69', items: d.courses.map(c => ({ label: c.label, value: c.users, suffix: ' люд.', sub: `вступ ${c.year} · ${fmt(c.views)} переглядів` })) });
             const modeNames = { standalone: 'PWA (головний екран)', browser: 'Браузер', unknown: 'Невідомо (старі дані)' };
-            const modeColors = { standalone: '#ff5500', browser: '#60a5fa', unknown: '#4b403a' };
+            const modeColors = { standalone: '#ff702e', browser: '#60a5fa', unknown: '#a8afb6' };
             C.donut(modes, { unit: 'людей', items: d.display_modes.map(m => ({ label: modeNames[m.name] || m.name, value: m.users, color: modeColors[m.name] })) });
             C.donut(plat, { unit: 'людей', items: d.platforms.map(x => ({ label: x.name, value: x.users })) });
             C.donut(brow, { unit: 'людей', items: d.browsers.map(x => ({ label: x.name, value: x.users })) });
@@ -503,8 +528,8 @@
     }
     function metricToggle() {
         const opts = [['both', 'Обидва'], ['views', 'Перегляди'], ['users', 'Люди']];
-        return h('div', { class: 'segmented small' }, opts.map(([k, label]) => h('button', { type: 'button', class: state.dailyMetric === k ? 'active' : '', text: label,
-            on: { click: () => { state.dailyMetric = k; renderStats(state.lastData.stats); } } })));
+        return h('div', { class: 'segmented small', role: 'group', aria: { label: 'Показники графіка' } }, opts.map(([k, label]) => h('button', { type: 'button', class: state.dailyMetric === k ? 'active' : '', text: label, aria: { pressed: String(state.dailyMetric === k) }, data: { control: 'metric-' + k },
+            on: { click: () => { state.dailyMetric = k; renderStats(state.lastData.stats); restoreControl($('page-stats'), 'metric-' + k); } } })));
     }
     function renderGroups(box, groups) {
         const input = h('input', { type: 'search', placeholder: 'Пошук групи…', value: state.groupQuery, aria: { label: 'Пошук групи' } });
@@ -571,10 +596,11 @@
         const load = s.load_avg ? s.load_avg.map(x => nf1.format(x)).join(' · ') : '–';
         const loadPct = s.load_avg && s.cpu_count ? s.load_avg[0] / s.cpu_count * 100 : 0;
         const refreshBtn = h('button', { type: 'button', class: 'btn', text: 'Оновити розклад зараз', on: { click: ev => refreshSchedule(ev.currentTarget) } });
+        C.dispose($('page-server'));
         $('page-server').replaceChildren(
             statusBanner(d.health),
             h('div', { class: 'tile-grid' }, [
-                tile('Аптайм', fmtDuration(s.uptime_seconds), `з ${fmtDateTime(s.started_at)}`),
+                tile('Без перезапуску', fmtDuration(s.uptime_seconds), `з ${fmtDateTime(s.started_at)}`),
                 tile('Запитів / хв', fmt(rq.last5.rpm), `за 5 хв: ${fmt(rq.last5.requests)} (API ${fmt(rq.last5.api)})`),
                 tile('Час відповіді API', rq.latency_ms.p50 === null ? '–' : `${fmt(rq.latency_ms.p50)} мс`,
                     `p95 ${rq.latency_ms.p95 === null ? '–' : fmt(rq.latency_ms.p95) + ' мс'} · p99 ${rq.latency_ms.p99 === null ? '–' : fmt(rq.latency_ms.p99) + ' мс'}`),
@@ -614,14 +640,14 @@
                     h('p', { class: 'muted small', text: 'Статистика тепер в адмінці. Бота можна увімкнути назад через BOT_MODE=embedded у .env.' })]),
                 card('Останні помилки 5xx', rq.recent_errors.length ? h('div', { class: 'list' }, rq.recent_errors.slice(0, 12).map(e =>
                     h('div', { class: 'list-row' }, [h('span', { class: 'badge b-critical', text: e.status }), h('span', { text: e.path }), h('span', { class: 'muted small', text: fmtDateTime(e.time) })])))
-                    : h('p', { class: 'muted', text: 'Помилок немає 🎉' }), { span: 2 })
+                    : h('p', { class: 'muted', text: 'Помилок 5xx не зафіксовано' }), { span: 2 })
             ])
         );
         after(() => {
             const labels = rq.series.map(x => x.time);
             C.bars(reqChart, { labels, height: 210, series: [
-                { name: 'Успішні', values: rq.series.map(x => x.requests - x.s4xx - x.s5xx), color: '#ff5500' },
-                { name: '4xx', values: rq.series.map(x => x.s4xx), color: '#ffb020' },
+                { name: 'Успішні', values: rq.series.map(x => x.requests - x.s4xx - x.s5xx), color: '#ff702e' },
+                { name: '4xx', values: rq.series.map(x => x.s4xx), color: '#ffbf69' },
                 { name: '5xx', values: rq.series.map(x => x.s5xx), color: '#ef4444' }] });
             C.line(latChart, { labels, height: 210, series: [{ name: 'Сер. час, мс', values: rq.series.map(x => x.avg_ms), color: '#2dd4bf' }] });
         });
@@ -685,7 +711,7 @@
             let left = r.expires_in;
             const timer = h('span', { class: 'muted small' });
             const copy = h('button', { type: 'button', class: 'btn btn-ghost small', text: 'Копіювати', on: { click: async () => {
-                try { await navigator.clipboard.writeText(r.code); toast('Скопійовано'); } catch (_) { toast('Не вдалося скопіювати', 'warn'); } } } });
+                try { await navigator.clipboard.writeText(r.code); toast('Скопійовано'); } catch { toast('Не вдалося скопіювати', 'warn'); } } } });
             box.replaceChildren(h('div', { class: 'code-value mono', text: r.code }), h('div', { class: 'code-meta' }, [timer, copy]));
             box.hidden = false;
             const tick = () => {
@@ -710,7 +736,7 @@
         registerSW();
         const pending = extractTelegramAuth();
         try { state.config = await api('/config'); }
-        catch (e) { state.config = {}; }
+        catch { state.config = {}; }
         if (pending) {
             try { await api('/auth/telegram', { method: 'POST', body: pending }); }
             catch (e) { $('boot').hidden = true; return showLogin(e.message); }
