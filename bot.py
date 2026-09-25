@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 import random
-from config import KYIV, DB_PATH
+from config import KYIV, DB_PATH, ADMIN_IDS as CONFIG_ADMIN_IDS
 from process_lock import exclusive_process_lock
 from datetime import datetime, time as dtime
 from telegram import Update, Bot
@@ -17,8 +17,8 @@ import analytics
 
 logger = logging.getLogger(__name__)
 
-# Preserve existing admins unless the deployment explicitly overrides them.
-ADMIN_IDS = {int(value.strip()) for value in os.getenv('TELEGRAM_ADMIN_IDS', '1125085502,1320649428').split(',') if value.strip()}
+# Admin IDs come from config.py (hard allowlist, env can only narrow it).
+ADMIN_IDS = CONFIG_ADMIN_IDS
 BOT_STATE = 'disabled' 
 DAILY_REPORT_HOUR = 22
 DAILY_REPORT_MINUTE = 0

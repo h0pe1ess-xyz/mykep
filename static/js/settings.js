@@ -327,3 +327,13 @@ window.obFinish = function() {
     storage.remove('mykep_schedule');
     window.location.reload();
 };
+
+// Onboarding buttons: delegated handlers (no inline onclick, so a strict CSP
+// without 'unsafe-inline' scripts keeps working).
+document.addEventListener('click', event => {
+    const target = event.target instanceof Element ? event.target.closest('[data-ob-step], [data-ob-finish]') : null;
+    if (!target) return;
+    event.preventDefault();
+    if (target.hasAttribute('data-ob-finish')) window.obFinish();
+    else window.obNextSlide(Number(target.getAttribute('data-ob-step')));
+});

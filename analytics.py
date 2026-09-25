@@ -21,6 +21,11 @@ async def init_analytics_db():
         await db.execute('CREATE INDEX IF NOT EXISTS idx_analytics_timestamp ON analytics(timestamp)')
         await db.execute('CREATE INDEX IF NOT EXISTS idx_analytics_uid ON analytics(uid)')
         await db.execute('CREATE INDEX IF NOT EXISTS idx_analytics_group ON analytics(group_name)')
+        # Non-destructive migration: old rows keep NULL (= unknown display mode).
+        columns = {row[1] for row in await db.execute_fetchall('PRAGMA table_info(analytics)')}
+        if 'display_mode' not in columns:
+            await db.execute('ALTER TABLE analytics ADD COLUMN display_mode TEXT')
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_analytics_endpoint_ts ON analytics(endpoint, timestamp)')
         await db.execute('''CREATE TABLE IF NOT EXISTS bot_reports (
             report_date TEXT NOT NULL, admin_id INTEGER NOT NULL,
             PRIMARY KEY (report_date, admin_id))''')
@@ -37,11 +42,15 @@ async def start_writer():
     _writer = asyncio.create_task(_write_loop(), name='analytics-writer')
 
 
-def record_request(uid, group_name, endpoint, user_agent=''):
+DISPLAY_MODES = {'standalone', 'browser'}
+
+
+def record_request(uid, group_name, endpoint, user_agent='', display_mode=None):
     global _dropped
+    mode = display_mode if display_mode in DISPLAY_MODES else None
     row = (datetime.now(KYIV).strftime('%Y-%m-%d %H:%M:%S'),
            str(uid or '')[:128], str(group_name).strip().upper()[:64],
-           str(endpoint)[:64], str(user_agent)[:512])
+           str(endpoint)[:64], str(user_agent)[:512], mode)
     try:
         if _queue is None:
             raise asyncio.QueueFull
@@ -52,9 +61,9 @@ def record_request(uid, group_name, endpoint, user_agent=''):
             logger.warning('Analytics queue unavailable/full: %s events dropped', _dropped)
 
 
-async def log_request(uid, group_name, endpoint, user_agent=''):
+async def log_request(uid, group_name, endpoint, user_agent='', display_mode=None):
     """Compatibility wrapper for integrations using the previous async API."""
-    record_request(uid, group_name, endpoint, user_agent)
+    record_request(uid, group_name, endpoint, user_agent, display_mode)
 
 
 async def _write_loop():
@@ -81,7 +90,7 @@ async def _write_loop():
         for attempt in range(3):
             try:
                 async with connect() as db:
-                    await db.executemany('INSERT INTO analytics (timestamp, uid, group_name, endpoint, user_agent) VALUES (?, ?, ?, ?, ?)', batch)
+                    await db.executemany('INSERT INTO analytics (timestamp, uid, group_name, endpoint, user_agent, display_mode) VALUES (?, ?, ?, ?, ?, ?)', batch)
                     await db.commit()
                 _last_write_error = False
                 break

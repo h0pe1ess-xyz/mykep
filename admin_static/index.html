@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <meta name="referrer" content="no-referrer">
+    <meta name="format-detection" content="telephone=no">
+    <title>MyKep Admin</title>
+    <meta name="theme-color" content="#0e0a08">
+    <meta name="application-name" content="MyKep Admin">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="MyKep Admin">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/admin/manifest.webmanifest">
+    <link rel="icon" type="image/png" href="/admin/icon-192.png">
+    <link rel="apple-touch-icon" href="/admin/apple-touch-icon.png">
+    <link rel="stylesheet" href="/admin/admin.css?v=1">
+    <script src="/admin/charts.js?v=1" defer></script>
+    <script src="/admin/admin.js?v=1" defer></script>
+</head>
+<body>
+    <div id="boot" class="boot" aria-live="polite"><div class="spinner" aria-hidden="true"></div><span>Завантаження…</span></div>
+
+    <section id="login" class="login" hidden>
+        <div class="login-card">
+            <img src="/admin/icon-192.png" class="login-logo" width="72" height="72" alt="">
+            <h1>MyKep Admin</h1>
+            <p class="muted">Панель керування. Доступ лише для адміністраторів.</p>
+            <a id="tg-login" class="btn btn-tg" hidden rel="noopener">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.9 4.3 18.8 19c-.2 1-.9 1.3-1.7.8l-4.8-3.5-2.3 2.2c-.3.3-.5.5-1 .5l.3-4.9 8.9-8c.4-.3-.1-.5-.6-.2L6.6 12.8l-4.7-1.5c-1-.3-1-1 .2-1.5L20.5 2.9c.9-.3 1.6.2 1.4 1.4z"/></svg>
+                <span>Увійти через Telegram</span>
+            </a>
+            <p id="tg-missing" class="hint" hidden>Вхід через Telegram не налаштований на сервері (немає TELEGRAM_BOT_TOKEN).</p>
+            <div id="ios-hint" class="hint" hidden>
+                <b>Ви в застосунку з головного екрана iPhone.</b> Telegram-вхід тут може не спрацювати (iOS ізолює дані PWA від Safari). Відкрийте <b>mykep.pp.ua/admin</b> у Safari, увійдіть, перейдіть у «Безпека» → «Код входу» і введіть код нижче.
+            </div>
+            <details id="code-box" class="code-box">
+                <summary>Увійти одноразовим кодом</summary>
+                <form id="code-form" class="code-form" autocomplete="off">
+                    <label for="code-input" class="sr-only">Код входу</label>
+                    <input id="code-input" name="code" inputmode="text" autocomplete="one-time-code" autocapitalize="characters"
+                           maxlength="9" placeholder="XXXX-XXXX" spellcheck="false" required>
+                    <button class="btn" type="submit">Увійти</button>
+                </form>
+            </details>
+            <div id="dev-box" class="dev-box" hidden>
+                <p class="small warn-text">⚠ Локальний режим розробки (ADMIN_DEV_LOGIN=1)</p>
+                <div id="dev-buttons" class="dev-buttons"></div>
+            </div>
+            <p id="login-error" class="error" role="alert" hidden></p>
+        </div>
+        <p class="login-foot muted small">MyKep · захищене з'єднання</p>
+    </section>
+
+    <div id="app" class="app" hidden>
+        <aside class="sidebar">
+            <div class="brand"><img src="/admin/icon-192.png" width="34" height="34" alt=""><div><b>MyKep</b><span>Admin</span></div></div>
+            <nav class="side-nav" aria-label="Розділи">
+                <button type="button" data-view="overview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h8V3H3zm10 8h8V11h-8zM3 21h8v-6H3zm10-18v6h8V3z"/></svg><span>Огляд</span></button>
+                <button type="button" data-view="stats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m6 10V4m6 16v-7m6 7H2"/></svg><span>Статистика</span></button>
+                <button type="button" data-view="server"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v6H4zm0 10h16v6H4zm3-7h.01M7 17h.01"/></svg><span>Сервер</span></button>
+                <button type="button" data-view="security"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Безпека</span></button>
+            </nav>
+            <div class="side-user" id="side-user"></div>
+        </aside>
+        <div class="content">
+            <header class="topbar">
+                <div class="topbar-title">
+                    <h1 id="page-title">Огляд</h1>
+                    <span id="updated-at" class="muted small"></span>
+                </div>
+                <div class="topbar-actions">
+                    <span id="status-pill" class="status-pill" hidden></span>
+                    <button type="button" id="refresh-btn" class="icon-btn" aria-label="Оновити дані" title="Оновити">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></svg>
+                    </button>
+                </div>
+            </header>
+            <div id="offline-banner" class="offline-banner" hidden>Немає з'єднання з сервером — показано останні дані</div>
+            <main id="main">
+                <section class="page" data-page="overview" id="page-overview"></section>
+                <section class="page" data-page="stats" id="page-stats" hidden></section>
+                <section class="page" data-page="server" id="page-server" hidden></section>
+                <section class="page" data-page="security" id="page-security" hidden></section>
+            </main>
+        </div>
+        <nav class="tabbar" aria-label="Розділи">
+            <button type="button" data-view="overview"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h8V3H3zm10 8h8V11h-8zM3 21h8v-6H3zm10-18v6h8V3z"/></svg><span>Огляд</span></button>
+            <button type="button" data-view="stats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m6 10V4m6 16v-7m6 7H2"/></svg><span>Статистика</span></button>
+            <button type="button" data-view="server"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v6H4zm0 10h16v6H4zm3-7h.01M7 17h.01"/></svg><span>Сервер</span></button>
+            <button type="button" data-view="security"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Безпека</span></button>
+        </nav>
+        <div id="toast" class="toast" role="status" hidden></div>
+    </div>
+    <noscript><p class="noscript">Для адмін-панелі потрібен JavaScript.</p></noscript>
+</body>
+</html>

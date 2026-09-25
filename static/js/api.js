@@ -1,6 +1,15 @@
 let groupsRequest = null;
 let scheduleNotice = '';
 
+// Anonymous: only tells the admin stats whether MyKep runs as an installed PWA.
+function currentDisplayMode() {
+    try {
+        const standalone = window.matchMedia('(display-mode: standalone)').matches ||
+            window.matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
+        return standalone ? 'standalone' : 'browser';
+    } catch (_) { return 'browser'; }
+}
+
 async function fetchJSON(url, timeout = 10000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
@@ -86,7 +95,7 @@ function staleScheduleNotice(meta) {
 }
 async function fetchSchedule(week = 'auto') {
     const { group, duration1, duration2, key, week: selectedWeek } = scheduleRequestContext(week);
-    const query = new URLSearchParams({ group, duration1, duration2, uid: getUserId() });
+    const query = new URLSearchParams({ group, duration1, duration2, uid: getUserId(), mode: currentDisplayMode() });
     if (selectedWeek !== 'auto') query.set('week', selectedWeek);
     try {
         const result = await fetchJSON(`/api/schedule?${query}`);

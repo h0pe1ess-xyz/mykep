@@ -55,6 +55,12 @@ class ScheduleService:
         self.lock = asyncio.Lock()
         self.task = None
         self._built = {}
+        # Diagnostics for the admin panel (never exposed publicly).
+        self.last_attempt_wall = 0.0
+        self.last_error_type = None
+        self.last_duration_ms = None
+        self.refresh_ok = 0
+        self.refresh_failed = 0
 
     def install(self, data, updated_at):
         self.raw = data
@@ -81,6 +87,8 @@ class ScheduleService:
             if self.last_attempt and time.monotonic() - self.last_attempt < RETRY_SECONDS:
                 return False
             self.last_attempt = time.monotonic()
+            self.last_attempt_wall = time.time()
+            started = time.monotonic()
             try:
                 data = await asyncio.to_thread(fetch_schedule_sync)
                 if not valid_snapshot(data):
@@ -91,10 +99,16 @@ class ScheduleService:
                     await db.commit()
                 self.install(data, updated_at)
                 self.last_error = False
+                self.last_error_type = None
+                self.refresh_ok += 1
+                self.last_duration_ms = round((time.monotonic() - started) * 1000)
                 logger.info("Refreshed schedule: %s groups", len(self.groups))
                 return True
             except Exception as exc:
                 self.last_error = True
+                self.last_error_type = type(exc).__name__
+                self.refresh_failed += 1
+                self.last_duration_ms = round((time.monotonic() - started) * 1000)
                 logger.warning("Schedule refresh failed (%s); retaining cached data", type(exc).__name__)
                 return False
 
@@ -106,6 +120,29 @@ class ScheduleService:
     def metadata(self):
         return {"updated_at": datetime.fromtimestamp(self.updated_at, KYIV).isoformat() if self.updated_at else None,
                 "stale": bool(self.raw) and (self.last_error or time.time() - self.updated_at > REFRESH_SECONDS * 2)}
+
+    def diagnostics(self):
+        now = time.time()
+        next_in = None
+        if self.last_attempt:
+            wait = RETRY_SECONDS if self.last_error else REFRESH_SECONDS
+            next_in = max(0, round(wait - (time.monotonic() - self.last_attempt)))
+        return {
+            **self.metadata(),
+            "ready": bool(self.raw),
+            "groups": len(self.groups),
+            "age_seconds": round(now - self.updated_at) if self.updated_at else None,
+            "last_attempt": datetime.fromtimestamp(self.last_attempt_wall, KYIV).isoformat() if self.last_attempt_wall else None,
+            "last_error": self.last_error,
+            "last_error_type": self.last_error_type,
+            "last_duration_ms": self.last_duration_ms,
+            "refresh_ok": self.refresh_ok,
+            "refresh_failed": self.refresh_failed,
+            "refresh_interval": REFRESH_SECONDS,
+            "retry_interval": RETRY_SECONDS,
+            "next_refresh_in": next_in,
+            "retry_blocked_for": max(0, round(RETRY_SECONDS - (time.monotonic() - self.last_attempt))) if self.last_attempt else 0,
+        }
 
     def build(self, group, duration1, duration2, week=None):
         # Minute bucket handles the Saturday rollover; bound memory explicitly.
