@@ -359,14 +359,49 @@
     function chartBox(cls = '') { return h('div', { class: 'chart-box ' + cls }); }
     function after(fn) { requestAnimationFrame(() => requestAnimationFrame(fn)); }
     function statusBanner(health) {
-        const texts = { ok: 'Усі системи працюють нормально', warning: 'Є попередження', critical: 'Критична проблема' };
-        return h('div', { class: 'status-banner s-' + health.status }, [
-            h('div', { class: 'status-main' }, [h('i', { class: 'status-dot' }), h('div', {}, [
-                h('b', { text: texts[health.status] || health.status }),
-                h('span', { class: 'muted small', text: `Без перезапуску ${fmtDuration(health.uptime_seconds)} · v${health.version} · ${fmt(health.rpm)} запит/хв · p95 ${health.p95_ms === null ? '–' : fmt(health.p95_ms) + ' мс'}` })
-            ])]),
-            h('div', { class: 'checks' }, health.checks.map(c => h('span', { class: 'check c-' + c.level, title: c.detail }, [
-                h('i'), h('b', { text: c.label }), h('span', { text: c.detail })])))
+        const checks = Array.isArray(health.checks) ? health.checks : [];
+        const issues = checks.filter(c => c.level === 'warning' || c.level === 'critical');
+        const texts = { ok: 'Сервер працює', warning: 'Потрібна увага', critical: 'Є критична проблема' };
+        const knownLevels = new Set(['ok', 'warning', 'critical']);
+        const status = knownLevels.has(health.status) ? health.status : 'unknown';
+        const explanation = issues.length
+            ? issues.map(c => c.label + ': ' + c.detail).join(' · ')
+            : status === 'ok' ? 'За поточними перевірками проблем не виявлено.'
+            : 'Відкрийте перевірки сервера, щоб уточнити стан.';
+        const metrics = [
+            ['Без перезапуску', fmtDuration(health.uptime_seconds)],
+            ['Запитів за хвилину', fmt(health.rpm)],
+            ['Час відповіді p95', health.p95_ms == null ? 'Немає даних' : fmt(health.p95_ms) + ' мс'],
+            ['Версія', 'v' + health.version]
+        ];
+        const levelText = { ok: 'Норма', warning: 'Увага', critical: 'Проблема', unknown: 'Невідомо' };
+        const list = h('ul', { class: 'checks' }, checks.map(c => {
+            const level = knownLevels.has(c.level) ? c.level : 'unknown';
+            return h('li', { class: 'check c-' + level }, [
+                h('div', { class: 'check-heading' }, [
+                    h('i', { aria: { hidden: 'true' } }),
+                    h('b', { text: c.label }),
+                    h('span', { class: 'check-state', text: levelText[level] })
+                ]),
+                h('p', { class: 'check-detail', text: c.detail })
+            ]);
+        }));
+        const details = h('details', { class: 'health-details' }, [
+            h('summary', { text: 'Перевірки сервера' + (issues.length ? ' · зауважень: ' + issues.length : '') }),
+            checks.length ? list : h('p', { class: 'muted small', text: 'Результатів перевірок поки немає.' })
+        ]);
+        details.open = state.view === 'server';
+        return h('div', { class: 'status-banner s-' + status }, [
+            h('div', { class: 'status-main' }, [
+                h('i', { class: 'status-dot', aria: { hidden: 'true' } }),
+                h('div', { class: 'status-copy' }, [
+                    h('b', { text: texts[status] || 'Стан сервера невідомий' }),
+                    h('p', { class: 'status-explanation', text: explanation })
+                ])
+            ]),
+            h('dl', { class: 'status-metrics' }, metrics.map(([label, value]) =>
+                h('div', {}, [h('dt', { text: label }), h('dd', { text: value })]))),
+            details
         ]);
     }
     function updateStatusPill(health) {
