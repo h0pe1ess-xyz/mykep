@@ -1,4 +1,4 @@
-/* MyKep Admin — tiny dependency-free SVG charts.
+/* MyKep Admin: tiny dependency-free SVG charts.
    Security: text is only ever written with textContent; SVG is built with
    createElementNS/setAttribute (no innerHTML), so data cannot inject markup. */
 (() => {
@@ -103,8 +103,10 @@
                 });
                 tip.hidden = false;
                 const cw = container.clientWidth, tw = tip.offsetWidth;
+                // Keep the tooltip inside the chart so it never widens the page.
                 let left = x + 12;
-                if (left + tw > cw) left = Math.max(0, x - tw - 12);
+                if (left + tw > cw) left = x - tw - 12;
+                left = Math.max(0, Math.min(left, cw - tw));
                 tip.style.left = left + 'px';
                 tip.style.top = Math.max(0, y - 10) + 'px';
             },
@@ -188,7 +190,7 @@
             });
             tip.show(x(i) * rect.width / W, (ev.clientY - rect.top), (o.titles || o.labels)[i],
                 series.map(s => ({ name: s.name, color: s.color,
-                    value: s.values[i] === undefined || s.values[i] === null ? '—' : (o.tipFmt || fmt)(s.values[i]) })));
+                    value: s.values[i] === undefined || s.values[i] === null ? '–' : (o.tipFmt || fmt)(s.values[i]) })));
         };
         const leave = () => { cursor.setAttribute('visibility', 'hidden'); dots.forEach(d => d.setAttribute('visibility', 'hidden')); tip.hide(); };
         hit.addEventListener('pointermove', move);

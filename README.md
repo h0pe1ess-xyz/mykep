@@ -177,8 +177,6 @@ mykep/
 ├── process_lock.py         # Блокування повторного запуску бота
 ├── requirements.txt        # Залежності застосунку
 ├── requirements-dev.txt    # Залежності для розробки
-├── flake.nix               # Середовище розробки Nix
-├── flake.lock              # Зафіксовані залежності Nix
 ├── CHANGELOG_UK.md         # Історія змін
 ├── deploy/                 # Приклади конфігурацій systemd і Nginx
 ├── scripts/                # Допоміжні скрипти та перевірки навантаження

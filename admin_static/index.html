@@ -16,9 +16,9 @@
     <link rel="manifest" href="/admin/manifest.webmanifest">
     <link rel="icon" type="image/png" href="/admin/icon-192.png">
     <link rel="apple-touch-icon" href="/admin/apple-touch-icon.png">
-    <link rel="stylesheet" href="/admin/admin.css?v=1">
-    <script src="/admin/charts.js?v=1" defer></script>
-    <script src="/admin/admin.js?v=1" defer></script>
+    <link rel="stylesheet" href="/admin/admin.css?v=2">
+    <script src="/admin/charts.js?v=2" defer></script>
+    <script src="/admin/admin.js?v=2" defer></script>
 </head>
 <body>
     <div id="boot" class="boot" aria-live="polite"><div class="spinner" aria-hidden="true"></div><span>Завантаження…</span></div>
@@ -46,12 +46,12 @@
                 </form>
             </details>
             <div id="dev-box" class="dev-box" hidden>
-                <p class="small warn-text">⚠ Локальний режим розробки (ADMIN_DEV_LOGIN=1)</p>
+                <p class="small warn-text"><b>Локальний режим розробки</b> (ADMIN_DEV_LOGIN=1). Тільки для перевірки на своєму комп’ютері.</p>
                 <div id="dev-buttons" class="dev-buttons"></div>
             </div>
             <p id="login-error" class="error" role="alert" hidden></p>
         </div>
-        <p class="login-foot muted small">MyKep · захищене з'єднання</p>
+        <p class="login-foot muted small">MyKep Admin</p>
     </section>
 
     <div id="app" class="app" hidden>
@@ -78,8 +78,8 @@
                     </button>
                 </div>
             </header>
-            <div id="offline-banner" class="offline-banner" hidden>Немає з'єднання з сервером — показано останні дані</div>
-            <main id="main">
+            <div id="offline-banner" class="offline-banner" role="status" hidden>Немає з'єднання з сервером. Показано останні завантажені дані.</div>
+            <main id="main" tabindex="-1">
                 <section class="page" data-page="overview" id="page-overview"></section>
                 <section class="page" data-page="stats" id="page-stats" hidden></section>
                 <section class="page" data-page="server" id="page-server" hidden></section>

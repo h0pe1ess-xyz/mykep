@@ -245,9 +245,9 @@ def _health_summary():
         checks.append({'key': key, 'label': label, 'level': level, 'detail': detail})
 
     if not sched.get('ready'):
-        add('schedule', 'Розклад', 'critical', 'Немає даних розкладу — сайт віддає 503')
+        add('schedule', 'Розклад', 'critical', 'Немає даних розкладу, сайт віддає 503')
     elif sched.get('stale'):
-        add('schedule', 'Розклад', 'warning', f"Застарілий кеш (помилка: {sched.get('last_error_type') or '—'})")
+        add('schedule', 'Розклад', 'warning', f"Застарілий кеш (помилка: {sched.get('last_error_type') or 'невідомо'})")
     else:
         add('schedule', 'Розклад', 'ok', f"{sched.get('groups')} груп, актуальний")
     if not writer['running']:
@@ -304,7 +304,7 @@ async def refresh_schedule(request: Request):
     ok = await _schedule.refresh()
     await auth.audit('refresh_schedule', s['user_id'], client_ip(request), 'ok' if ok else 'failed')
     return {'status': 'success', 'data': {'refreshed': ok, 'message': 'Розклад оновлено.' if ok else
-            'Не вдалося оновити — працює останній збережений розклад.', 'schedule': _schedule.diagnostics()}}
+            'Не вдалося оновити. Працює останній збережений розклад.', 'schedule': _schedule.diagnostics()}}
 
 
 @router.get('/sessions')

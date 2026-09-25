@@ -59,3 +59,8 @@ python main.py                           # http://127.0.0.1:8000/admin/
 python scripts/seed_demo_analytics.py demo.db --days 21 --users 350
 MYKEP_DB_PATH=demo.db python main.py
 ```
+
+## Важливо для деплою
+* `ADMIN_PUBLIC_ORIGIN` задавайте лише на продакшні (`https://mykep.pp.ua`). Якщо домен не збігається
+  з тим, де відкрито /admin, усі дії в адмінці повертатимуть 403. На тестовому сервері не задавайте.
+* `ADMIN_DEV_LOGIN=1` сервер ігнорує, поки `ADMIN_COOKIE_SECURE` не дорівнює `0`.

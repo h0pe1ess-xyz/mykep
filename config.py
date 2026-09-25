@@ -1,5 +1,6 @@
 """Shared settings. Existing deployments keep schedule.db in the project root."""
 import os
+import re
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
@@ -44,11 +45,15 @@ ADMIN_IDS = _admin_ids()
 ADMIN_COOKIE_SECURE = os.getenv('ADMIN_COOKIE_SECURE', '1').strip() != '0'
 # Local-only passwordless login for testing without Telegram. Works only when
 # the request comes from 127.0.0.1/::1 directly (no proxy) to localhost.
-ADMIN_DEV_LOGIN = os.getenv('ADMIN_DEV_LOGIN', '0').strip() == '1'
+# It is additionally refused while Secure cookies are on (i.e. production).
+ADMIN_DEV_LOGIN = os.getenv('ADMIN_DEV_LOGIN', '0').strip() == '1' and not ADMIN_COOKIE_SECURE
 ADMIN_SESSION_HOURS = _int_env('ADMIN_SESSION_HOURS', 168, 1, 720)     # absolute lifetime
 ADMIN_IDLE_HOURS = _int_env('ADMIN_IDLE_HOURS', 72, 1, 720)            # inactivity timeout
 # Optional, e.g. https://mykep.pp.ua. When set, only this Origin is accepted
 # for admin POST requests; otherwise the request Host is used.
 ADMIN_PUBLIC_ORIGIN = os.getenv('ADMIN_PUBLIC_ORIGIN', '').strip().rstrip('/')
+if ADMIN_PUBLIC_ORIGIN and not re.fullmatch(r'https://[a-z0-9.-]+(:\d{1,5})?|http://(localhost|127\.0\.0\.1)(:\d{1,5})?',
+                                            ADMIN_PUBLIC_ORIGIN.lower()):
+    raise RuntimeError('ADMIN_PUBLIC_ORIGIN must look like https://example.com (no path)')
 COLLEGE_SIZE = _int_env('ADMIN_COLLEGE_SIZE', 1200, 1, 100000)
 PUBLIC_CSP = os.getenv('PUBLIC_CSP', '1').strip() != '0'

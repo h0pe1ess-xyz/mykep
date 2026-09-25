@@ -305,9 +305,12 @@ async def consume_login_code(raw_code):
             (_sha256(code),))
         if not rows:
             return None
-        # Single use: delete before issuing a session.
-        await db.execute('DELETE FROM admin_login_codes WHERE code_hash = ?', (_sha256(code),))
+        # Single use: only the request whose DELETE actually removed the row
+        # wins, so two parallel requests with the same code cannot both log in.
+        cur = await db.execute('DELETE FROM admin_login_codes WHERE code_hash = ?', (_sha256(code),))
         await db.commit()
+        if cur.rowcount != 1:
+            return None
     user_id, name, username, expires = rows[0]
     if expires < _now() or user_id not in ADMIN_IDS:
         return None
