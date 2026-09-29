@@ -15,7 +15,7 @@ URL = "https://kep.nung.edu.ua/pages/education/schedule"
 
 
 def normalize_group(value):
-    return re.sub(r"[\s\-–-]", "", str(value)).casefold()
+    return re.sub(r"[\s\-\N{EN DASH}-]", "", str(value)).casefold()
 
 
 def split_groups(value):
@@ -167,13 +167,13 @@ def is_lesson_active(weeks_str: str, current_week: int) -> bool:
     try:
         if not weeks_str: return True
         w_str = str(weeks_str).lower().strip()
-        
-        if not w_str or "всі" in w_str or "усі" in w_str or "1-4" in w_str or "щотижня" in w_str: 
+
+        if not w_str or "всі" in w_str or "усі" in w_str or "1-4" in w_str or "щотижня" in w_str:
             return True
-        
+
         w_str = w_str.replace("/", ",").replace("\\", ",").replace(".", ",").replace(";", ",")
         w_str = w_str.replace(" та ", ",").replace(" і ", ",")
-        
+
         clean_str = re.sub(r'[^0-9,\-]', '', w_str)
         if not clean_str: return True
 
@@ -186,7 +186,7 @@ def is_lesson_active(weeks_str: str, current_week: int) -> bool:
         return False
     except Exception as e:
         logger.warning(f"Error filtering active week '{weeks_str}': {e}. Defaulting to True.")
-        return True 
+        return True
 
 def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: int, duration2: int,
                          week: Optional[int] = None) -> Optional[Dict[str, Any]]:
@@ -195,7 +195,7 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
         raise ValueError("Week must be an integer from 1 to 4")
     if not raw_schedule_data:
         return None
-    
+
     group_schedule = None
     search_group = normalize_group(group_name)
     for key, value in raw_schedule_data.items():
@@ -210,7 +210,7 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
     now = datetime.now(KYIV)
     current_weekday = now.weekday()
     reference_date = now
-    
+
     if current_weekday == 6:
         reference_date = now + timedelta(days=1)
     elif current_weekday == 5 and now.hour >= 15:
@@ -230,7 +230,7 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
     shift1_60 = {"1": "08:00 - 09:00", "2": "09:10 - 10:10", "3": "10:30 - 11:30", "4": "11:40 - 12:40"}
     shift2_80 = {"5": "14:10 - 15:30", "6": "15:40 - 17:00", "7": "17:10 - 18:30", "8": "18:40 - 20:00"}
     shift2_60 = {"5": "14:10 - 15:10", "6": "15:20 - 16:20", "7": "16:30 - 17:30", "8": "17:40 - 18:40"}
-    
+
     time_mapping = {}
     time_mapping.update(shift1_80 if int(duration1) == 80 else shift1_60)
     time_mapping.update(shift2_80 if int(duration2) == 80 else shift2_60)
@@ -239,13 +239,13 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
     for day_name, day_date in days_to_check.items():
         week_num = week if week is not None else get_academic_week(day_date.date())
         formatted_day = []
-        
+
         for lesson in normalized_schedule.get(day_name, []):
             week_val = lesson.get("week", lesson.get("weeks", ""))
-            
-            if not is_lesson_active(week_val, week_num): 
+
+            if not is_lesson_active(week_val, week_num):
                 continue
-                
+
             num = str(lesson.get("number"))
             formatted_day.append({
                 "lesson": int(num) if num.isdigit() else 0,
@@ -254,7 +254,7 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
                 "teacher": lesson.get("teacher", ""),
                 "room": lesson.get("cabinet", "")
             })
-            
+
         formatted_day.sort(key=lambda x: x["lesson"])
         full_week_schedule[day_name] = formatted_day
 

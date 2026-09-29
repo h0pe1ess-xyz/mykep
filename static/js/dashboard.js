@@ -2,13 +2,13 @@ function updateTimerDisplay(percentage) {
     percentage = Math.max(0, Math.min(100, percentage));
     const arc = document.getElementById('progress-arc');
     const knob = document.getElementById('timer-knob');
-    if (!arc || !knob) return; 
-    
+    if (!arc || !knob) return;
+
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const isFirstPaint = document.getElementById('dashboard-main')?.dataset.ready !== 'true';
-    
-    const totalLength = 130 * Math.PI; 
-    
+
+    const totalLength = 130 * Math.PI;
+
     const applyState = (pct) => {
         const offset = totalLength - (pct / 100) * totalLength;
         arc.style.strokeDasharray = totalLength;
@@ -21,12 +21,12 @@ function updateTimerDisplay(percentage) {
         arc.style.transition = 'none';
         knob.style.transition = 'none';
         applyState(0);
-        
-        void arc.getBoundingClientRect(); // Force layout
+
+        void arc.getBoundingClientRect();
 
         arc.style.transition = 'stroke-dashoffset 1s ease';
         knob.style.transition = 'transform 1s ease';
-        
+
         requestAnimationFrame(() => {
             applyState(percentage);
         });
@@ -54,7 +54,7 @@ function renderDashboard(schedule) {
         if (currentCard) currentCard.style.display = "none";
         if (nextCard) nextCard.style.display = "none";
         if (main) main.dataset.ready = 'true';
-        return; 
+        return;
     }
 
     const now = getKyivNow();
@@ -93,7 +93,7 @@ function renderDashboard(schedule) {
         if (gaugeMain) gaugeMain.innerHTML = `${minutesLeft}<span class="timer-unit">хв</span>`;
         if (gaugeSub) gaugeSub.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg> Ауд. ${escapeHTML(currentLesson.room)}`;
         if (statusText) statusText.innerText = `Зараз йде ${currentLesson.lesson}-${getLessonSuffix(currentLesson.lesson)} пара, залишайтесь сфокусованими.`;
-        
+
         document.getElementById('current-subject').innerText = currentLesson.subject;
         document.getElementById('current-teacher').innerHTML = renderTeacherLabel(currentLesson.teacher);
         document.getElementById('current-time').innerText = currentLesson.time;
@@ -104,7 +104,7 @@ function renderDashboard(schedule) {
             const minsToNext = start - currentMins;
             if (minsToNext > 0 && minsToNext <= 90) {
                 const breakDuration = previousLessonEnd === null ? 0 : start - previousLessonEnd;
-                updateTimerDisplay(breakDuration > 0 ? (minsToNext / breakDuration) * 100 : 100); 
+                updateTimerDisplay(breakDuration > 0 ? (minsToNext / breakDuration) * 100 : 100);
                 if (gaugeMain) gaugeMain.innerHTML = `${minsToNext}<span class="timer-unit">хв</span>`;
                 if (gaugeSub) gaugeSub.innerHTML = `до ${nextLesson.lesson}-ї пари`;
                 if (statusText) statusText.innerText = previousLessonEnd === null ? "Пари ще не почалися." : "Перерва.";
@@ -137,14 +137,14 @@ function renderDashboard(schedule) {
     const firstLessonStart = timeToMins(schedule[0]?.time.split(' - ')[0] || "00:00");
     const lastLessonEnd = timeToMins(schedule[schedule.length - 1]?.time.split(' - ')[1] || "00:00");
     const totalDayMins = lastLessonEnd - firstLessonStart;
-    
+
     let dayProgress = 0;
     if (currentMins >= lastLessonEnd) {
         dayProgress = 100;
     } else if (currentMins > firstLessonStart) {
         dayProgress = ((currentMins - firstLessonStart) / totalDayMins) * 100;
     }
-    
+
     const targetProgress = Math.floor(dayProgress);
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const isFirstPaint = document.getElementById('dashboard-main')?.dataset.ready !== 'true';
@@ -152,7 +152,7 @@ function renderDashboard(schedule) {
     if (progressFill && progressThumb && progressText) {
         const setStyles = (val) => {
             progressFill.style.width = `${val}%`;
-            
+
             const thumbWidth = progressThumb.offsetWidth || 50;
             const containerWidth = progressThumb.parentElement.offsetWidth || 300;
             let minPct = 8;
@@ -171,13 +171,12 @@ function renderDashboard(schedule) {
             progressThumb.style.transition = 'none';
             setStyles(0);
             animateValue(progressText, 0, targetProgress, 1000);
-            
-            // Force reflow to ensure the browser registers the 0% state
+
             void progressFill.offsetWidth;
-            
+
             progressFill.style.transition = 'width 1s ease';
             progressThumb.style.transition = 'left 1s ease';
-            
+
             // The browser needs a tiny delay to start the transition after forcing layout
             // in some edge cases, especially on mobile WebKit.
             requestAnimationFrame(() => {
@@ -193,7 +192,7 @@ function renderDashboard(schedule) {
             }
         }
     }
-    
+
     if (main) main.dataset.ready = 'true';
 }
 
@@ -201,7 +200,7 @@ let currentGlobalSchedule = null;
 let dashboardInterval = null;
 let lastDashboardMinute = '';
 function tickDashboard(force = false) {
-    if (document.visibilityState === 'hidden' || !currentGlobalSchedule) return;
+    if (document.visibilityState === 'hidden' || !currentGlobalSchedule || Tabs.current !== 'dashboard') return;
     const now = getKyivNow();
     const minute = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}-${now.getMinutes()}`;
     if (!force && minute === lastDashboardMinute) return;

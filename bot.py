@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Admin IDs come from config.py (hard allowlist, env can only narrow it).
 ADMIN_IDS = CONFIG_ADMIN_IDS
-BOT_STATE = 'disabled' 
+BOT_STATE = 'disabled'
 DAILY_REPORT_HOUR = 22
 DAILY_REPORT_MINUTE = 0
 
@@ -29,7 +29,6 @@ def _is_admin(user_id: int) -> bool:
 
 
 def _bar(value: int, max_val: int, width: int = 10) -> str:
-    """Simple text progress bar."""
     if max_val == 0:
         return "░" * width
     filled = round(value / max_val * width)
@@ -37,7 +36,6 @@ def _bar(value: int, max_val: int, width: int = 10) -> str:
 
 
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Today's summary."""
     if not update.effective_user or not update.effective_message or not _is_admin(update.effective_user.id):
         return
 
@@ -59,7 +57,6 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Weekly breakdown."""
     if not update.effective_user or not update.effective_message or not _is_admin(update.effective_user.id):
         return
 
@@ -77,7 +74,6 @@ async def cmd_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_groups(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Top groups all time."""
     if not update.effective_user or not update.effective_message or not _is_admin(update.effective_user.id):
         return
 
@@ -97,7 +93,6 @@ async def cmd_groups(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def cmd_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """User counts by period."""
     if not update.effective_user or not update.effective_message or not _is_admin(update.effective_user.id):
         return
 
@@ -114,7 +109,6 @@ async def cmd_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_live(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Activity in the last hour."""
     if not update.effective_user or not update.effective_message or not _is_admin(update.effective_user.id):
         return
 
@@ -132,7 +126,6 @@ async def cmd_live(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_platforms(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Platform breakdown."""
     if not update.effective_user or not update.effective_message or not _is_admin(update.effective_user.id):
         return
 
@@ -147,7 +140,6 @@ async def cmd_platforms(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def cmd_hours(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Hourly activity chart for today."""
     if not update.effective_user or not update.effective_message or not _is_admin(update.effective_user.id):
         return
 
@@ -166,7 +158,6 @@ async def cmd_hours(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Show available commands."""
     if not update.effective_user or not update.effective_message or not _is_admin(update.effective_user.id):
         return
 
@@ -186,7 +177,6 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def _send_daily_report(bot: Bot) -> None:
-    """Send daily summary to all admins."""
     data = await analytics.get_today_stats()
     user_data = await analytics.get_user_counts()
 

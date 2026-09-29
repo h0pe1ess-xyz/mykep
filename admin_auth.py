@@ -50,8 +50,6 @@ def bot_id():
     head = TELEGRAM_BOT_TOKEN.split(':', 1)[0]
     return int(head) if head.isdigit() else None
 
-
-# ---------------------------------------------------------------- rate limit
 class RateLimiter:
     """Sliding-window limiter with a bounded number of tracked keys."""
 
@@ -95,8 +93,6 @@ code_global_limiter = RateLimiter(40, 600)       # all login-code guesses (anti-
 api_session_limiter = RateLimiter(240, 60)       # admin API calls per session
 action_limiter = RateLimiter(10, 60)             # heavy actions per session
 
-
-# ------------------------------------------------------------------- storage
 async def init_admin_db():
     async with connect() as db:
         await db.execute('''CREATE TABLE IF NOT EXISTS admin_sessions (
@@ -145,8 +141,6 @@ async def audit_log(limit=100):
             (max(1, min(int(limit), 500)),))
     return [{'time': _iso(r[0]), 'event': r[1], 'user_id': r[2], 'ip': r[3], 'detail': r[4]} for r in rows]
 
-
-# ------------------------------------------------------------- telegram auth
 def verify_telegram_payload(data, now=None):
     """Return a normalized user dict if `data` is a genuine, fresh Telegram
     Login payload; otherwise None. Pure function (no I/O) for easy testing."""
@@ -192,8 +186,6 @@ async def consume_auth_hash(auth_hash):
         await db.commit()
         return cur.rowcount == 1
 
-
-# ------------------------------------------------------------------ sessions
 async def create_session(user_id, display_name, username, method, ip, user_agent):
     if user_id not in ADMIN_IDS:
         raise PermissionError('not an admin')
@@ -275,8 +267,6 @@ def describe_user_agent(ua):
                else 'Браузер')
     return f'{browser} · {os_name}'
 
-
-# --------------------------------------------------------------- login codes
 def normalize_code(value):
     return re.sub(r'[^A-Z0-9]', '', str(value or '').upper())[:32]
 

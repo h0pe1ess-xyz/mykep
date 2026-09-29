@@ -1,8 +1,6 @@
 function renderScheduleList(schedule) {
     const listContainer = document.getElementById('dynamic-schedule-list');
     if (!listContainer) return;
-    
-    // A single DOM write; optional entrance never blocks rendering or navigation.
 
     if (!schedule || schedule.length === 0) {
         listContainer.innerHTML = `
@@ -15,10 +13,9 @@ function renderScheduleList(schedule) {
         return;
     }
 
-    listContainer.innerHTML = '';
-    schedule.forEach((lesson, index) => {
-        const delay = Math.min(index * 0.06, 0.36); 
-        const cardHtml = `
+    listContainer.innerHTML = schedule.map((lesson, index) => {
+        const delay = Math.min(index * 0.06, 0.36);
+        return `
             <div class="lesson-card" style="animation: fadeIn var(--transition-normal) both; animation-delay: ${delay}s;">
                 <div class="lesson-top">
                     <span>${escapeHTML(lesson.lesson)}-${getLessonSuffix(lesson.lesson)} пара</span>
@@ -35,8 +32,7 @@ function renderScheduleList(schedule) {
                 </div>
             </div>
         `;
-        listContainer.insertAdjacentHTML('beforeend', cardHtml);
-    });
+    }).join('');
 }
 
 let schedulePageData = null;

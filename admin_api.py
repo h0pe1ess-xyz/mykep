@@ -131,8 +131,6 @@ def _is_direct_localhost(request: Request):
     return (client_ip(request) in ('127.0.0.1', '::1') and host in ('localhost', '127.0.0.1')
             and not request.headers.get('x-forwarded-for') and not request.headers.get('x-real-ip'))
 
-
-# ----------------------------------------------------------------- endpoints
 @router.get('/config')
 async def admin_config(request: Request):
     return {'status': 'success', 'data': {

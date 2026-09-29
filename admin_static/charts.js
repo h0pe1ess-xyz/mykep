@@ -36,7 +36,7 @@
         return fmt(Math.round(v * 10) / 10);
     }
 
-    // Fritsch–Carlson monotone cubic: smooth lines that never overshoot below 0.
+    // Fritsch-Carlson monotone cubic: smooth lines that never overshoot below 0.
     function monotonePath(pts) {
         const n = pts.length;
         if (n === 0) return '';
@@ -228,7 +228,7 @@
             });
             tip.show(x(i) * rect.width / W, (ev.clientY - container.getBoundingClientRect().top), (o.titles || o.labels)[i],
                 series.map(s => ({ name: s.name, color: s.color,
-                    value: s.values[i] === undefined || s.values[i] === null ? '–' : (o.tipFmt || fmt)(s.values[i]) })));
+                    value: s.values[i] === undefined || s.values[i] === null ? '-' : (o.tipFmt || fmt)(s.values[i]) })));
         };
         const leave = () => { cursor.setAttribute('visibility', 'hidden'); dots.forEach(d => d.setAttribute('visibility', 'hidden')); tip.hide(); };
         hit.addEventListener('pointermove', move);
@@ -318,7 +318,7 @@
                 rect.addEventListener('pointerenter', () => {
                     const box = rect.getBoundingClientRect(), cbox = container.getBoundingClientRect();
                     tip.show(box.left - cbox.left + box.width / 2, box.top - cbox.top,
-                        `${rows[r]}, ${String(c).padStart(2, '0')}:00–${String(c + 1).padStart(2, '0')}:00`,
+                        `${rows[r]}, ${String(c).padStart(2, '0')}:00-${String(c + 1).padStart(2, '0')}:00`,
                         [{ name: o.valueName || 'Переглядів', color: '#ff702e', value: fmt(v) }]);
                 });
                 rect.addEventListener('pointerleave', () => tip.hide());

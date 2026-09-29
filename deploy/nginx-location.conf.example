@@ -16,7 +16,7 @@ location / {
 }
 # Do not aggressively rate-limit by client IP: many students may share campus Wi-Fi.
 
-# ---- MyKep Admin (/admin) — optional extra hardening ------------------------
+# ---- MyKep Admin (/admin) - optional extra hardening ------------------------
 # Put this in the `http {}` block (e.g. /etc/nginx/conf.d/mykep-limits.conf):
 #   limit_req_zone $binary_remote_addr zone=mykep_admin_auth:10m rate=6r/m;
 # And these locations next to `location /` in the same server block:

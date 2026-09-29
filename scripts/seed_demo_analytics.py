@@ -36,7 +36,7 @@ def main():
     args = ap.parse_args()
     target = Path(args.path).resolve()
     if target.name == 'schedule.db':
-        sys.exit('Refusing to write into schedule.db — use a separate demo file, e.g. demo.db')
+        sys.exit('Refusing to write into schedule.db - use a separate demo file, e.g. demo.db')
     rnd = random.Random(args.seed)
     kyiv = ZoneInfo('Europe/Kyiv')
     now = datetime.now(kyiv).replace(tzinfo=None)

@@ -1,10 +1,10 @@
-﻿# ---------- Secrets & local config ----------
+# Secrets & local config
 .env
 .env.*
 !.env.example
 .envrc
 
-# ---------- Runtime data (never commit real user data) ----------
+# Runtime data (never commit real user data)
 *.db
 *.db-wal
 *.db-shm
@@ -17,7 +17,7 @@
 stats.txt
 debug_cache.txt
 
-# ---------- Python ----------
+# Python
 __pycache__/
 *.py[cod]
 .venv/
@@ -34,16 +34,16 @@ dist/
 .coverage.*
 htmlcov/
 
-# ---------- Nix (local dev environment only) ----------
+# Nix (local dev environment only)
 flake.nix
 flake.lock
 result
 
-# ---------- Internal docs & tests (not for the public repo) ----------
+# Internal docs & tests (not for the public repo)
 tests/
 docs/
 
-# ---------- AI agent files (local only) ----------
+# AI agent files (local only)
 GEMINI.md
 findings.md
 AGENTS.md
@@ -56,20 +56,30 @@ brain/
 .claude/
 .playwright-mcp/
 
-# ---------- Browser test artifacts ----------
+# Browser test artifacts
 node_modules/
 playwright-report/
 test-results/
 
-# ---------- Archives (project zips shared between machines) ----------
+# Archives (project zips shared between machines)
 *.zip
 *.zip.txt
 *.tar.gz
 
-# ---------- Editors & OS ----------
+# Editors & OS
 .vscode/
 .idea/
 *.swp
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Local review artifacts
+mykep-release/
+mykep-review/
+mykep-update.zip
+PROMPT-ANTIGRAVITY.md
+REVIEW.md
+CHANGESET.json
+lighthouse-report*
+*.har

@@ -37,18 +37,18 @@
         }
         return node;
     }
-    const fmt = v => (v === null || v === undefined || Number.isNaN(v)) ? '–' : (Number.isInteger(v) ? nf.format(v) : nf1.format(v));
-    const pct = v => (v === null || v === undefined) ? '–' : nf1.format(v) + '%';
+    const fmt = v => (v === null || v === undefined || Number.isNaN(v)) ? '-' : (Number.isInteger(v) ? nf.format(v) : nf1.format(v));
+    const pct = v => (v === null || v === undefined) ? '-' : nf1.format(v) + '%';
     const hh = hour => String(hour).padStart(2, '0') + ':00';
     function fmtBytes(b) {
-        if (b === null || b === undefined) return '–';
+        if (b === null || b === undefined) return '-';
         const units = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
         let i = 0, v = b;
         while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
         return nf1.format(v) + ' ' + units[i];
     }
     function fmtDuration(sec) {
-        if (sec === null || sec === undefined) return '–';
+        if (sec === null || sec === undefined) return '-';
         const d = Math.floor(sec / 86400), hrs = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60);
         if (d) return `${d} д ${hrs} год`;
         if (hrs) return `${hrs} год ${m} хв`;
@@ -56,20 +56,20 @@
         return `${Math.max(0, Math.round(sec))} с`;
     }
     function fmtDate(iso) {
-        if (!iso) return '–';
+        if (!iso) return '-';
         const [, m, d] = iso.slice(0, 10).split('-').map(Number);
         return `${d} ${MONTHS[m - 1]}`;
     }
     function fmtDateTime(iso) {
-        if (!iso) return '–';
+        if (!iso) return '-';
         const date = new Date(iso);
-        if (Number.isNaN(date.getTime())) return '–';
+        if (Number.isNaN(date.getTime())) return '-';
         return date.toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
     }
     function fmtAgo(iso) {
-        if (!iso) return '–';
+        if (!iso) return '-';
         const sec = (Date.now() - new Date(iso).getTime()) / 1000;
-        if (!Number.isFinite(sec)) return '–';
+        if (!Number.isFinite(sec)) return '-';
         if (sec < 60) return 'щойно';
         return fmtDuration(sec) + ' тому';
     }
@@ -482,20 +482,20 @@
         const heat = chartBox(), weekdays = chartBox(), slotsDonut = h('div'), slotBars = h('div');
         const specs = h('div'), courses = h('div'), plat = h('div'), brow = h('div'), modes = h('div'), freq = chartBox();
         const groupsBox = h('div');
-        const peakHourText = p.hour !== null ? `${hh(p.hour)}–${hh((p.hour + 1) % 24)}` : '–';
+        const peakHourText = p.hour !== null ? `${hh(p.hour)}-${hh((p.hour + 1) % 24)}` : '-';
         const slotSum = d.slots.summary;
         page.replaceChildren(
             h('div', { class: 'toolbar' }, [rangeControl(), h('div', { class: 'toolbar-actions' }, [
                 h('button', { type: 'button', class: 'btn btn-ghost small', text: 'CSV за днями', on: { click: ev => download(ev, 'daily') } }),
                 h('button', { type: 'button', class: 'btn btn-ghost small', text: 'CSV за групами', on: { click: ev => download(ev, 'groups') } })])]),
-            h('p', { class: 'muted small range-note', text: `${fmtDate(d.start)} – ${fmtDate(d.end)} · ${d.days} дн.` }),
+            h('p', { class: 'muted small range-note', text: `${fmtDate(d.start)} - ${fmtDate(d.end)} · ${d.days} дн.` }),
             h('div', { class: 'kpi-grid' }, [
                 kpi('Переглядів', fmt(t.views), { accent: true, hint: `≈ ${fmt(t.avg_daily_views)} на день` }),
                 kpi('Унікальних користувачів', fmt(t.users), { hint: `сер. DAU: ${fmt(t.avg_dau)}` }),
                 kpi('Нових користувачів', fmt(t.new_users), { hint: 'вперше за весь час' }),
                 kpi('Переглядів на людину', fmt(t.views_per_user), { hint: `сер. активних днів: ${fmt(r.avg_active_days)}` }),
-                kpi('Пікова година', peakHourText, { hint: `пік 15 хв: ${p.quarter || '–'}` }),
-                kpi('Найактивніший день', p.weekday || '–', { hint: p.best_day ? `рекорд: ${fmt(p.best_day.views)} (${fmtDate(p.best_day.date)})` : '' }),
+                kpi('Пікова година', peakHourText, { hint: `пік 15 хв: ${p.quarter || '-'}` }),
+                kpi('Найактивніший день', p.weekday || '-', { hint: p.best_day ? `рекорд: ${fmt(p.best_day.views)} (${fmtDate(p.best_day.date)})` : '' }),
                 kpi('Повертаються', pct(r.returning_pct), { hint: 'заходили ≥ 2 днів' }),
                 kpi('Повернулися на 1-й / 7-й день', `${pct(r.d1_pct)} / ${pct(r.d7_pct)}`, { wide: true, hint: `когорти: ${fmt(r.d1_base)} / ${fmt(r.d7_base)} люд.` })
             ]),
@@ -534,9 +534,9 @@
                     { name: 'Нові', values: d.daily.map(x => x.new_users), color: '#2dd4bf' }] });
                 C.line(growth, { labels, titles, height: 220, series: [{ name: 'Всього користувачів', values: d.daily.map(x => x.total_users), color: '#92b5ce' }] });
             }
-            C.bars(hours, { labels: d.hours_avg.map((_, i) => String(i).padStart(2, '0')), titles: d.hours_avg.map((_, i) => `${hh(i)}–${hh((i + 1) % 24)}`),
+            C.bars(hours, { labels: d.hours_avg.map((_, i) => String(i).padStart(2, '0')), titles: d.hours_avg.map((_, i) => `${hh(i)}-${hh((i + 1) % 24)}`),
                 values: single ? d.hours_total : d.hours_avg, highlightMax: true, height: 220, name: single ? 'Переглядів' : 'Сер. переглядів' });
-            const from = 24, to = 92; // 06:00–23:00
+            const from = 24, to = 92; // 06:00-23:00
             const q = d.quarter_hours_avg.slice(from, to);
             const qLabels = q.map((_, i) => { const m = (from + i) * 15; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; });
             const toIdx = hm => { const [a, b] = hm.split(':').map(Number); return (a * 60 + b) / 15 - from; };
@@ -628,7 +628,7 @@
         updateStatusPill(d.health);
         const s = d.system, rq = d.requests, sc = d.schedule, w = d.analytics_writer;
         const reqChart = chartBox(), latChart = chartBox();
-        const load = s.load_avg ? s.load_avg.map(x => nf1.format(x)).join(' · ') : '–';
+        const load = s.load_avg ? s.load_avg.map(x => nf1.format(x)).join(' · ') : '-';
         const loadPct = s.load_avg && s.cpu_count ? s.load_avg[0] / s.cpu_count * 100 : 0;
         const refreshBtn = h('button', { type: 'button', class: 'btn', text: 'Оновити розклад зараз', on: { click: ev => refreshSchedule(ev.currentTarget) } });
         C.dispose($('page-server'));
@@ -637,16 +637,16 @@
             h('div', { class: 'tile-grid' }, [
                 tile('Без перезапуску', fmtDuration(s.uptime_seconds), `з ${fmtDateTime(s.started_at)}`),
                 tile('Запитів / хв', fmt(rq.last5.rpm), `за 5 хв: ${fmt(rq.last5.requests)} (API ${fmt(rq.last5.api)})`),
-                tile('Час відповіді API', rq.latency_ms.p50 === null ? '–' : `${fmt(rq.latency_ms.p50)} мс`,
-                    `p95 ${rq.latency_ms.p95 === null ? '–' : fmt(rq.latency_ms.p95) + ' мс'} · p99 ${rq.latency_ms.p99 === null ? '–' : fmt(rq.latency_ms.p99) + ' мс'}`),
+                tile('Час відповіді API', rq.latency_ms.p50 === null ? '-' : `${fmt(rq.latency_ms.p50)} мс`,
+                    `p95 ${rq.latency_ms.p95 === null ? '-' : fmt(rq.latency_ms.p95) + ' мс'} · p99 ${rq.latency_ms.p99 === null ? '-' : fmt(rq.latency_ms.p99) + ' мс'}`),
                 tile('Помилки 5xx', fmt(rq.totals.s5xx), `4xx: ${fmt(rq.totals.s4xx)} · всього запитів: ${fmt(rq.totals.requests)}`, rq.last5.s5xx ? 'warning' : null),
-                meter('Навантаження CPU', load, loadPct, `ядер: ${fmt(s.cpu_count)} · процес: ${s.process.cpu_percent === null ? '–' : fmt(s.process.cpu_percent) + '%'}`),
+                meter('Навантаження CPU', load, loadPct, `ядер: ${fmt(s.cpu_count)} · процес: ${s.process.cpu_percent === null ? '-' : fmt(s.process.cpu_percent) + '%'}`),
                 s.memory ? meter("Пам'ять сервера", `${fmtBytes(s.memory.used)} / ${fmtBytes(s.memory.total)}`, s.memory.percent, `процес MyKep: ${fmtBytes(s.process.rss)}`)
                     : tile("Пам'ять процесу", fmtBytes(s.process.rss)),
-                s.disk ? meter('Диск', `${fmtBytes(s.disk.used)} / ${fmtBytes(s.disk.total)}`, s.disk.percent, `вільно ${fmtBytes(s.disk.free)}`) : tile('Диск', '–'),
+                s.disk ? meter('Диск', `${fmtBytes(s.disk.used)} / ${fmtBytes(s.disk.total)}`, s.disk.percent, `вільно ${fmtBytes(s.disk.free)}`) : tile('Диск', '-'),
                 tile('База даних', fmtBytes(s.database.size), `WAL: ${fmtBytes(s.database.wal)}`),
-                tile('Event loop', s.event_loop_lag_ms.current === null ? '–' : `${fmt(s.event_loop_lag_ms.current)} мс`,
-                    `макс. за 2 хв: ${s.event_loop_lag_ms.max_2min === null ? '–' : fmt(s.event_loop_lag_ms.max_2min) + ' мс'}`, s.event_loop_lag_ms.max_2min > 250 ? 'warning' : null),
+                tile('Event loop', s.event_loop_lag_ms.current === null ? '-' : `${fmt(s.event_loop_lag_ms.current)} мс`,
+                    `макс. за 2 хв: ${s.event_loop_lag_ms.max_2min === null ? '-' : fmt(s.event_loop_lag_ms.max_2min) + ' мс'}`, s.event_loop_lag_ms.max_2min > 250 ? 'warning' : null),
                 tile('Процес', `PID ${s.pid}`, `потоків: ${fmt(s.process.threads)} · файлів: ${fmt(s.process.open_fds)}`),
                 tile('Версія', `v${s.version}`, `Python ${s.python} · ${s.platform}`),
                 tile('Сервер', s.hostname, `час: ${fmtDateTime(s.server_time)}`)
@@ -656,14 +656,14 @@
                 card('Середній час відповіді', latChart, { sub: 'мс, щохвилини' }),
                 card('Розклад (сайт коледжу)', [kv([
                     ['Статус', !sc || !sc.ready ? 'Немає даних' : sc.stale ? 'Застарілий кеш' : 'Актуальний', !sc || !sc.ready ? 'critical' : sc.stale ? 'warning' : 'ok'],
-                    ['Оновлено', sc && sc.updated_at ? `${fmtDateTime(sc.updated_at)} (${fmtAgo(sc.updated_at)})` : '–'],
-                    ['Груп', sc ? fmt(sc.groups) : '–'],
-                    ['Остання спроба', sc && sc.last_attempt ? fmtDateTime(sc.last_attempt) : '–'],
-                    ['Тривалість оновлення', sc && sc.last_duration_ms !== null ? `${fmt(sc.last_duration_ms)} мс` : '–'],
+                    ['Оновлено', sc && sc.updated_at ? `${fmtDateTime(sc.updated_at)} (${fmtAgo(sc.updated_at)})` : '-'],
+                    ['Груп', sc ? fmt(sc.groups) : '-'],
+                    ['Остання спроба', sc && sc.last_attempt ? fmtDateTime(sc.last_attempt) : '-'],
+                    ['Тривалість оновлення', sc && sc.last_duration_ms !== null ? `${fmt(sc.last_duration_ms)} мс` : '-'],
                     ['Остання помилка', sc && sc.last_error_type ? sc.last_error_type : 'немає', sc && sc.last_error_type ? 'warning' : null],
-                    ['Успішних / невдалих', sc ? `${fmt(sc.refresh_ok)} / ${fmt(sc.refresh_failed)}` : '–'],
-                    ['Наступне оновлення', sc && sc.next_refresh_in !== null ? `через ${fmtDuration(sc.next_refresh_in)}` : '–'],
-                    ['Інтервал', sc ? `${fmtDuration(sc.refresh_interval)} (повтор ${fmtDuration(sc.retry_interval)})` : '–']
+                    ['Успішних / невдалих', sc ? `${fmt(sc.refresh_ok)} / ${fmt(sc.refresh_failed)}` : '-'],
+                    ['Наступне оновлення', sc && sc.next_refresh_in !== null ? `через ${fmtDuration(sc.next_refresh_in)}` : '-'],
+                    ['Інтервал', sc ? `${fmtDuration(sc.refresh_interval)} (повтор ${fmtDuration(sc.retry_interval)})` : '-']
                 ]), refreshBtn], { span: 2 }),
                 card('Запис статистики', kv([
                     ['Writer', w.running ? 'працює' : 'зупинений', w.running ? 'ok' : 'critical'],
@@ -716,7 +716,7 @@
             ['Адміністратори', true, `${sec.admins} акаунти в жорсткому allowlist`, '']
         ];
         $('page-security').replaceChildren(h('div', { class: 'grid' }, [
-            card('Ваш акаунт', [kv([['Ім’я', me.user.name], ['Telegram', me.user.username ? '@' + me.user.username : '–'], ['ID', String(me.user.id)],
+            card('Ваш акаунт', [kv([['Ім’я', me.user.name], ['Telegram', me.user.username ? '@' + me.user.username : '-'], ['ID', String(me.user.id)],
                 ['Спосіб входу', METHODS[me.session.method] || me.session.method], ['Сесія діє до', fmtDateTime(me.session.expires_at)]]),
                 h('button', { type: 'button', class: 'btn btn-danger', text: 'Вийти', on: { click: logout } })]),
             card('Код входу для iPhone', [h('p', { class: 'muted small', text: 'iOS ізолює PWA з головного екрана від Safari, тож Telegram-вхід там може не працювати. Створіть тут одноразовий код (діє 3 хвилини) і введіть його на екрані входу в PWA.' }),
@@ -725,7 +725,7 @@
                 h('span', { class: 'badge ' + (ok ? 'b-ok' : 'b-critical'), text: ok ? 'OK' : '!' }), h('b', { text: name }), h('span', { class: 'muted small', text: ok ? good : bad })])))),
             card('Активні сесії', [h('div', { class: 'list' }, sessions.map(s => h('div', { class: 'list-row session' }, [
                 h('div', {}, [h('b', { text: s.device }), s.current && h('span', { class: 'badge b-ok', text: 'ця сесія' }),
-                    h('div', { class: 'muted small', text: `${s.name || s.user_id} · ${METHODS[s.method] || s.method} · IP ${s.ip || '–'}` }),
+                    h('div', { class: 'muted small', text: `${s.name || s.user_id} · ${METHODS[s.method] || s.method} · IP ${s.ip || '-'}` }),
                     h('div', { class: 'muted small', text: `активність ${fmtAgo(s.last_seen)} · до ${fmtDateTime(s.expires_at)}` })]),
                 !s.current && h('button', { type: 'button', class: 'btn btn-ghost small', text: 'Завершити', on: { click: () => revoke({ sid: s.sid }) } })
             ]))), sessions.length > 1 && h('button', { type: 'button', class: 'btn btn-ghost', text: 'Завершити всі інші сесії', on: { click: () => revoke({ scope: 'others' }) } })], { span: 2 }),

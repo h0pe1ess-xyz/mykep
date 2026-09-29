@@ -1,5 +1,4 @@
 let groupsRequest = null;
-let scheduleNotice = '';
 
 // Anonymous: only tells the admin stats whether MyKep runs as an installed PWA.
 function currentDisplayMode() {
@@ -7,7 +6,7 @@ function currentDisplayMode() {
         const standalone = window.matchMedia('(display-mode: standalone)').matches ||
             window.matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
         return standalone ? 'standalone' : 'browser';
-    } catch (_) { return 'browser'; }
+    } catch { return 'browser'; }
 }
 
 async function fetchJSON(url, timeout = 10000) {
@@ -33,7 +32,7 @@ async function fetchGroups(force = false) {
                 const cache = JSON.parse(storage.get('mykep_groups') || 'null');
                 if (cache && Array.isArray(cache.data) && cache.data.length && Date.now() - cache.time < 3600000) return cache.data;
             }
-        } catch (_) { storage.remove('mykep_groups'); }
+        } catch { storage.remove('mykep_groups'); }
         const result = await fetchJSON('/api/groups');
         if (!Array.isArray(result.data) || !result.data.length || !result.data.every(group => typeof group === 'string')) throw new Error('Некоректний список груп.');
         storage.set('mykep_groups', JSON.stringify({ data: result.data, time: Date.now() }));
@@ -75,7 +74,7 @@ function readScheduleEntries() {
         return cache?.version === SCHEDULE_CACHE_VERSION && Array.isArray(cache.entries) ?
             cache.entries.filter(entry => entry && typeof entry.key === 'string' &&
                 Number.isFinite(entry.savedAt) && validSchedule(entry.data)) : [];
-    } catch (_) { storage.remove('mykep_schedule'); return []; }
+    } catch { storage.remove('mykep_schedule'); return []; }
 }
 function cachedScheduleForKey(key) {
     return readScheduleEntries().find(entry => entry.key === key) || null;
@@ -117,26 +116,4 @@ async function fetchSchedule(week = 'auto') {
         return { data: null, notice: error.status === 404 ? error.message :
             'Не вдалося завантажити розклад. Перевірте з’єднання й спробуйте ще раз.' };
     }
-}
-function showScheduleNotice() {
-    let notice = document.getElementById('schedule-notice');
-    if (!notice) {
-        notice = document.createElement('p'); notice.id = 'schedule-notice';
-        notice.className = 'schedule-notice'; notice.setAttribute('role', 'status');
-        document.querySelector('.app-header')?.insertAdjacentElement('afterend', notice);
-    }
-    notice.textContent = scheduleNotice;
-    notice.hidden = !scheduleNotice;
-}
-function showScheduleError(retryLoad = () => window.location.reload()) {
-    showScheduleNotice();
-    const dashboard = document.getElementById('dashboard-main');
-    if (dashboard) dashboard.hidden = true; // Preserve the timer DOM for retry.
-    const list = document.getElementById('dynamic-schedule-list');
-    if (list) list.replaceChildren();
-    const retry = document.createElement('button');
-    retry.type = 'button'; retry.className = 'btn btn-secondary';
-    retry.textContent = 'Спробувати ще раз'; retry.onclick = retryLoad;
-    const notice = document.getElementById('schedule-notice');
-    if (notice) { notice.hidden = false; notice.appendChild(retry); }
 }

@@ -1,41 +1,40 @@
 <!DOCTYPE html>
+
 <html lang="uk">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MyKep - розклад пар ФКЕП ІФНТУНГ</title>
-    <meta name="description" content="MyKep - розклад пар для студентів ФКЕП ІФНТУНГ: заняття на сьогодні й тиждень, аудиторії, викладачі та таймер. Студентський PWA-застосунок з офлайн-доступом.">
-    <meta name="robots" content="index, follow, max-image-preview:large">
-    <meta name="application-name" content="MyKep">
-    <link rel="canonical" href="https://mykep.pp.ua/">
-    <meta property="og:type" content="website">
-    <meta property="og:site_name" content="MyKep">
-    <meta property="og:locale" content="uk_UA">
-    <meta property="og:title" content="MyKep - розклад пар ФКЕП ІФНТУНГ">
-    <meta property="og:description" content="MyKep - розклад пар для студентів ФКЕП ІФНТУНГ: заняття на сьогодні й тиждень, аудиторії, викладачі та таймер. Студентський PWA-застосунок з офлайн-доступом.">
-    <meta property="og:url" content="https://mykep.pp.ua/">
-    <meta property="og:image" content="https://mykep.pp.ua/images/mykep-social.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:image:type" content="image/png">
-    <meta property="og:image:alt" content="MyKep - розклад пар ФКЕП ІФНТУНГ. Незалежний студентський PWA-застосунок.">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="MyKep - розклад пар ФКЕП ІФНТУНГ">
-    <meta name="twitter:description" content="MyKep - розклад пар для студентів ФКЕП ІФНТУНГ: заняття на сьогодні й тиждень, аудиторії, викладачі та таймер. Студентський PWA-застосунок з офлайн-доступом.">
-    <meta name="twitter:image" content="https://mykep.pp.ua/images/mykep-social.png">
-    <meta name="twitter:image:alt" content="MyKep - розклад пар ФКЕП ІФНТУНГ">
-     <link rel="icon" type="image/png" href="favicon.png">
-     <link rel="apple-touch-icon" href="favicon.png">
-     <link rel="manifest" href="manifest.json">
-     <meta name="mobile-web-app-capable" content="yes">
-    <!-- Retained for older iOS Home Screen support. -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-     <meta name="theme-color" content="#110c0a">
-     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <script src="js/display-mode.js?v=2.7.0"></script>
-    <script src="js/android-layout.js?v=2.7.0"></script>
-    <script src="js/gesture-guard.js?v=2.7.0"></script>
-    <link rel="stylesheet" href="style.css?v=2.7.0">
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<title>MyKep - розклад пар ФКЕП ІФНТУНГ</title>
+<meta content="MyKep - розклад пар для студентів ФКЕП ІФНТУНГ: заняття на сьогодні й тиждень, аудиторії, викладачі та таймер. Студентський PWA-застосунок з офлайн-доступом." name="description"/>
+<meta content="index, follow, max-image-preview:large" name="robots"/>
+<meta content="MyKep" name="application-name"/>
+<link href="https://mykep.pp.ua/" rel="canonical"/>
+<meta content="website" property="og:type"/>
+<meta content="MyKep" property="og:site_name"/>
+<meta content="uk_UA" property="og:locale"/>
+<meta content="MyKep - розклад пар ФКЕП ІФНТУНГ" property="og:title"/>
+<meta content="MyKep - розклад пар для студентів ФКЕП ІФНТУНГ: заняття на сьогодні й тиждень, аудиторії, викладачі та таймер. Студентський PWA-застосунок з офлайн-доступом." property="og:description"/>
+<meta content="https://mykep.pp.ua/" property="og:url"/>
+<meta content="https://mykep.pp.ua/images/mykep-social.png" property="og:image"/>
+<meta content="1200" property="og:image:width"/>
+<meta content="630" property="og:image:height"/>
+<meta content="image/png" property="og:image:type"/>
+<meta content="MyKep - розклад пар ФКЕП ІФНТУНГ. Незалежний студентський PWA-застосунок." property="og:image:alt"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="MyKep - розклад пар ФКЕП ІФНТУНГ" name="twitter:title"/>
+<meta content="MyKep - розклад пар для студентів ФКЕП ІФНТУНГ: заняття на сьогодні й тиждень, аудиторії, викладачі та таймер. Студентський PWA-застосунок з офлайн-доступом." name="twitter:description"/>
+<meta content="https://mykep.pp.ua/images/mykep-social.png" name="twitter:image"/>
+<meta content="MyKep - розклад пар ФКЕП ІФНТУНГ" name="twitter:image:alt"/>
+<link href="favicon.png" rel="icon" type="image/png"/>
+<link href="favicon.png" rel="apple-touch-icon"/>
+<link href="manifest.json" rel="manifest"/>
+<meta content="yes" name="mobile-web-app-capable"/>
+
+<meta content="yes" name="apple-mobile-web-app-capable"/>
+<meta content="#110c0a" name="theme-color"/>
+<meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"/>
+
+
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -91,204 +90,328 @@
   ]
 }
     </script>
-</head>
+<script src="/js/boot.js?v=2.8.0"></script><link href="/css/app.css?v=2.8.0" rel="stylesheet"/><script defer="" src="/js/utils.js?v=2.8.0"></script><script defer="" src="/js/pwa.js?v=2.8.0"></script><script defer="" src="/js/api.js?v=2.8.0"></script><script defer="" src="/js/teacher-hints.js?v=2.8.0"></script><script defer="" src="/js/dashboard.js?v=2.8.0"></script><script defer="" src="/js/schedule.js?v=2.8.0"></script><script defer="" src="/js/settings.js?v=2.8.0"></script><script defer="" src="/js/onboarding.js?v=2.8.0"></script><script defer="" src="/js/tabs.js?v=2.8.0"></script><script defer="" src="/js/app.js?v=2.8.0"></script></head>
 <body>
-    <h1 class="sr-only page-heading">MyKep - розклад пар ФКЕП ІФНТУНГ</h1>
-    <noscript>
-        <style>body { flex-direction: column; align-items: center; justify-content: flex-start; overflow-y: auto; } .page-heading { position: static; width: auto; height: auto; margin: 24px 24px 0; clip: auto; clip-path: none; overflow: visible; white-space: normal; flex-shrink: 0; } #main-app { display: none; } .no-js-info { max-width: 42rem; padding: 32px 24px; overflow-y: auto; line-height: 1.6; } .no-js-info a { text-decoration: underline; }</style>
-        <main class="no-js-info">
-            <p>Незалежний студентський PWA-застосунок для ВСП «Фаховий коледж електронних приладів ІФНТУНГ». Розклад на сьогодні й тиждень, аудиторії, викладачі та таймер пари.</p>
-            <p>Для інтерактивного розкладу увімкніть JavaScript. <a href="/about.html">Про MyKep та джерело розкладу</a> можна прочитати без JavaScript.</p>
-        </main>
-    </noscript>
-    <!-- ОНБОРДИНГ -->
-    <div class="onboarding-overlay" id="onboarding" data-nosnippet style="display: none;">
-        <div class="onboarding-card">
-            <!-- Слайд 1: Вітання -->
-            <div class="onboarding-slide active" id="ob-slide-1">
-                <h2>Вітаємо в MyKep</h2>
-                <p>Ваш розклад завжди під рукою.</p>
-                <div class="onboarding-features">
-                    <div class="feature-item">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> 
+<h1 class="sr-only page-heading">MyKep - розклад пар ФКЕП ІФНТУНГ</h1>
+<noscript>
+<style>body { flex-direction: column; align-items: center; justify-content: flex-start; overflow-y: auto; } .page-heading { position: static; width: auto; height: auto; margin: 24px 24px 0; clip: auto; clip-path: none; overflow: visible; white-space: normal; flex-shrink: 0; } #main-app { display: none; } .no-js-info { max-width: 42rem; padding: 32px 24px; overflow-y: auto; line-height: 1.6; } .no-js-info a { text-decoration: underline; }</style>
+<main class="no-js-info">
+<p>Незалежний студентський PWA-застосунок для ВСП «Фаховий коледж електронних приладів ІФНТУНГ». Розклад на сьогодні й тиждень, аудиторії, викладачі та таймер пари.</p>
+<p>Для інтерактивного розкладу увімкніть JavaScript. <a href="/about.html">Про MyKep та джерело розкладу</a> можна прочитати без JavaScript.</p>
+</main>
+</noscript>
+
+<div class="onboarding-overlay" data-nosnippet="" id="onboarding" style="display: none;">
+<div class="onboarding-card">
+
+<div class="onboarding-slide active" id="ob-slide-1">
+<h2>Вітаємо в MyKep</h2>
+<p>Ваш розклад завжди під рукою.</p>
+<div class="onboarding-features">
+<div class="feature-item">
+<svg fill="none" height="20" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="20"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                         Точний час до кінця пари
                     </div>
-                    <div class="feature-item">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+<div class="feature-item">
+<svg fill="none" height="20" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="20"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
                         Швидко та зручно
                     </div>
-                    <div class="feature-item">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+<div class="feature-item">
+<svg fill="none" height="20" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="20"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
                         Темна тема
                     </div>
-                </div>
-                <div class="button-group">
-                    <button class="btn btn-primary" data-ob-step="2">Далі</button>
-                </div>
-            </div>
+</div>
+<div class="button-group">
+<button class="btn btn-primary" data-ob-step="2">Далі</button>
+</div>
+</div>
 
-            <!-- Слайд 2: Автори -->
-            <div class="onboarding-slide" id="ob-slide-2">
-                <h2>Розробники</h2>
-                <p>Створено студентами для студентів.</p>
-                <div class="authors-grid">
-                    <div class="author-profile">
-                        <div class="avatar"><img src="pfp/1.png" alt="h0pe1esss" width="460" height="460" loading="lazy" decoding="async" title="Аватар h0pe1esss"></div>
-                        <div class="author-name">@h0pe1esss</div>
-                    </div>
-                    <div class="author-profile">
-                        <div class="avatar"><img src="pfp/2.gif" alt="ODDxq" width="184" height="184" loading="lazy" decoding="async" title="Аватар ODDxq"></div>
-                        <div class="author-name">@ODDxq</div>
-                    </div>
-                </div>
-                <div class="button-group">
-                    <button class="btn btn-secondary" data-ob-step="1">Назад</button>
-                    <button class="btn btn-primary" data-ob-step="3">Далі</button>
-                </div>
-            </div>
+<div class="onboarding-slide" id="ob-slide-2">
+<h2>Розробники</h2>
+<p>Створено студентами для студентів.</p>
+<div class="authors-grid">
+<div class="author-profile">
+<div class="avatar"><img alt="h0pe1esss" decoding="async" height="96" loading="lazy" src="pfp/1.png" title="Аватар h0pe1esss" width="96"/></div>
+<div class="author-name">@h0pe1esss</div>
+</div>
+<div class="author-profile">
+<div class="avatar"><img alt="ODDxq" decoding="async" height="96" loading="lazy" src="pfp/2.webp" title="Аватар ODDxq" width="96"/></div>
+<div class="author-name">@ODDxq</div>
+</div>
+</div>
+<div class="button-group">
+<button class="btn btn-secondary" data-ob-step="1">Назад</button>
+<button class="btn btn-primary" data-ob-step="3">Далі</button>
+</div>
+</div>
 
-            <!-- Слайд 3: Налаштування -->
-            <div class="onboarding-slide" id="ob-slide-3">
-                <h2>Налаштування</h2>
-                <p>Оберіть вашу групу для завантаження розкладу.</p>
-                
-                <div class="input-group">
-                    <span class="group-field-label" id="ob-group-label">Академічна група</span>
-                    <details id="ob-group-picker" class="group-picker">
-                        <summary id="ob-group-select" class="text-input" aria-describedby="ob-group-status" aria-labelledby="ob-group-label ob-group-value">
-                            <span id="ob-group-value">Оберіть групу</span><span aria-hidden="true">⌄</span>
-                        </summary>
-                        <div class="group-picker-panel">
-                            <div class="search-container">
-                                <label for="ob-group-search" class="search-label">Пошук групи</label>
-                                <div class="search-input-wrapper">
-                                    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                                    <input type="search" id="ob-group-search" class="modal-search" placeholder="Введіть назву групи..." aria-label="Пошук у списку груп" autocomplete="off">
-                                </div>
-                            </div>
-                            <div id="ob-group-options" class="group-options" role="group" aria-label="Доступні групи"></div>
-                        </div>
-                    </details>
-                    <p id="ob-group-status" class="help-text" role="status" aria-live="polite"></p>
-                    <button id="ob-group-retry" type="button" class="settings-btn" hidden>Спробувати ще раз</button>
-                </div>
+<div class="onboarding-slide" id="ob-slide-3">
+<h2>Налаштування</h2>
+<p>Оберіть вашу групу для завантаження розкладу.</p>
+<div class="input-group">
+<span class="group-field-label" id="ob-group-label">Академічна група</span>
+<details class="group-picker" id="ob-group-picker">
+<summary aria-describedby="ob-group-status" aria-labelledby="ob-group-label ob-group-value" class="text-input" id="ob-group-select">
+<span id="ob-group-value">Оберіть групу</span><span aria-hidden="true">⌄</span>
+</summary>
+<div class="group-picker-panel">
+<div class="search-container">
+<label class="search-label" for="ob-group-search">Пошук групи</label>
+<div class="search-input-wrapper">
+<svg class="search-icon" fill="none" height="16" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="16"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line></svg>
+<input aria-label="Пошук у списку груп" autocomplete="off" class="modal-search" id="ob-group-search" placeholder="Введіть назву групи..." type="search"/>
+</div>
+</div>
+<div aria-label="Доступні групи" class="group-options" id="ob-group-options" role="group"></div>
+</div>
+</details>
+<p aria-live="polite" class="help-text" id="ob-group-status" role="status"></p>
+<button class="settings-btn" hidden="" id="ob-group-retry" type="button">Спробувати ще раз</button>
+</div>
+<div class="button-group">
+<button class="btn btn-secondary" data-ob-step="2">Назад</button>
+<button class="btn btn-primary" data-ob-finish="">Розпочати</button>
+</div>
+</div>
+</div>
+</div>
 
+<div class="app-container" id="main-app" style="opacity: 1;"><div class="views" id="views"><div class="views-track"><section aria-label="Розклад" class="view view-schedule page-schedule" data-view="schedule" tabindex="-1"><header class="app-header">
+<h2 class="app-title">MyKep</h2>
+<label class="location-badge week-control" for="schedule-week">
+<span class="sr-only">Тиждень для перегляду розкладу</span>
+<select class="week-select" id="schedule-week">
+<option value="auto">Авто</option>
+<option value="1">1-й тиждень</option>
+<option value="2">2-й тиждень</option>
+<option value="3">3-й тиждень</option>
+<option value="4">4-й тиждень</option>
+</select>
+</label>
+</header><p class="schedule-notice" hidden="" id="schedule-notice" role="status"></p><div class="day-picker">
 
-                <div class="button-group">
-                    <button class="btn btn-secondary" data-ob-step="2">Назад</button>
-                    <button class="btn btn-primary" data-ob-finish>Розпочати</button>
-                </div>
-            </div>
-        </div>
-    </div>
+</div><main class="schedule-main">
+<div class="schedule-list" id="dynamic-schedule-list">
 
+</div>
+</main></section><section aria-label="Головна" class="view view-dashboard" data-view="dashboard" tabindex="-1"><header class="app-header">
+<h2 class="app-title">MyKep</h2>
+<div class="location-badge">
+<svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="14"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+<span id="header-group-text">Група ПІ-24-02</span>
+</div>
+</header><p class="schedule-notice" hidden="" id="dashboard-notice" role="status"></p><main class="main-content" id="dashboard-main">
 
-
-    <!-- ОСНОВНИЙ ДОДАТОК -->
-    <div class="app-container" id="main-app" style="opacity: 1;">
-        <header class="app-header">
-            <h2 class="app-title">MyKep</h2>
-            <div class="location-badge">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                <span id="header-group-text">Група ПІ-24-02</span>
-            </div>
-        </header>
-
-        <main id="dashboard-main" class="main-content">
-            <!-- Таймер -->
-            <div class="timer-widget">
-                <svg class="timer-svg" viewBox="0 0 300 180">
-                    <defs>
-                        <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" stop-color="#eb3905" />
-                            <stop offset="100%" stop-color="#f59a3f" />
-                        </linearGradient>
-                    </defs>
-                    <path class="arc-track" d="M 20 150 A 130 130 0 0 1 280 150" />
-                    <path class="arc-progress" id="progress-arc" d="M 20 150 A 130 130 0 0 1 280 150" />
-                    <g id="timer-knob" style="transform: rotate(-90deg);">
-                        <g transform="translate(150, 20)">
-                            <circle cx="0" cy="0" r="16" fill="#ffffff" />
-                            <polyline points="-2,-4 2,0 -2,4" fill="none" stroke="#e84e12" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        </g>
-                    </g>
-                </svg>
-                <div class="timer-display">
-                    <div class="timer-main" id="minutes-left">0<span class="timer-unit">хв</span></div>
-                    <div class="timer-sub" id="current-room">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+<div class="timer-widget">
+<svg class="timer-svg" viewbox="0 0 300 180">
+<defs>
+<lineargradient id="arcGrad" x1="0%" x2="100%" y1="0%" y2="0%">
+<stop offset="0%" stop-color="#eb3905"></stop>
+<stop offset="100%" stop-color="#f59a3f"></stop>
+</lineargradient>
+</defs>
+<path class="arc-track" d="M 20 150 A 130 130 0 0 1 280 150"></path>
+<path class="arc-progress" d="M 20 150 A 130 130 0 0 1 280 150" id="progress-arc"></path>
+<g id="timer-knob" style="transform: rotate(-90deg);">
+<g transform="translate(150, 20)">
+<circle cx="0" cy="0" fill="#ffffff" r="16"></circle>
+<polyline fill="none" points="-2,-4 2,0 -2,4" stroke="#e84e12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></polyline>
+</g>
+</g>
+</svg>
+<div class="timer-display">
+<div class="timer-main" id="minutes-left">0<span class="timer-unit">хв</span></div>
+<div class="timer-sub" id="current-room">
+<svg fill="none" height="12" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="12"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
                         Ауд. ---
                     </div>
-                </div>
-            </div>
+</div>
+</div>
 
-            <!-- Текст статусу -->
-            <div class="status-section">
-                <h2>Розклад на сьогодні</h2>
-                <p id="status-text">Завантаження розкладу...</p>
-            </div>
+<div class="status-section">
+<h2>Розклад на сьогодні</h2>
+<p id="status-text">Завантаження розкладу...</p>
+</div>
 
-            <!-- Картка Поточної Пари -->
-            <div class="lesson-card-detailed" id="current-lesson-card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+<div class="lesson-card-detailed" id="current-lesson-card">
+<div class="card-header">
+<div class="card-title">
+<svg fill="none" height="16" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="16"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                         Поточна пара
                     </div>
-                </div>
-                <div class="card-body">
-                    <div class="lesson-subject" id="current-subject">---</div>
-                </div>
-                <div class="card-footer">
-                    <div class="lesson-teacher" id="current-teacher">---</div>
-                    <div class="lesson-time" id="current-time">00:00 - 00:00</div>
-                </div>
-            </div>
+</div>
+<div class="card-body">
+<div class="lesson-subject" id="current-subject">---</div>
+</div>
+<div class="card-footer">
+<div class="lesson-teacher" id="current-teacher">---</div>
+<div class="lesson-time" id="current-time">00:00 - 00:00</div>
+</div>
+</div>
 
-            <!-- Картка Наступної Пари -->
-            <div class="lesson-card-detailed" id="next-lesson-card">
-                <div class="card-body split-body">
-                    <div class="info-block">
-                        <div class="info-label">Наступна пара</div>
-                        <div class="lesson-subject" id="next-subject">---</div>
-                    </div>
-                    <div class="info-block align-right">
-                        <div class="info-label">Аудиторія</div>
-                        <div class="lesson-room" id="next-room">---</div>
-                    </div>
-                </div>
-                <div class="card-footer">
-                    <div class="lesson-teacher" id="next-teacher">---</div>
-                    <div class="lesson-time-default" id="next-time">00:00 - 00:00</div>
-                </div>
-                <div class="progress-section">
-                    <div class="info-label">Прогрес навчального дня</div>
-                    <div class="progress-bar-container">
-                        <div class="progress-track"></div>
-                        <div class="progress-fill" id="day-progress-fill" style="width: 0%;"></div>
-                        <div class="progress-thumb" id="day-progress-thumb" style="left: 0%;">
-                            <span id="day-progress-text">0%</span>
-                        </div>
-                    </div>
-                </div>
+<div class="lesson-card-detailed" id="next-lesson-card">
+<div class="card-body split-body">
+<div class="info-block">
+<div class="info-label">Наступна пара</div>
+<div class="lesson-subject" id="next-subject">---</div>
+</div>
+<div class="info-block align-right">
+<div class="info-label">Аудиторія</div>
+<div class="lesson-room" id="next-room">---</div>
+</div>
+</div>
+<div class="card-footer">
+<div class="lesson-teacher" id="next-teacher">---</div>
+<div class="lesson-time-default" id="next-time">00:00 - 00:00</div>
+</div>
+<div class="progress-section">
+<div class="info-label">Прогрес навчального дня</div>
+<div class="progress-bar-container">
+<div class="progress-track"></div>
+<div class="progress-fill" id="day-progress-fill" style="width: 0%;"></div>
+<div class="progress-thumb" id="day-progress-thumb" style="left: 0%;">
+<span id="day-progress-text">0%</span>
+</div>
+</div>
+</div>
+</div>
+</main></section><section aria-label="Налаштування" class="view view-settings" data-view="settings" tabindex="-1"><header class="app-header">
+<h2 class="app-title">Налаштування</h2>
+<div class="location-badge">
+<svg fill="none" height="12" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="12"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>
+                MyKep v2.8.0
             </div>
-        </main>
+</header><main class="main-content" style="justify-content: flex-start; gap: 16px; padding-top: 10px;">
+<div class="settings-card">
+<div class="settings-row">
+<div class="settings-info">
+<div class="settings-title">Академічна група</div>
+<div class="settings-desc" id="current-group-display">Поточна: ПІ-24-02</div>
+</div>
+<button class="settings-btn" id="open-group-modal">Змінити</button>
+</div>
+<div class="settings-row">
+<div class="settings-info">
+<div class="settings-title">Тривалість 1-ї зміни</div>
+<div class="settings-desc" id="duration1-desc">Поточна: 80 хвилин</div>
+</div>
+<button aria-checked="true" aria-label="Тривалість 1-ї зміни: увімкнено - 80 хвилин, вимкнено - 60 хвилин" class="toggle active" id="duration1-toggle" role="switch" type="button"></button>
+</div>
+<div class="settings-row">
+<div class="settings-info">
+<div class="settings-title">Тривалість 2-ї зміни</div>
+<div class="settings-desc" id="duration2-desc">Поточна: 60 хвилин</div>
+</div>
+<button aria-checked="true" aria-label="Тривалість 2-ї зміни: увімкнено - 80 хвилин, вимкнено - 60 хвилин" class="toggle active" id="duration2-toggle" role="switch" type="button"></button>
+</div>
+<div class="settings-row">
+<div class="settings-info">
+<div class="settings-title" style="font-size: 13px; color: #a0a0a0;">Повернути рекомендований розклад</div>
+</div>
+<button class="settings-btn" id="reset-duration-btn">Скинути</button>
+</div>
+</div>
+<div class="settings-card">
+<div class="settings-row">
+<div class="settings-info">
+<div class="settings-title">Локальні дані</div>
+<div class="settings-desc">Скинути збережений розклад</div>
+</div>
+<button class="settings-btn danger" id="clear-cache-btn">Очистити</button>
+</div>
+</div>
+<div class="settings-card" style="text-align: center; padding: 18px; margin-bottom: 16px;">
+<p style="margin: 0 0 14px; font-size: 14px; color: var(--text-main, #ffffff); line-height: 1.4;">
+                    Знайшли баг чи є ідея?
+                </p>
+<a href="https://t.me/MyKep_news" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; min-height: 56px; padding: 16px; border: 1px solid #ff5500; border-radius: 14px; background: #ff5500; color: #ffffff; font-family: inherit; font-size: 17px; font-weight: 700; line-height: 1.35; text-align: center; text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: rgba(255, 255, 255, 0.18);" target="_blank">
+                    Перейти в Telegram
+                </a>
+</div>
+<div class="settings-card">
+<div class="settings-row">
+<div class="settings-info"><div class="settings-title">Встановлення MyKep</div><div class="settings-desc">Інструкція для вашого пристрою</div></div>
+<button class="settings-btn" id="show-install-help" type="button">Інструкція</button>
+</div>
+</div>
 
-        <nav class="bottom-nav">
-            <a class="nav-btn" aria-label="Розклад" href="/schedule.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></a>
-            <a class="nav-btn active center-action" aria-label="Головна" href="/"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg></a>
-            <a class="nav-btn" aria-label="Налаштування" href="/settings.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></a>
-        </nav>
-    </div>
-    <script src="js/utils.js?v=2.7.0"></script>
-    <script src="js/pwa.js?v=2.7.0"></script>
-    <script src="js/api.js?v=2.7.0"></script>
-    <script src="js/teacher-hints.js?v=2.7.0"></script>
-    <script src="js/mobile-fit.js?v=2.7.0"></script>
-    
-    <script src="js/dashboard.js?v=2.7.0"></script>
-    <script src="js/schedule.js?v=2.7.0"></script>
-    <script src="js/settings.js?v=2.7.0"></script>
-    <script src="js/app.js?v=2.7.0"></script>
-</body>
+<div class="credits-block">
+
+<div class="credit-person">
+<div class="avatar">
+<img alt="h0pe1ess" decoding="async" height="64" loading="lazy" src="pfp/1.png" title="Аватар h0pe1ess" width="64"/>
+</div>
+<div class="nick">@h0pe1esss</div>
+<div class="credits-socials">
+<a aria-label="Telegram h0pe1esss" class="social-btn" href="https://t.me/h0pe1esss" rel="noopener noreferrer" style="box-sizing: border-box; text-decoration: none;" target="_blank">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M21.5 2L2 11.5L8.5 14L10 21.5L13.5 17L19 21.5L21.5 2Z"></path></svg>
+</a>
+<a aria-label="Instagram h0pe1esss" class="social-btn" href="https://www.instagram.com/h0p31esss" rel="noopener noreferrer" style="box-sizing: border-box; text-decoration: none;" target="_blank">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><rect height="20" rx="5" ry="5" width="20" x="2" y="2"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line></svg>
+</a>
+<a aria-label="GitHub h0pe1ess-xyz" class="social-btn" href="https://github.com/h0pe1ess-xyz" rel="noopener noreferrer" style="box-sizing: border-box; text-decoration: none;" target="_blank">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+</a>
+</div>
+</div>
+
+<div class="credit-person">
+<div class="avatar">
+<img alt="ODDxq" decoding="async" height="64" loading="lazy" src="pfp/2.webp" title="Аватар ODDxq" width="64"/>
+</div>
+<div class="nick">@ODDxq</div>
+<div class="credits-socials">
+<a aria-label="Telegram ODDxq" class="social-btn" href="https://t.me/oddxq" rel="noopener noreferrer" style="box-sizing: border-box; text-decoration: none;" target="_blank">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M21.5 2L2 11.5L8.5 14L10 21.5L13.5 17L19 21.5L21.5 2Z"></path></svg>
+</a>
+<a aria-label="Instagram ODDxq" class="social-btn" href="https://www.instagram.com/san4esif" rel="noopener noreferrer" style="box-sizing: border-box; text-decoration: none;" target="_blank">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><rect height="20" rx="5" ry="5" width="20" x="2" y="2"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line></svg>
+</a>
+<a aria-label="Сайт ODDxq" class="social-btn" href="https://oddxq.dev" rel="noopener noreferrer" style="box-sizing: border-box; text-decoration: none;" target="_blank">
+<svg fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" x2="22" y1="12" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+</a>
+</div>
+</div>
+</div>
+<div style="text-align: center; margin-top: 30px; margin-bottom: 20px; font-size: 12px; color: var(--text-muted); opacity: 0.5;">
+                MyKep v2.8.0
+            </div>
+</main></section></div></div><nav aria-label="Основна навігація" class="bottom-nav">
+<a aria-label="Розклад" class="nav-btn" data-tab="schedule" href="/schedule.html"><svg fill="none" height="22" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="22"><rect height="18" rx="2" ry="2" width="18" x="3" y="4"></rect><line x1="16" x2="16" y1="2" y2="6"></line><line x1="8" x2="8" y1="2" y2="6"></line><line x1="3" x2="21" y1="10" y2="10"></line></svg></a>
+<a aria-label="Головна" class="nav-btn active center-action" data-tab="dashboard" href="/"><svg fill="currentColor" height="24" viewbox="0 0 24 24" width="24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg></a>
+<a aria-label="Налаштування" class="nav-btn" data-tab="settings" href="/settings.html"><svg fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="22"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></a>
+</nav></div>
+
+
+<div aria-labelledby="confirm-modal-title" aria-modal="true" class="modal-overlay" id="confirm-modal" role="dialog">
+<div class="modal-container" style="text-align: center;">
+<div class="modal-header" style="justify-content: center; padding-bottom: 0; border-bottom: none;">
+<h3 id="confirm-modal-title" style="color: #ff4444; margin-bottom: 10px;">Зміна тривалості занять</h3>
+</div>
+<div id="confirm-modal-desc" style="padding: 5px 0 20px; font-size: 14px; color: #e0e0e0; line-height: 1.5;">
+                    Рекомендована тривалість занять: 80 хвилин для першої зміни та 60 хвилин для другої.<br/><br/>Зміна цих параметрів вплине на час початку й завершення пар та роботу таймера в MyKep. Офіційний розклад коледжу при цьому не зміниться.<br/><br/>Змінюйте тривалість лише тоді, коли для вашої групи діє інший розклад дзвінків. Продовжити?
+                </div>
+<div style="display: flex; gap: 10px; justify-content: center;">
+<button class="settings-btn" id="confirm-cancel-btn" style="flex: 1; background: rgba(255, 255, 255, 0.1); color: white;">Скасувати</button>
+<button class="settings-btn" id="confirm-ok-btn" style="flex: 1; background: rgba(255, 68, 68, 0.8); color: white; border-color: rgba(255, 68, 68, 0.5);">Змінити</button>
+</div>
+</div>
+</div><div aria-label="Вибір групи" aria-modal="true" class="modal-overlay" id="group-modal" role="dialog">
+<div class="modal-container">
+<div class="modal-header">
+<h3>Вибір групи</h3>
+<button class="close-modal" id="close-modal">×</button>
+</div>
+<div class="search-container">
+<label class="search-label" for="modal-search">Пошук групи</label>
+<div class="search-input-wrapper">
+<svg class="search-icon" fill="none" height="16" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="16"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line></svg>
+<input aria-label="Пошук групи" class="modal-search" id="modal-search" placeholder="Введіть назву групи..." type="search"/>
+</div>
+</div>
+<div class="modal-list" id="modal-group-list">
+
+</div>
+</div>
+</div></body>
 </html>

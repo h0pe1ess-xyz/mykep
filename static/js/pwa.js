@@ -22,7 +22,7 @@ function browserContext(nav = navigator, location = window.location, referrer = 
 }
 function browserModeAccepted() {
     try { return sessionStorage.getItem('mykep_browser_session') === 'yes'; }
-    catch (_) { return false; }
+    catch { return false; }
 }
 window.addEventListener('beforeinstallprompt', event => {
     event.preventDefault();
@@ -106,11 +106,12 @@ async function showPWAGuide(force = false) {
     updatePWAInstallStatus();
     const previousFocus = document.activeElement;
     const appNodes = [...document.body.children].filter(node => node !== overlay && node.tagName !== 'SCRIPT');
+    const inertStates = appNodes.map(node => node.inert);
     appNodes.forEach(node => { node.inert = true; });
     const guidePromise = new Promise(resolve => {
         finishPWAGuide = () => {
             overlay.remove();
-            appNodes.forEach(node => { node.inert = false; });
+            appNodes.forEach((node, index) => { node.inert = inertStates[index]; });
             if (previousFocus && previousFocus.isConnected) previousFocus.focus();
             finishPWAGuide = null;
             resolve();
@@ -123,7 +124,7 @@ async function showPWAGuide(force = false) {
         try {
             await navigator.clipboard.writeText(url);
             status.textContent = 'Посилання скопійовано.';
-        } catch (_) {
+        } catch {
             const input = overlay.querySelector('#pwa-url');
             input.hidden = false; input.value = url; input.focus(); input.select();
             status.textContent = 'Натисніть і утримуйте посилання, щоб скопіювати його.';
@@ -135,7 +136,7 @@ async function showPWAGuide(force = false) {
         deferredInstallPrompt = null;
         overlay.querySelector('#pwa-install').hidden = true;
         try { await prompt.prompt(); await prompt.userChoice; }
-        catch (_) { /* The manual instructions remain visible. */ }
+        catch { /* The manual instructions remain visible. */ }
     };
     overlay.querySelector('#pwa-browser').onclick = () => {
         overlay.querySelector('#pwa-browser').hidden = true;
@@ -151,7 +152,7 @@ async function showPWAGuide(force = false) {
         overlay.querySelector('#pwa-browser').focus();
     };
     overlay.querySelector('#pwa-confirm-browser').onclick = () => {
-        try { sessionStorage.setItem('mykep_browser_session', 'yes'); } catch (_) {}
+        try { sessionStorage.setItem('mykep_browser_session', 'yes'); } catch {}
         finishPWAGuide();
     };
     overlay.addEventListener('keydown', event => {

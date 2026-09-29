@@ -170,8 +170,6 @@ async def get_groups():
     # Group pickers are not schedule views and must not inflate bot statistics.
     return {'status': 'success', 'data': schedule.groups, 'meta': schedule.metadata()}
 
-
-# ------------------------------------------------------------ admin frontend
 # Explicit allowlist: no user input ever reaches the filesystem path.
 ADMIN_FILES = {
     'admin.css': 'text/css; charset=utf-8',
@@ -209,6 +207,12 @@ async def canonical_home(request: Request):
     # Preserve launch parameters; use a relative target independent of Host headers.
     target = '/' + ('?' + request.url.query if request.url.query else '')
     return RedirectResponse(url=target, status_code=308)
+
+
+@app.api_route('/schedule.html', methods=['GET', 'HEAD'], include_in_schema=False)
+@app.api_route('/settings.html', methods=['GET', 'HEAD'], include_in_schema=False)
+async def app_tab():
+    return FileResponse(BASE_DIR / 'static' / 'index.html', media_type='text/html; charset=utf-8')
 
 
 app.mount('/', StaticFiles(directory=str(BASE_DIR / 'static'), html=True), name='static')

@@ -80,7 +80,7 @@ def _pct(a, b):
 
 def parse_group(name):
     """ПІ-24-02 -> ('ПІ', 2024). Returns (None, None) when unknown."""
-    m = re.match(r'^\s*([^\d\s\-–]+)[\s\-–]*(\d{2})', str(name or ''))
+    m = re.match(r'^\s*([^\d\s\-\N{EN DASH}]+)[\s\-\N{EN DASH}]*(\d{2})', str(name or ''))
     if not m:
         return None, None
     return m.group(1).upper(), 2000 + int(m.group(2))
@@ -92,8 +92,6 @@ def course_for(year, today=None):
     course = academic_start - year + 1
     return course if 1 <= course <= 5 else None
 
-
-# ---------------------------------------------------------------- overview
 async def overview():
     return await _cached('overview', _overview)
 
@@ -173,8 +171,6 @@ async def _overview():
         'top_groups_today': [{'group': g, 'views': c, 'users': u} for g, c, u in top_today],
     }
 
-
-# ------------------------------------------------------------------- stats
 async def stats(range_key):
     if range_key not in RANGES:
         range_key = '30'
