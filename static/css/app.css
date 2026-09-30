@@ -103,7 +103,7 @@ a {
 .main-content::-webkit-scrollbar { display: none; }
 
 
-.app-header { display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 10; flex-shrink: 0; margin-bottom: 20px; }
+.app-header { display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 10; flex-shrink: 0; margin-bottom: 20px; padding-top: 4px; }
 .app-title { font-size: 22px; font-weight: 500; letter-spacing: -0.5px; margin: 0; text-shadow: 0 0 20px rgba(255, 255, 255, 0.2); }
 .location-badge { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-muted); padding: 4px 8px; cursor: pointer; transition: color var(--transition-fast); }
 .location-badge:active { color: white; }
