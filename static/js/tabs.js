@@ -10,6 +10,7 @@ const Tabs = (() => {
     };
     let current = document.documentElement.dataset.tab || 'dashboard';
     let views, track, nav, gesture;
+    let frame = 0;
     let clickBlockedUntil = 0;
     const listeners = new Set();
 
@@ -21,15 +22,15 @@ const Tabs = (() => {
 
     function show(tab, { historyMode = 'push', focus = false } = {}) {
         if (!names.includes(tab)) return;
-        gesture = null;
-        track.style.transform = '';
-        track.classList.remove('is-dragging');
+        cancelDrag();
         const changed = current !== tab;
         const activeElement = document.activeElement;
         const moveFocus = focus || activeElement?.closest('.view')?.dataset.view !== tab &&
             !!activeElement?.closest('.view');
         current = tab;
         document.documentElement.dataset.tab = tab;
+        track.classList.remove('is-dragging');
+        track.style.transform = '';
         document.title = titles[tab];
         const activeView = track.querySelector(`[data-view="${tab}"]`);
         activeView.inert = false;
@@ -53,10 +54,23 @@ const Tabs = (() => {
         if (changed) listeners.forEach(listener => listener(tab));
     }
 
-    function reset() {
+    function cancelDrag() {
+        if (frame) cancelAnimationFrame(frame);
+        frame = 0;
         gesture = null;
+    }
+
+    function reset() {
+        cancelDrag();
         track?.classList.remove('is-dragging');
         if (track) track.style.transform = '';
+    }
+
+    function renderDrag() {
+        frame = 0;
+        if (!gesture || gesture.axis !== 'x') return;
+        if (isBlocked()) { reset(); return; }
+        track.style.transform = `translate3d(${gesture.position}px, 0, 0)`;
     }
 
     function ownsHorizontalScroll(target) {
@@ -69,18 +83,21 @@ const Tabs = (() => {
     }
 
     function start(event) {
-        reset();
+        if (gesture) reset();
         if (event.touches.length !== 1 || isBlocked() || ownsHorizontalScroll(event.target)) return;
         const point = event.touches[0];
         const width = document.documentElement.clientWidth;
         if (point.clientX <= 20 || point.clientX >= width - 20) return;
+        const viewWidth = views.clientWidth;
+        if (!viewWidth) return;
         gesture = { id: point.identifier, x: point.clientX, y: point.clientY,
-            width: views.clientWidth, dx: 0, axis: null, samples: [[event.timeStamp, point.clientX]] };
+            index: names.indexOf(current), width: viewWidth, dx: 0, axis: null,
+            origin: 0, position: 0, samples: [[event.timeStamp, point.clientX]] };
     }
 
     function move(event) {
         if (!gesture) return;
-        if (event.touches.length !== 1 || isBlocked()) { reset(); return; }
+        if (event.touches.length !== 1) { reset(); return; }
         const point = event.touches[0];
         if (point.identifier !== gesture.id) { reset(); return; }
         const dx = point.clientX - gesture.x;
@@ -88,31 +105,36 @@ const Tabs = (() => {
         if (!gesture.axis) {
             if (Math.max(Math.abs(dx), Math.abs(dy)) < 10) return;
             if (Math.abs(dx) <= Math.abs(dy) * 1.2) { reset(); return; }
+            if (isBlocked()) { reset(); return; }
             gesture.axis = 'x';
+            gesture.origin = new DOMMatrixReadOnly(getComputedStyle(track).transform).m41;
+            track.style.transform = `translate3d(${gesture.origin}px, 0, 0)`;
             track.classList.add('is-dragging');
         }
         if (event.cancelable) event.preventDefault();
         gesture.dx = dx;
         gesture.samples.push([event.timeStamp, point.clientX]);
         while (gesture.samples.length > 2 && gesture.samples[1][0] < event.timeStamp - 100) gesture.samples.shift();
-        const index = names.indexOf(current);
-        const atEdge = index === 0 && dx > 0 || index === names.length - 1 && dx < 0;
-        const offset = Math.max(-gesture.width, Math.min(gesture.width, dx * (atEdge ? 0.3 : 1)));
-        track.style.transform = `translate3d(calc(${-index * 100}% + ${offset}px), 0, 0)`;
+        const { index, width, origin } = gesture;
+        const min = -Math.min(names.length - 1, index + 1) * width;
+        const max = -Math.max(0, index - 1) * width;
+        gesture.position = Math.max(min, Math.min(max, origin + dx));
+        if (!frame) frame = requestAnimationFrame(renderDrag);
     }
 
     function end(event) {
         if (!gesture || gesture.axis !== 'x') { reset(); return; }
-        const { dx, width, samples } = gesture;
+        if (isBlocked()) { reset(); return; }
+        const { width, samples, index } = gesture;
         const point = [...event.changedTouches].find(touch => touch.identifier === gesture.id);
+        const dx = point ? point.clientX - gesture.x : gesture.dx;
         const first = samples[0];
         const velocity = point ? (point.clientX - first[1]) / Math.max(event.timeStamp - first[0], 1) : 0;
         clickBlockedUntil = performance.now() + 400;
         const passed = Math.abs(dx) >= width * 0.25 ||
             Math.abs(dx) >= 30 && Math.abs(velocity) > 0.35 && Math.sign(velocity) === Math.sign(dx);
-        const target = names[names.indexOf(current) + (dx < 0 ? 1 : -1)];
-        reset();
-        if (passed && target) show(target);
+        const target = names[index + (dx < 0 ? 1 : -1)];
+        show(passed && target ? target : current);
     }
 
     function init() {

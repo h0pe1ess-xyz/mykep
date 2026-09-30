@@ -106,22 +106,28 @@ window.mykepViewportReport = function() {
         if (event.cancelable) event.preventDefault();
     }
 
-    function canScroll(target, axis, delta) {
-        let node = target && target.nodeType === 1 ? target : target?.parentElement;
-        while (node && node !== document.documentElement && node !== document.body) {
-            const style = window.getComputedStyle(node);
-            const overflow = axis === 'y' ? style.overflowY : style.overflowX;
-            if (/^(auto|scroll|overlay)$/.test(overflow)) {
-                const size = axis === 'y' ? node.clientHeight : node.clientWidth;
-                const total = axis === 'y' ? node.scrollHeight : node.scrollWidth;
-                const position = axis === 'y' ? node.scrollTop : node.scrollLeft;
-                if (total > size + 1 && ((delta > 0 && position > 0) ||
-                    (delta < 0 && position < total - size - 1))) return true;
-                // Match CSS scroll-chain boundaries instead of moving the page behind a modal.
-                const behavior = axis === 'y' ? style.overscrollBehaviorY : style.overscrollBehaviorX;
-                if (behavior === 'none' || behavior === 'contain') return false;
+    function scrollContainers(target) {
+        const containers = { x: [], y: [] };
+        for (let node = target; node && node !== document.documentElement && node !== document.body; node = node.parentElement) {
+            const style = getComputedStyle(node);
+            for (const axis of ['x', 'y']) {
+                const vertical = axis === 'y';
+                const overflow = vertical ? style.overflowY : style.overflowX;
+                if (!/^(auto|scroll|overlay)$/.test(overflow)) continue;
+                const max = vertical ? node.scrollHeight - node.clientHeight : node.scrollWidth - node.clientWidth;
+                const behavior = vertical ? style.overscrollBehaviorY : style.overscrollBehaviorX;
+                const stop = behavior === 'none' || behavior === 'contain';
+                if (max > 1 || stop) containers[axis].push({ node, max, stop });
             }
-            node = node.parentElement;
+        }
+        return containers;
+    }
+
+    function canScroll(containers, axis, delta) {
+        for (const { node, max, stop } of containers[axis]) {
+            const position = axis === 'y' ? node.scrollTop : node.scrollLeft;
+            if (max > 1 && ((delta > 0 && position > 0) || (delta < 0 && position < max - 1))) return true;
+            if (stop) return false;
         }
         return false;
     }
@@ -136,9 +142,10 @@ window.mykepViewportReport = function() {
         const width = document.documentElement.clientWidth || window.innerWidth;
         const edge = ios && (touch.clientX <= EDGE || touch.clientX >= width - EDGE);
         state = { id: touch.identifier, x: touch.clientX, y: touch.clientY,
-            target: event.target, edge };
-        // WebKit owns gestures that start at the screen edge.
-        if (edge) state = null;
+            startX: touch.clientX, startY: touch.clientY, axis: null,
+            containers: scrollContainers(event.target), edge };
+        const control = event.target.closest?.('a, button, input, textarea, select, label, summary, [role="button"], [contenteditable="true"]');
+        if (edge && !control) cancel(event);
     }, options);
 
     document.addEventListener('touchmove', event => {
@@ -152,8 +159,13 @@ window.mykepViewportReport = function() {
         const dx = touch.clientX - state.x;
         const dy = touch.clientY - state.y;
         if (Math.max(Math.abs(dx), Math.abs(dy)) < 2) return;
-        const axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
-        if (!canScroll(state.target, axis, axis === 'x' ? dx : dy)) {
+        const totalX = touch.clientX - state.startX;
+        const totalY = touch.clientY - state.startY;
+        if (!state.axis && Math.max(Math.abs(totalX), Math.abs(totalY)) >= 10) {
+            state.axis = Math.abs(totalX) > Math.abs(totalY) * 1.2 ? 'x' : 'y';
+        }
+        const axis = state.axis || (Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y');
+        if ((state.edge && axis === 'x') || !canScroll(state.containers, axis, axis === 'x' ? dx : dy)) {
             cancel(event);
         }
         state.x = touch.clientX;

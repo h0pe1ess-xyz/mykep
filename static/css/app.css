@@ -579,9 +579,11 @@ html.android-viewport:not(.ios-standalone) .app-container > nav.bottom-nav {
 /* The navigation remains an untransformed child of the original viewport shell. */
 html .app-container { display: flex; flex-direction: column; }
 .views { flex: 1 1 0; min-height: 0; min-width: 0; overflow: hidden;
+    overscroll-behavior-x: none;
     margin: 0 calc(-1 * var(--app-gutter)); }
 .views-track { display: flex; height: 100%; width: 100%;
-    transform: translate3d(-100%, 0, 0); transition: transform 250ms ease; }
+    transform: translate3d(-100%, 0, 0); transition: transform 250ms ease;
+    will-change: transform; }
 html[data-tab="schedule"] .views-track { transform: translate3d(0, 0, 0); }
 html[data-tab="settings"] .views-track { transform: translate3d(-200%, 0, 0); }
 .views-track.is-dragging { transition: none; }
