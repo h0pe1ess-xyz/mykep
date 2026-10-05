@@ -8,7 +8,7 @@
 <meta content="MyKep - розклад пар для студентів ФКЕП ІФНТУНГ: заняття на сьогодні й тиждень, аудиторії, викладачі та таймер. Студентський PWA-застосунок з офлайн-доступом." name="description"/>
 <meta content="index, follow, max-image-preview:large" name="robots"/>
 <meta content="MyKep" name="application-name"/>
-<meta content="2.8.0-support.1" name="mykep-build"/>
+<meta content="2.8.0-support.2" name="mykep-build"/>
 <link href="https://mykep.pp.ua/" rel="canonical"/>
 <meta content="website" property="og:type"/>
 <meta content="MyKep" property="og:site_name"/>
@@ -91,7 +91,7 @@
   ]
 }
     </script>
-<script src="/js/boot.js?v=2.8.0-swipe.2"></script><link href="/css/app.css?v=2.8.0-support.1" rel="stylesheet"/><script defer="" src="/js/utils.js?v=2.8.0-search.1"></script><script defer="" src="/js/pwa.js?v=2.8.0-install.1"></script><script defer="" src="/js/api.js?v=2.8.0"></script><script defer="" src="/js/teacher-hints.js?v=2.8.0"></script><script defer="" src="/js/dashboard.js?v=2.8.0"></script><script defer="" src="/js/schedule.js?v=2.8.0"></script><script defer="" src="/js/settings.js?v=2.8.0-search.1"></script><script defer="" src="/js/support.js?v=2.8.0-support.1"></script><script defer="" src="/js/onboarding.js?v=2.8.0-search.1"></script><script defer="" src="/js/tabs.js?v=2.8.0-swipe.2"></script><script defer="" src="/js/app.js?v=2.8.0-onboard.1"></script></head>
+<script src="/js/boot.js?v=2.8.0-swipe.2"></script><link href="/css/app.css?v=2.8.0-support.2" rel="stylesheet"/><script defer="" src="/js/utils.js?v=2.8.0-search.1"></script><script defer="" src="/js/pwa.js?v=2.8.0-install.1"></script><script defer="" src="/js/api.js?v=2.8.0"></script><script defer="" src="/js/teacher-hints.js?v=2.8.0"></script><script defer="" src="/js/dashboard.js?v=2.8.0"></script><script defer="" src="/js/schedule.js?v=2.8.0"></script><script defer="" src="/js/settings.js?v=2.8.0-search.1"></script><script defer="" src="/js/support.js?v=2.8.0-support.2"></script><script defer="" src="/js/onboarding.js?v=2.8.0-search.1"></script><script defer="" src="/js/tabs.js?v=2.8.0-swipe.2"></script><script defer="" src="/js/app.js?v=2.8.0-onboard.1"></script></head>
 <body>
 <h1 class="sr-only page-heading">MyKep - розклад пар ФКЕП ІФНТУНГ</h1>
 <noscript>
@@ -322,6 +322,14 @@
 <button class="settings-btn" id="reset-duration-btn">Скинути</button>
 </div>
 </div>
+<div class="settings-card telegram-channel-card" id="telegram-channel-card">
+<h3>MyKep у Telegram</h3>
+<p>Приєднуйтеся до нашого каналу.</p>
+<a class="telegram-channel-link" href="https://t.me/MyKep_news" id="telegram-channel-link" rel="noopener noreferrer" target="_blank">
+<svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="20"><path d="M21.5 2L2 11.5L8.5 14L10 21.5L13.5 17L19 21.5L21.5 2Z"></path></svg>
+Відкрити канал
+</a>
+</div>
 <div class="settings-card">
 <div class="settings-row">
 <div class="settings-info">
@@ -338,7 +346,6 @@
 <div class="support-actions">
 <button class="support-action" id="support-copy" type="button">Скопіювати дані</button>
 <button aria-controls="support-report" aria-expanded="false" class="support-action" id="support-show" type="button">Показати дані</button>
-<a class="support-action" href="https://t.me/MyKep_news" rel="noopener noreferrer" target="_blank">Канал MyKep</a>
 </div>
 <label class="sr-only" for="support-report">Повідомлення з даними застосунку</label>
 <textarea class="support-report" hidden="" id="support-report" readonly="" rows="9" spellcheck="false"></textarea>

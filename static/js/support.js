@@ -66,7 +66,8 @@ function initSupportReport() {
         preview.value = report;
         if (link.dataset.supportDraft === 'true') {
             const url = new URL(destination);
-            url.searchParams.set('text', report);
+            // Telegram clients need percent-encoded spaces, not form-style +.
+            url.search = `text=${encodeURIComponent(report)}`;
             link.href = url.href;
         }
         return report;
