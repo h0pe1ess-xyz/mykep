@@ -8,6 +8,11 @@ function escapeHTML(value) {
     return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
 }
 
+function normalizeGroupSearch(value) {
+    // Separators are optional in search; preserve the original group for display/API.
+    return value.normalize('NFKC').toLocaleLowerCase('uk').replace(/[^\p{L}\p{N}]/gu, '');
+}
+
 const kyivDateFormatter = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/Kyiv', year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'

@@ -161,7 +161,8 @@ function initGroupModal(onChange) {
         groupList.textContent = 'Завантаження груп…';
         try {
             groupsData = await fetchGroups();
-            renderGroups(groupsData.filter(g => g.toLowerCase().includes(searchInput.value.toLowerCase().trim())));
+            const query = normalizeGroupSearch(searchInput.value);
+            renderGroups(groupsData.filter(group => normalizeGroupSearch(group).includes(query)));
         } catch {
             groupList.textContent = 'Не вдалося завантажити групи. ';
             const retry = document.createElement('button');
@@ -212,8 +213,8 @@ function initGroupModal(onChange) {
     });
 
     searchInput.addEventListener('input', (e) => {
-        const query = e.target.value.toLowerCase().trim();
-        const filtered = groupsData.filter(g => g.toLowerCase().includes(query));
+        const query = normalizeGroupSearch(e.target.value);
+        const filtered = groupsData.filter(group => normalizeGroupSearch(group).includes(query));
         renderGroups(filtered);
     });
 }

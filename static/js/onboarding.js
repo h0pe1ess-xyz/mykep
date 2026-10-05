@@ -50,8 +50,8 @@ function closeOnboardingGroupPicker(restoreFocus = true) {
 function renderOnboardingGroups() {
     const search = document.getElementById('ob-group-search');
     const list = document.getElementById('ob-group-options');
-    const query = search.value.toLocaleLowerCase('uk').trim();
-    const groups = onboardingGroups.filter(group => group.toLocaleLowerCase('uk').includes(query));
+    const query = normalizeGroupSearch(search.value);
+    const groups = onboardingGroups.filter(group => normalizeGroupSearch(group).includes(query));
     list.replaceChildren();
     groups.forEach(group => {
         const button = document.createElement('button');
