@@ -1,19 +1,19 @@
-const CACHE_NAME = 'mykep-cache-v2.8.0-install.1';
+const CACHE_NAME = 'mykep-cache-v2.8.0-onboard.1';
 const APP_SHELL = [
     "/",
     "/about.html",
     "/css/about.css?v=2.8.0",
-    "/css/app.css?v=2.8.0-install.1",
+    "/css/app.css?v=2.8.0-onboard.1",
     "/manifest.json",
     "/favicon.ico",
     "/pfp/1.png",
     "/pfp/2.webp",
     "/data/teacher-hints.json?v=2.8.0",
     "/js/api.js?v=2.8.0",
-    "/js/app.js?v=2.8.0-perf.1",
+    "/js/app.js?v=2.8.0-onboard.1",
     "/js/boot.js?v=2.8.0-swipe.2",
     "/js/dashboard.js?v=2.8.0",
-    "/js/onboarding.js?v=2.8.0",
+    "/js/onboarding.js?v=2.8.0-onboard.1",
     "/js/pwa.js?v=2.8.0-install.1",
     "/js/schedule.js?v=2.8.0",
     "/js/settings.js?v=2.8.0",

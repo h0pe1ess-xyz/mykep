@@ -45,7 +45,7 @@ function renderOnboardingGroups() {
             document.getElementById('ob-group-status').textContent = '';
             search.value = '';
             renderOnboardingGroups();
-            document.getElementById('ob-group-select').focus();
+            document.getElementById('ob-group-select').focus({ preventScroll: true });
         };
         list.appendChild(button);
     });
@@ -71,7 +71,7 @@ async function initOnboardingGroups(force = false) {
     picker.onkeydown = event => {
         if (event.key === 'Escape') {
             picker.open = false;
-            document.getElementById('ob-group-select').focus();
+            document.getElementById('ob-group-select').focus({ preventScroll: true });
         }
     };
     // Do not auto-focus search: opening the list should not raise the iPhone keyboard.
@@ -95,7 +95,7 @@ window.obFinish = function() {
     if (!onboardingGroupsLoaded || !onboardingGroups.includes(group)) {
         status.textContent = onboardingGroupsLoading ? 'Зачекайте, групи завантажуються…' : 'Оберіть вашу групу зі списку.';
         document.getElementById('ob-group-picker').open = true;
-        document.getElementById('ob-group-select').focus();
+        document.getElementById('ob-group-select').focus({ preventScroll: true });
         return;
     }
     if (!storage.set('mykep_group', group)) {

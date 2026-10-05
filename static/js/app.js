@@ -2,8 +2,11 @@
 
 function updateViewportSize() {
     const viewport = window.visualViewport;
-    document.documentElement.style.setProperty('--viewport-height', `${viewport ? viewport.height : window.innerHeight}px`);
+    const height = viewport ? viewport.height : window.innerHeight;
+    document.documentElement.style.setProperty('--viewport-height', `${height}px`);
     document.documentElement.style.setProperty('--viewport-top', `${viewport ? viewport.offsetTop : 0}px`);
+    // Keyboard height belongs to the visual viewport, not CSS height queries.
+    document.getElementById('onboarding')?.classList.toggle('onboarding-compact', height < 520);
 }
 updateViewportSize();
 window.addEventListener('resize', updateViewportSize);
