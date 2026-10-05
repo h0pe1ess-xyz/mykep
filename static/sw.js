@@ -1,17 +1,16 @@
-const CACHE_NAME = 'mykep-cache-v2.8.0-swipe.2';
+const CACHE_NAME = 'mykep-cache-v2.8.0-perf.1';
 const APP_SHELL = [
     "/",
     "/about.html",
     "/css/about.css?v=2.8.0",
     "/css/app.css?v=2.8.0-swipe.2",
     "/manifest.json",
-    "/favicon.png",
     "/favicon.ico",
     "/pfp/1.png",
     "/pfp/2.webp",
     "/data/teacher-hints.json?v=2.8.0",
     "/js/api.js?v=2.8.0",
-    "/js/app.js?v=2.8.0",
+    "/js/app.js?v=2.8.0-perf.1",
     "/js/boot.js?v=2.8.0-swipe.2",
     "/js/dashboard.js?v=2.8.0",
     "/js/onboarding.js?v=2.8.0",
@@ -20,7 +19,7 @@ const APP_SHELL = [
     "/js/settings.js?v=2.8.0",
     "/js/tabs.js?v=2.8.0-swipe.2",
     "/js/teacher-hints.js?v=2.8.0",
-    "/js/utils.js?v=2.8.0",
+    "/js/utils.js?v=2.8.0-perf.1",
     "/icons/icon-192.png",
     "/icons/icon-512.png",
     "/icons/maskable-512.png",
@@ -58,13 +57,8 @@ self.addEventListener('fetch', event => {
     }
     const resource = url.pathname + url.search;
     if (!APP_SHELL.includes(resource)) return;
-    const cachePromise = caches.open(CACHE_NAME);
-    const update = cachePromise.then(async cache => {
-        const response = await fetch(request);
-        if (response.ok && response.type === 'basic') await cache.put(request, response.clone());
-        return response;
-    });
-    // Register lifetime extension synchronously, even when a cached response wins.
-    event.waitUntil(update.catch(() => {}));
-    event.respondWith(cachePromise.then(async cache => (await cache.match(request)) || update));
+    // Shell resources are frozen by CACHE_NAME and versioned asset URLs.
+    // A new worker precaches the next release before replacing this cache.
+    event.respondWith(caches.open(CACHE_NAME).then(async cache =>
+        (await cache.match(request)) || fetch(request)));
 });

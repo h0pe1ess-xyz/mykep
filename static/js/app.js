@@ -95,7 +95,9 @@ const App = (() => {
             return;
         }
         if (tab === 'dashboard') {
-            tickDashboard(true);
+            // Keep the minute guard: returning to a tab does not change its data.
+            // New schedule data still forces a render through startDashboard().
+            tickDashboard();
             window.requestDashboardFit?.();
         }
         const target = targets[tab];

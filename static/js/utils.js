@@ -8,8 +8,12 @@ function escapeHTML(value) {
     return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
 }
 
+const kyivDateFormatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Kyiv', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+});
 function getKyivNow() {
-    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Kyiv', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+    const parts = kyivDateFormatter.formatToParts(new Date());
     const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
     return new Date(+values.year, +values.month - 1, +values.day, +values.hour, +values.minute, +values.second);
 }
@@ -88,9 +92,11 @@ function getAcademicWeek() {
 function updateHeaderDisplays() {
     const savedGroup = storage.get('mykep_group') || 'ПІ-24-02';
     const headerDisplay = document.getElementById('header-group-text');
-    if (headerDisplay) headerDisplay.innerText = `Група ${savedGroup}`;
+    const groupText = `Група ${savedGroup}`;
+    if (headerDisplay && headerDisplay.textContent !== groupText) headerDisplay.textContent = groupText;
     const weekSelect = document.getElementById('schedule-week');
     if (weekSelect) {
-        weekSelect.options[0].textContent = `Авто · ${getAcademicWeek()}-й тиждень`;
+        const weekText = `Авто · ${getAcademicWeek()}-й тиждень`;
+        if (weekSelect.options[0].textContent !== weekText) weekSelect.options[0].textContent = weekText;
     }
 }
