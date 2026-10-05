@@ -400,22 +400,36 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .author-profile .avatar { width: clamp(64px, 22vw, 96px); height: clamp(64px, 22vw, 96px); }
 .author-name { overflow-wrap: anywhere; }
 .pwa-overlay { position: fixed; left: 0; right: 0; z-index: 10000; background: var(--bg-main); background-image: radial-gradient(circle at 50% 15%, rgba(255,85,0,.15), transparent 60%); display: flex; align-items: center; justify-content: center; padding-left: 16px; padding-right: 16px; overflow-y: auto; }
-.pwa-card { background: rgba(36, 28, 24, .8); border: 1px solid var(--border-color); border-radius: 24px; padding: 28px 24px; width: 100%; max-width: 400px; max-height: 100%; overflow-y: auto; box-shadow: 0 12px 32px rgba(0,0,0,.5); text-align: center; }
-.pwa-icon { display: block; width: 80px; height: 80px; max-width: 100%; object-fit: contain; flex-shrink: 0; border-radius: 16px; margin: 0 auto 16px; }
-.pwa-card h2 { font-size: 24px; margin-bottom: 12px; }
-.pwa-card p { font-size: 14px; line-height: 1.5; color: var(--text-muted); margin: 10px 0 16px; }
-.pwa-instructions { background: var(--bg-main); border: 1px solid var(--border-color); padding: 16px; border-radius: 16px; text-align: left; margin-bottom: 12px; }
-.pwa-instructions strong { font-size: 14px; }
-.pwa-instructions p { font-size: 13px; margin-bottom: 10px; }
-.pwa-card .btn { margin-top: 12px; }
-.pwa-accent { color: var(--accent-orange); }
-.pwa-external-help { text-align: left; color: var(--text-muted); font-size: 12px; margin-top: 12px; }
-.pwa-external-help summary { cursor: pointer; padding: 8px 0; }
-.pwa-external-help p { font-size: 13px; }
-.pwa-browser-link { display: block; margin: 16px auto 0; padding: 10px 8px; min-height: 44px; font-size: 12px; font-weight: 400; line-height: 1.5; color: var(--text-muted); text-decoration: underline; text-underline-offset: 3px; background: none; box-shadow: none; }
+.pwa-card { background: var(--bg-surface); border-radius: 16px; padding: 32px 24px 20px; width: 100%; max-width: 420px; max-height: 100%; overflow-y: auto; overscroll-behavior: contain; box-shadow: 0 16px 40px rgba(0,0,0,.35); text-align: center; }
+.pwa-icon { display: block; width: 72px; height: 72px; object-fit: contain; border-radius: 16px; margin: 0 auto 24px; }
+.pwa-card h2 { font-size: 26px; line-height: 1.2; font-weight: 650; letter-spacing: -.025em; text-wrap: balance; margin-bottom: 12px; overflow-wrap: anywhere; }
+.pwa-card p { font-size: 16px; line-height: 1.55; color: #c5b8b0; margin: 0 0 24px; }
+.pwa-card .btn { min-height: 48px; margin-top: 4px; padding: 14px 16px; line-height: 1.4; }
+.pwa-card .btn-primary { color: var(--bg-main); box-shadow: none; }
+.pwa-card .btn:disabled { opacity: .75; cursor: progress; }
+.pwa-card .btn:focus-visible, .pwa-copy-btn:focus-visible, .pwa-about-link:focus-visible { outline: 2px solid var(--text-main); outline-offset: 4px; }
+.pwa-steps { text-align: left; padding-left: 24px; margin: 28px 0 24px; font-size: 16px; line-height: 1.55; color: #c5b8b0; }
+.pwa-steps li { padding-left: 6px; margin-bottom: 18px; }
+.pwa-steps li:last-child { margin-bottom: 0; }
+.pwa-steps li::marker { color: #ff9b69; font-weight: 600; }
+.pwa-steps strong { color: var(--text-main); font-weight: 600; }
+.pwa-inline-icon { display: inline-block; width: 20px; height: 20px; vertical-align: -.2em; }
+.pwa-external-help { text-align: left; color: #c5b8b0; font-size: 14px; margin-top: 16px; }
+.pwa-external-help summary { cursor: pointer; min-height: 44px; padding: 12px 0; }
+.pwa-external-help p { font-size: 14px; margin: 8px 0 16px; }
+.pwa-copy-btn { display: block; width: 100%; min-height: 48px; padding: 12px 16px; border-radius: 12px; background: var(--accent-orange); color: var(--bg-main); font-size: 15px; line-height: 1.4; font-weight: 600; }
+.pwa-copy-btn:hover { background: #e64d00; }
+.pwa-external-help .pwa-copy-btn { background: var(--pill-dark); color: var(--text-main); }
+.pwa-external-help .pwa-copy-btn:hover { background: var(--bg-surface-hover); }
+.pwa-browser-link { display: block; margin: 12px auto 0; padding: 12px 8px; min-height: 44px; font-size: 14px; line-height: 1.5; color: #c5b8b0; text-decoration: underline; text-underline-offset: 4px; background: none; box-shadow: none; }
 .pwa-browser-link:hover { color: var(--text-main); }
 #pwa-title:focus { outline: none; }
 .pwa-url { margin-top: 10px; }
+.pwa-card .pwa-feedback { font-size: 14px; margin: 20px 0 4px; }
+.pwa-feedback:empty { display: none; }
+.pwa-card .help-text { color: #c5b8b0; font-size: 14px; }
+.pwa-card .pwa-about-link { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 8px; margin-top: 4px; font-size: 14px; color: #c5b8b0; text-decoration: underline; text-underline-offset: 4px; }
+.pwa-card a, .pwa-card summary { -webkit-touch-callout: default; }
 .schedule-notice { font-size: 12px; line-height: 1.5; padding: 12px; border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-muted); background: var(--bg-surface); margin-bottom: 12px; flex-shrink: 0; }
 @media (max-width: 375px) {
     .app-container { --app-gutter: 16px; padding-left: var(--app-gutter); padding-right: var(--app-gutter); }
