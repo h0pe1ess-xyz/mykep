@@ -52,6 +52,18 @@ function buildSupportReport(device) {
     return `Повідомлення MyKep\n\nПроблема або ідея: [опишіть тут]\n\nДані застосунку:\nВерсія: ${build}\nСистема: ${device.system}\nМодель: ${device.model}\nБраузер: ${device.browser}\nРежим: ${mode}\nВікно: ${window.innerWidth} × ${window.innerHeight}`;
 }
 
+function createSupportTelegramURL(report, destination = 'https://t.me/oddxq') {
+    const url = new URL(destination);
+    // Telegram clients need percent-encoded spaces, not form-style +.
+    url.search = `text=${encodeURIComponent(report)}`;
+    return url.href;
+}
+
+let supportDeviceInfo = null;
+function getCurrentSupportReport() {
+    return buildSupportReport(supportDeviceInfo || getSupportDevice());
+}
+
 function initSupportReport() {
     const link = document.getElementById('support-telegram');
     const copy = document.getElementById('support-copy');
@@ -60,15 +72,12 @@ function initSupportReport() {
     const status = document.getElementById('support-status');
     if (!link || !copy || !toggle || !preview || !status) return;
     const destination = link.href;
-    const device = getSupportDevice();
+    const device = supportDeviceInfo = getSupportDevice();
     function refresh() {
         const report = buildSupportReport(device);
         preview.value = report;
         if (link.dataset.supportDraft === 'true') {
-            const url = new URL(destination);
-            // Telegram clients need percent-encoded spaces, not form-style +.
-            url.search = `text=${encodeURIComponent(report)}`;
-            link.href = url.href;
+            link.href = createSupportTelegramURL(report, destination);
         }
         return report;
     }
@@ -77,6 +86,15 @@ function initSupportReport() {
     const ready = getSupportModel().then(model => { if (model) device.model = model; refresh(); });
     link.addEventListener('click', refresh);
     link.addEventListener('focus', refresh);
+    document.getElementById('dashboard-support')?.addEventListener('click', event => {
+        event.preventDefault();
+        Tabs.show('settings', { focus: true });
+        const card = document.getElementById('support-card');
+        const scroller = card.closest('main');
+        // Scroll only the settings panel; scrolling the page can displace swipe views.
+        scroller.scrollTop += card.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 16;
+        link.focus({ preventScroll: true });
+    });
     toggle.addEventListener('click', () => {
         refresh();
         preview.hidden = !preview.hidden;

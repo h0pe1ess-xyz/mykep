@@ -84,7 +84,11 @@ async function showPWAGuide(force = false) {
     const copyControls = `<button class="pwa-copy-btn" id="pwa-copy" type="button">Скопіювати посилання</button>
         <label class="sr-only" for="pwa-url">Посилання на MyKep</label>
         <input class="text-input pwa-url" id="pwa-url" readonly hidden>
-        <span id="pwa-copy-status" class="help-text" role="status"></span>`;
+        <span id="pwa-copy-status" class="help-text" role="status"></span>
+        <div class="pwa-support-links">
+            <a class="pwa-support-link" id="pwa-support" href="https://t.me/oddxq" target="_blank" rel="noopener noreferrer">Написати в підтримку</a>
+            <a class="pwa-support-channel" href="https://t.me/MyKep_news" target="_blank" rel="noopener noreferrer">Відкрити канал MyKep</a>
+        </div>`;
     const help = `<details class="pwa-external-help"><summary>Не виходить встановити?</summary>
         <p>Відкрий цей сайт у ${browser}. Якщо ти у Telegram, у його меню обери «Відкрити у браузері». Або скопіюй посилання й встав його в ${browser}.</p>${copyControls}</details>`;
 
@@ -103,13 +107,13 @@ async function showPWAGuide(force = false) {
                 : 'За цим посиланням встановлення недоступне. Відкрий сайт для встановлення або переглянь розклад тут.';
             body = ctx.embedded
                 ? `<ol class="pwa-steps"><li>У меню ${ctx.telegram ? 'Telegram' : 'цього браузера'} обери <strong>«Відкрити у браузері»</strong>.</li><li>Або скопіюй посилання й відкрий його у <strong>${browser}</strong>.</li></ol>${copyControls}`
-                : '<a class="btn btn-primary" id="pwa-secure">Відкрити сайт для встановлення</a>';
+                : `<a class="btn btn-primary" id="pwa-secure">Відкрити сайт для встановлення</a>${copyControls}`;
         } else if (state === 'installing' || state === 'installed') {
             heading = state === 'installed' ? 'MyKep встановлено' : 'MyKep встановлюється';
             description = state === 'installed'
                 ? 'Тепер відкрий його з іконки, як звичайний застосунок.'
                 : 'Дочекайся появи іконки MyKep. Потім відкрий застосунок:';
-            body = `<ol class="pwa-steps">${launchSteps}</ol>`;
+            body = `<ol class="pwa-steps">${launchSteps}</ol>${help}`;
         } else if (state === 'manual') {
             heading = 'Додай MyKep на головний екран';
             description = `Це можна зробити в меню ${browser}:`;
@@ -125,6 +129,14 @@ async function showPWAGuide(force = false) {
         content.innerHTML = body;
         const secureLink = content.querySelector('#pwa-secure');
         if (secureLink) secureLink.href = secureURL.href;
+        const supportLink = content.querySelector('#pwa-support');
+        if (supportLink && typeof createSupportTelegramURL === 'function') {
+            const updateSupportLink = () => {
+                supportLink.href = createSupportTelegramURL('Не вдається встановити або відкрити MyKep.\n\n' + getCurrentSupportReport());
+            };
+            updateSupportLink();
+            supportLink.addEventListener('click', updateSupportLink);
+        }
         status.textContent = feedback;
         overlay.querySelector('#pwa-browser').hidden = state === 'confirm';
         if (focus) title.focus();
