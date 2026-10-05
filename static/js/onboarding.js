@@ -14,6 +14,7 @@ function checkOnboarding() {
 }
 
 window.obNextSlide = function(step) {
+    closeOnboardingGroupPicker(false);
     document.querySelectorAll('.onboarding-slide').forEach(el => el.classList.remove('active'));
     const nextSlide = document.getElementById('ob-slide-' + step);
     if (nextSlide) nextSlide.classList.add('active');
@@ -24,6 +25,26 @@ let onboardingGroups = [];
 let onboardingGroupsLoaded = false;
 let onboardingGroupsLoading = false;
 let onboardingSelectedGroup = '';
+
+function openOnboardingGroupPicker() {
+    const picker = document.getElementById('ob-group-picker');
+    picker.hidden = false;
+    document.getElementById('ob-group-select').setAttribute('aria-expanded', 'true');
+    document.querySelector('.onboarding-card').inert = true;
+    // Let people browse before opening the keyboard themselves.
+    document.getElementById('ob-group-back').focus({ preventScroll: true });
+    initOnboardingGroups();
+}
+
+function closeOnboardingGroupPicker(restoreFocus = true) {
+    const picker = document.getElementById('ob-group-picker');
+    if (!picker || picker.hidden) return;
+    document.getElementById('ob-group-search').blur();
+    picker.hidden = true;
+    document.getElementById('ob-group-select').setAttribute('aria-expanded', 'false');
+    document.querySelector('.onboarding-card').inert = false;
+    if (restoreFocus) document.getElementById('ob-group-select').focus({ preventScroll: true });
+}
 
 function renderOnboardingGroups() {
     const search = document.getElementById('ob-group-search');
@@ -41,11 +62,11 @@ function renderOnboardingGroups() {
         button.onclick = () => {
             onboardingSelectedGroup = group;
             document.getElementById('ob-group-value').textContent = group;
-            document.getElementById('ob-group-picker').open = false;
             document.getElementById('ob-group-status').textContent = '';
+            document.getElementById('ob-settings-status').textContent = '';
             search.value = '';
             renderOnboardingGroups();
-            document.getElementById('ob-group-select').focus({ preventScroll: true });
+            closeOnboardingGroupPicker();
         };
         list.appendChild(button);
     });
@@ -55,6 +76,7 @@ function renderOnboardingGroups() {
         empty.textContent = 'Груп не знайдено. Спробуйте інший пошук.';
         list.appendChild(empty);
     }
+    list.scrollTop = 0;
 }
 
 async function initOnboardingGroups(force = false) {
@@ -70,8 +92,13 @@ async function initOnboardingGroups(force = false) {
     search.oninput = renderOnboardingGroups;
     picker.onkeydown = event => {
         if (event.key === 'Escape') {
-            picker.open = false;
-            document.getElementById('ob-group-select').focus({ preventScroll: true });
+            event.preventDefault();
+            closeOnboardingGroupPicker();
+        } else if (event.key === 'Tab') {
+            const controls = [...picker.querySelectorAll('button, input')].filter(node => !node.disabled && node.getClientRects().length);
+            const first = controls[0], last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
         }
     };
     // Do not auto-focus search: opening the list should not raise the iPhone keyboard.
@@ -90,12 +117,11 @@ async function initOnboardingGroups(force = false) {
 }
 
 window.obFinish = function() {
-    const status = document.getElementById('ob-group-status');
+    const status = document.getElementById('ob-settings-status');
     const group = onboardingSelectedGroup;
     if (!onboardingGroupsLoaded || !onboardingGroups.includes(group)) {
-        status.textContent = onboardingGroupsLoading ? 'Зачекайте, групи завантажуються…' : 'Оберіть вашу групу зі списку.';
-        document.getElementById('ob-group-picker').open = true;
-        document.getElementById('ob-group-select').focus({ preventScroll: true });
+        openOnboardingGroupPicker();
+        document.getElementById('ob-group-status').textContent = onboardingGroupsLoading ? 'Зачекайте, групи завантажуються…' : 'Оберіть вашу групу зі списку.';
         return;
     }
     if (!storage.set('mykep_group', group)) {
@@ -112,6 +138,10 @@ window.obFinish = function() {
 // Onboarding buttons: delegated handlers (no inline onclick, so a strict CSP
 // without 'unsafe-inline' scripts keeps working).
 document.addEventListener('click', event => {
+    if (event.target instanceof Element) {
+        if (event.target.closest('#ob-group-select')) { openOnboardingGroupPicker(); return; }
+        if (event.target.closest('#ob-group-back')) { closeOnboardingGroupPicker(); return; }
+    }
     const target = event.target instanceof Element ? event.target.closest('[data-ob-step], [data-ob-finish]') : null;
     if (!target) return;
     event.preventDefault();

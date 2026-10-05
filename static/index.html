@@ -90,7 +90,7 @@
   ]
 }
     </script>
-<script src="/js/boot.js?v=2.8.0-swipe.2"></script><link href="/css/app.css?v=2.8.0-onboard.1" rel="stylesheet"/><script defer="" src="/js/utils.js?v=2.8.0-perf.1"></script><script defer="" src="/js/pwa.js?v=2.8.0-install.1"></script><script defer="" src="/js/api.js?v=2.8.0"></script><script defer="" src="/js/teacher-hints.js?v=2.8.0"></script><script defer="" src="/js/dashboard.js?v=2.8.0"></script><script defer="" src="/js/schedule.js?v=2.8.0"></script><script defer="" src="/js/settings.js?v=2.8.0"></script><script defer="" src="/js/onboarding.js?v=2.8.0-onboard.1"></script><script defer="" src="/js/tabs.js?v=2.8.0-swipe.2"></script><script defer="" src="/js/app.js?v=2.8.0-onboard.1"></script></head>
+<script src="/js/boot.js?v=2.8.0-swipe.2"></script><link href="/css/app.css?v=2.8.0-onboard.2" rel="stylesheet"/><script defer="" src="/js/utils.js?v=2.8.0-perf.1"></script><script defer="" src="/js/pwa.js?v=2.8.0-install.1"></script><script defer="" src="/js/api.js?v=2.8.0"></script><script defer="" src="/js/teacher-hints.js?v=2.8.0"></script><script defer="" src="/js/dashboard.js?v=2.8.0"></script><script defer="" src="/js/schedule.js?v=2.8.0"></script><script defer="" src="/js/settings.js?v=2.8.0"></script><script defer="" src="/js/onboarding.js?v=2.8.0-onboard.2"></script><script defer="" src="/js/tabs.js?v=2.8.0-swipe.2"></script><script defer="" src="/js/app.js?v=2.8.0-onboard.1"></script></head>
 <body>
 <h1 class="sr-only page-heading">MyKep - розклад пар ФКЕП ІФНТУНГ</h1>
 <noscript>
@@ -154,23 +154,10 @@
 <p>Оберіть вашу групу для завантаження розкладу.</p>
 <div class="input-group">
 <span class="group-field-label" id="ob-group-label">Академічна група</span>
-<details class="group-picker" id="ob-group-picker">
-<summary aria-describedby="ob-group-status" aria-labelledby="ob-group-label ob-group-value" class="text-input" id="ob-group-select">
+<button aria-haspopup="dialog" aria-expanded="false" aria-controls="ob-group-picker" aria-labelledby="ob-group-label ob-group-value" class="text-input" id="ob-group-select" type="button">
 <span id="ob-group-value">Оберіть групу</span><span aria-hidden="true">⌄</span>
-</summary>
-<div class="group-picker-panel">
-<div class="search-container">
-<label class="search-label" for="ob-group-search">Пошук групи</label>
-<div class="search-input-wrapper">
-<svg class="search-icon" fill="none" height="16" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="16"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line></svg>
-<input aria-label="Пошук у списку груп" autocomplete="off" class="modal-search" id="ob-group-search" placeholder="Введіть назву групи..." type="search"/>
-</div>
-</div>
-<div aria-label="Доступні групи" class="group-options" id="ob-group-options" role="group"></div>
-</div>
-</details>
-<p aria-live="polite" class="help-text" id="ob-group-status" role="status"></p>
-<button class="settings-btn" hidden="" id="ob-group-retry" type="button">Спробувати ще раз</button>
+</button>
+<p aria-live="polite" class="help-text" id="ob-settings-status" role="status"></p>
 </div>
 <div class="button-group">
 <button class="btn btn-secondary" data-ob-step="2">Назад</button>
@@ -178,6 +165,25 @@
 </div>
 </div>
 </div>
+
+<section aria-labelledby="ob-group-title" aria-modal="true" class="ob-group-screen" hidden="" id="ob-group-picker" role="dialog">
+<div class="ob-group-content">
+<h2 id="ob-group-title">Оберіть свою групу</h2>
+<div class="ob-group-header">
+<button aria-label="Назад до налаштувань" class="ob-group-back" id="ob-group-back" type="button">
+<svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="20"><path d="m15 18-6-6 6-6"></path></svg>
+</button>
+<div class="search-input-wrapper">
+<label class="sr-only" for="ob-group-search">Пошук групи</label>
+<svg class="search-icon" fill="none" height="16" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="16"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line></svg>
+<input aria-label="Пошук у списку груп" autocomplete="off" class="modal-search" id="ob-group-search" placeholder="Пошук групи" type="search"/>
+</div>
+</div>
+<p aria-live="polite" class="help-text" id="ob-group-status" role="status"></p>
+<button class="settings-btn" hidden="" id="ob-group-retry" type="button">Спробувати ще раз</button>
+<div aria-label="Доступні групи" class="group-options" id="ob-group-options" role="group"></div>
+</div>
+</section>
 </div>
 
 <div class="app-container" id="main-app" style="opacity: 1;"><div class="views" id="views"><div class="views-track"><section aria-label="Розклад" class="view view-schedule page-schedule" data-view="schedule" tabindex="-1"><header class="app-header">
