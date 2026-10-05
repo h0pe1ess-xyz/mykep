@@ -366,7 +366,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
     padding-top: max(16px, env(safe-area-inset-top));
     padding-bottom: max(16px, env(safe-area-inset-bottom));
 }
-#group-modal.modal-overlay { padding-top: max(16px, env(safe-area-inset-top)); padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+#group-modal.modal-overlay { padding-top: calc(max(16px, env(safe-area-inset-top)) + 8px); padding-bottom: max(16px, env(safe-area-inset-bottom)); }
 .modal-container { margin: 0; max-height: 100%; min-height: 0; overflow-y: auto; padding: 24px; }
 .modal-header, .modal-search { flex-shrink: 0; }
 .modal-header { gap: 8px; }
