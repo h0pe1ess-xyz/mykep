@@ -510,8 +510,8 @@ html, body, .app-container,
 .support-report { width: 100%; max-height: 280px; resize: vertical; padding: 12px; margin-top: 8px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-main); color: var(--text-main); font-size: 16px; line-height: 1.5; user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
 .support-status { font-size: 13px; line-height: 1.5; color: #c5b8b0; margin-top: 8px; }
 .support-status:empty { display: none; }
-.dashboard-support { display: flex; align-items: center; justify-content: center; flex-shrink: 0; min-height: 44px; padding: 8px 12px; border-radius: 12px; background: var(--pill-dark); color: var(--text-main); font-size: 13px; line-height: 1.4; text-align: center; text-decoration: none; }
-.dashboard-support:hover { background: var(--bg-surface-hover); }
+.dashboard-support { display: inline-flex; align-items: center; justify-content: center; align-self: center; flex-shrink: 0; min-height: 32px; padding: 6px 4px; color: #c5b8b0; font-size: 12px; line-height: 1.4; text-align: center; text-decoration: underline; text-underline-offset: 3px; }
+.dashboard-support:hover { color: var(--text-main); }
 .pwa-support-links { display: grid; gap: 8px; margin-top: 12px; }
 .pwa-support-link { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 12px; border-radius: 12px; background: var(--pill-dark); color: var(--text-main); text-decoration: none; font-size: 14px; font-weight: 600; }
 .pwa-support-channel { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px; color: #c5b8b0; text-decoration: underline; text-underline-offset: 3px; font-size: 14px; }

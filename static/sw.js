@@ -1,9 +1,9 @@
-const CACHE_NAME = 'mykep-cache-v2.8.0-support.3';
+const CACHE_NAME = 'mykep-cache-v2.8.0-support.4';
 const APP_SHELL = [
     "/",
     "/about.html",
     "/css/about.css?v=2.8.0",
-    "/css/app.css?v=2.8.0-support.3",
+    "/css/app.css?v=2.8.0-support.4",
     "/manifest.json",
     "/favicon.ico",
     "/pfp/1.png",
