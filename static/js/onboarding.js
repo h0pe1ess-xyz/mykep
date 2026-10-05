@@ -41,6 +41,7 @@ function closeOnboardingGroupPicker(restoreFocus = true) {
     if (!picker || picker.hidden) return;
     document.getElementById('ob-group-search').blur();
     picker.hidden = true;
+    picker.classList.remove('is-searching');
     document.getElementById('ob-group-select').setAttribute('aria-expanded', 'false');
     document.querySelector('.onboarding-card').inert = false;
     if (restoreFocus) document.getElementById('ob-group-select').focus({ preventScroll: true });
@@ -90,6 +91,9 @@ async function initOnboardingGroups(force = false) {
     status.textContent = 'Завантаження груп…';
     retry.hidden = true;
     search.oninput = renderOnboardingGroups;
+    // Some mobile keyboards overlay the page without resizing visualViewport.
+    // Keep results near the top until the picker closes, including after blur.
+    search.onfocus = () => picker.classList.add('is-searching');
     picker.onkeydown = event => {
         if (event.key === 'Escape') {
             event.preventDefault();
