@@ -86,15 +86,6 @@ function initSupportReport() {
     const ready = getSupportModel().then(model => { if (model) device.model = model; refresh(); });
     link.addEventListener('click', refresh);
     link.addEventListener('focus', refresh);
-    document.getElementById('dashboard-support')?.addEventListener('click', event => {
-        event.preventDefault();
-        Tabs.show('settings', { focus: true });
-        const card = document.getElementById('support-card');
-        const scroller = card.closest('main');
-        // Scroll only the settings panel; scrolling the page can displace swipe views.
-        scroller.scrollTop += card.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 16;
-        link.focus({ preventScroll: true });
-    });
     toggle.addEventListener('click', () => {
         refresh();
         preview.hidden = !preview.hidden;

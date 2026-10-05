@@ -55,7 +55,9 @@ const App = (() => {
         target.signature = signature;
         if (tab === 'dashboard') {
             document.getElementById('dashboard-main').hidden = false;
-            startDashboard(data[days[getKyivNow().getDay()]] || []);
+            const today = getKyivNow().getDay();
+            const tomorrow = (today + 1) % 7;
+            startDashboard(data[days[today]] || [], tomorrow === 0 ? [] : (data[days[tomorrow]] || []));
         } else initSchedulePage(data);
     }
 
@@ -69,6 +71,7 @@ const App = (() => {
         const key = context.key + (tab === 'dashboard' ? `|day:${getKyivNow().getDay()}` : '');
         const cached = getCachedSchedule(week);
         target.pending = true;
+        if (tab === 'schedule' && target.key !== key) setScheduleSharingPending();
         target.lastLoad = Date.now();
         if (cached) {
             apply(tab, cached.data, key);

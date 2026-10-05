@@ -39,12 +39,14 @@ let schedulePageData = null;
 let schedulePickerState = null;
 function setSchedulePending() {
     schedulePageData = null;
+    setScheduleSharingPending();
     document.querySelectorAll('.day-picker button').forEach(button => { button.disabled = true; });
 }
 function initSchedulePage(scheduleDict) {
     const picker = document.querySelector('.day-picker');
     if (!picker) return;
     schedulePageData = scheduleDict;
+    scheduleShareContext = { group: storage.get('mykep_group') || 'ПІ-24-02', week: getScheduleWeekSelection(), date: getKyivNow() };
     document.querySelectorAll('.day-picker button').forEach(button => { button.disabled = false; });
     const days = [
         { id: 'понеділок', short: 'Пн', name: 'Понеділок' },
@@ -58,6 +60,7 @@ function initSchedulePage(scheduleDict) {
     if (schedulePickerState?.signature === signature) {
         // Background updates and week selection keep the chosen day and scroll.
         renderScheduleList(scheduleDict[schedulePickerState.activeDay] || []);
+        setScheduleShareData(scheduleDict[schedulePickerState.activeDay] || [], schedulePickerState.activeDay);
         return;
     }
     const todayMap = ['неділя', 'понеділок', 'вівторок', 'середа', 'четвер', "п'ятниця", 'субота'];
@@ -82,7 +85,10 @@ function initSchedulePage(scheduleDict) {
             item.classList.toggle('active', active);
             item.setAttribute('aria-pressed', String(active));
         });
-        if (schedulePageData) renderScheduleList(schedulePageData[dayId] || []);
+        if (schedulePageData) {
+            renderScheduleList(schedulePageData[dayId] || []);
+            setScheduleShareData(schedulePageData[dayId] || [], dayId);
+        }
         if (vibrate && navigator.vibrate) navigator.vibrate(10);
     }
     function updateArc() {

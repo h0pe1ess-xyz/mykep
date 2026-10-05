@@ -35,7 +35,13 @@ function updateTimerDisplay(percentage) {
     }
 }
 
-function renderDashboard(schedule) {
+function tomorrowLessonMessage(schedule) {
+    const starts = (schedule || []).map(lesson => String(lesson.time || '').split(' - ')[0])
+        .filter(time => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)).sort();
+    return starts.length ? `Завтра пари о ${starts[0]}.` : 'Завтра пар не заплановано.';
+}
+
+function renderDashboard(schedule, tomorrow = []) {
     const main = document.getElementById('dashboard-main');
     const gaugeMain = document.getElementById('minutes-left');
     const gaugeSub = document.getElementById('current-room');
@@ -50,7 +56,7 @@ function renderDashboard(schedule) {
         updateTimerDisplay(100);
         if (gaugeMain) { gaugeMain.innerHTML = `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`; }
         if (gaugeSub) gaugeSub.innerHTML = `Вихідний`;
-        if (statusText) statusText.innerText = "На сьогодні пар не заплановано.";
+        if (statusText) statusText.innerText = tomorrowLessonMessage(tomorrow);
         if (currentCard) currentCard.style.display = "none";
         if (nextCard) nextCard.style.display = "none";
         if (main) main.dataset.ready = 'true';
@@ -118,7 +124,7 @@ function renderDashboard(schedule) {
             updateTimerDisplay(100);
             if (gaugeMain) { gaugeMain.innerHTML = `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`; }
             if (gaugeSub) gaugeSub.innerHTML = `Кінець дня`;
-            if (statusText) statusText.innerText = "Всі пари на сьогодні завершились.";
+            if (statusText) statusText.innerText = tomorrowLessonMessage(tomorrow);
         }
     }
 
@@ -197,6 +203,7 @@ function renderDashboard(schedule) {
 }
 
 let currentGlobalSchedule = null;
+let tomorrowGlobalSchedule = [];
 let dashboardInterval = null;
 let lastDashboardMinute = '';
 function tickDashboard(force = false) {
@@ -205,11 +212,12 @@ function tickDashboard(force = false) {
     const minute = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}-${now.getMinutes()}`;
     if (!force && minute === lastDashboardMinute) return;
     lastDashboardMinute = minute;
-    renderDashboard(currentGlobalSchedule);
+    renderDashboard(currentGlobalSchedule, tomorrowGlobalSchedule);
     window.requestDashboardFit?.();
 }
-function startDashboard(schedule) {
+function startDashboard(schedule, tomorrow = []) {
     currentGlobalSchedule = schedule;
+    tomorrowGlobalSchedule = tomorrow;
     tickDashboard(true);
     if (dashboardInterval) clearInterval(dashboardInterval);
     dashboardInterval = setInterval(tickDashboard, 10000);
