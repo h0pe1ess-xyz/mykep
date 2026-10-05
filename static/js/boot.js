@@ -190,7 +190,7 @@ window.mykepViewportReport = function() {
     function fit() {
         frame = 0;
         const main = document.getElementById('dashboard-main');
-        if (!main || !main.clientHeight) return;
+        if (!main || document.documentElement.dataset.tab !== 'dashboard' || !main.clientHeight) return;
         main.dataset.overflow = 'false';
         let fits = false;
         for (let density = 0; density <= 4; density++) {
@@ -213,7 +213,14 @@ window.mykepViewportReport = function() {
         const main = document.getElementById('dashboard-main');
         if (!main) return;
         if (typeof ResizeObserver !== 'undefined') new ResizeObserver(window.requestDashboardFit).observe(main);
-        new MutationObserver(window.requestDashboardFit).observe(main, { childList: true, subtree: true, characterData: true });
+        const progressText = document.getElementById('day-progress-text');
+        new MutationObserver(records => {
+            // This counter sits in an absolute thumb and cannot affect layout.
+            // Its animation must not trigger density measurement on every frame.
+            if (records.some(record => !progressText?.contains(record.target))) {
+                window.requestDashboardFit();
+            }
+        }).observe(main, { childList: true, subtree: true, characterData: true });
         document.fonts?.ready.then(window.requestDashboardFit);
         window.requestDashboardFit();
     });

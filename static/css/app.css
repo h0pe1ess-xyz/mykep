@@ -601,6 +601,19 @@ html.ios-standalone .view > .app-header,
 html.ios-standalone .view > .main-content { width: 100%;
     max-width: calc(400px - 2 * var(--app-gutter)); align-self: center; }
 .view:focus { outline: none; }
+
+/* Keep Android swipes local to the track and avoid sampling moving backdrops. */
+html.android-viewport .views-track { contain: layout; }
+html.android-viewport .view { contain: layout paint; }
+html.android-viewport .view .lesson-card,
+html.android-viewport .view .lesson-card-detailed,
+html.android-viewport .view .settings-card,
+html.android-viewport .view .credits-block,
+html.android-viewport .bottom-nav::after {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .views-track { transition: none; }
 }

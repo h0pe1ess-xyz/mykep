@@ -1,9 +1,9 @@
-const CACHE_NAME = 'mykep-cache-v2.8.0-swipe.1';
+const CACHE_NAME = 'mykep-cache-v2.8.0-swipe.2';
 const APP_SHELL = [
     "/",
     "/about.html",
     "/css/about.css?v=2.8.0",
-    "/css/app.css?v=2.8.0-swipe.1",
+    "/css/app.css?v=2.8.0-swipe.2",
     "/manifest.json",
     "/favicon.png",
     "/favicon.ico",
@@ -12,13 +12,13 @@ const APP_SHELL = [
     "/data/teacher-hints.json?v=2.8.0",
     "/js/api.js?v=2.8.0",
     "/js/app.js?v=2.8.0",
-    "/js/boot.js?v=2.8.0-swipe.1",
+    "/js/boot.js?v=2.8.0-swipe.2",
     "/js/dashboard.js?v=2.8.0",
     "/js/onboarding.js?v=2.8.0",
     "/js/pwa.js?v=2.8.0",
     "/js/schedule.js?v=2.8.0",
     "/js/settings.js?v=2.8.0",
-    "/js/tabs.js?v=2.8.0-swipe.1",
+    "/js/tabs.js?v=2.8.0-swipe.2",
     "/js/teacher-hints.js?v=2.8.0",
     "/js/utils.js?v=2.8.0",
     "/icons/icon-192.png",
