@@ -3,8 +3,12 @@
 let scheduleShareContext = null;
 let scheduleShareData = null;
 let scheduleExportToken = 0;
-let scheduleExportURL = null;
 let scheduleExportFile = null;
+let scheduleShareSignature = '';
+let scheduleSharePreparing = false;
+let scheduleShareInFlight = false;
+let scheduleSharePrepareError = false;
+let scheduleShareStatusTimer = null;
 
 function scheduleExportDayLabel(day, week, now = getKyivNow()) {
     const names = ['неділя', 'понеділок', 'вівторок', 'середа', 'четвер', "п'ятниця", 'субота'];
@@ -17,30 +21,33 @@ function scheduleExportDayLabel(day, week, now = getKyivNow()) {
     return `${name} · ${date.getDate()}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
 }
 
-function closeScheduleExport(restoreFocus = false) {
-    ++scheduleExportToken;
-    const panel = document.getElementById('schedule-export');
-    panel.hidden = true;
-    panel.closest('main').classList.remove('schedule-export-open');
-    document.getElementById('schedule-share').setAttribute('aria-expanded', 'false');
-    document.getElementById('schedule-export-image').removeAttribute('src');
-    document.getElementById('schedule-export-save').removeAttribute('href');
-    if (scheduleExportURL) URL.revokeObjectURL(scheduleExportURL);
-    scheduleExportURL = null;
-    scheduleExportFile = null;
-    if (restoreFocus) document.getElementById('schedule-share').focus({ preventScroll: true });
+function updateScheduleShareButton() {
+    const button = document.getElementById('schedule-share');
+    button.disabled = !scheduleShareData || scheduleSharePreparing || scheduleShareInFlight;
+    button.setAttribute('aria-busy', String(scheduleSharePreparing || scheduleShareInFlight));
+}
+
+function showScheduleShareStatus(message = '') {
+    clearTimeout(scheduleShareStatusTimer);
+    const status = document.getElementById('schedule-share-status');
+    status.textContent = message;
+    status.hidden = !message;
+    if (message) scheduleShareStatusTimer = setTimeout(() => { status.hidden = true; }, 7000);
 }
 
 function setScheduleSharingPending() {
-    closeScheduleExport();
+    ++scheduleExportToken;
     scheduleShareData = null;
-    document.getElementById('schedule-share').disabled = true;
+    scheduleExportFile = null;
+    scheduleShareSignature = '';
+    scheduleSharePreparing = false;
+    showScheduleShareStatus();
+    updateScheduleShareButton();
 }
 
 function setScheduleShareData(lessons, day) {
-    closeScheduleExport();
     scheduleShareData = { lessons, day, ...scheduleShareContext };
-    document.getElementById('schedule-share').disabled = false;
+    refreshScheduleShareFile();
 }
 
 async function createSchedulePNG(data) {
@@ -50,133 +57,177 @@ async function createSchedulePNG(data) {
     canvas.width = 900;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas unavailable');
-    function lines(value, font, width = 788) {
+    const style = getComputedStyle(document.documentElement);
+    const family = getComputedStyle(document.body).fontFamily;
+    const colors = {
+        background: style.getPropertyValue('--bg-main').trim(),
+        card: style.getPropertyValue('--card-bg').trim(),
+        border: style.getPropertyValue('--border-color').trim(),
+        text: style.getPropertyValue('--text-main').trim(),
+        muted: style.getPropertyValue('--text-muted').trim(),
+        badge: style.getPropertyValue('--bg-surface-hover').trim()
+    };
+    const fonts = { title: `600 36px ${family}`, small: `500 26px ${family}`, footer: `24px ${family}` };
+    function lines(value, font, width = 756) {
         const text = String(value ?? '').replace(/\s+/g, ' ').trim();
         if (text.length > 1500) throw new Error('Text too large');
         ctx.font = font;
         const result = [];
         let line = '';
-        for (const character of Array.from(text)) {
-            if (ctx.measureText(line + character).width > width && line) {
-                result.push(line.trimEnd());
-                line = character.trimStart();
-            } else line += character;
+        for (const word of text.split(' ')) {
+            const candidate = line ? `${line} ${word}` : word;
+            if (ctx.measureText(candidate).width <= width) { line = candidate; continue; }
+            if (line) result.push(line);
+            line = '';
+            for (const character of Array.from(word)) {
+                if (ctx.measureText(line + character).width > width && line) { result.push(line); line = ''; }
+                line += character;
+            }
         }
         if (line) result.push(line.trimEnd());
         return result;
     }
-    const group = lines(data.group, 'bold 38px Arial');
+    const group = lines(data.group, fonts.small, 756);
     const label = scheduleExportDayLabel(data.day, data.week, data.date);
     const cards = data.lessons.map(lesson => {
-        const heading = lines(`${lesson.lesson}-${getLessonSuffix(lesson.lesson)} пара · ${lesson.time || 'Час не вказано'}`, '24px Arial');
-        const subject = lines(lesson.subject || 'Заняття', 'bold 32px Arial');
-        const teacher = lines(teacherDisplayName(String(lesson.teacher || '')), '24px Arial');
-        const room = lines(lesson.room ? `Аудиторія ${lesson.room}` : 'Аудиторія не вказана', '24px Arial');
+        const heading = lines(`${lesson.lesson}-${getLessonSuffix(lesson.lesson)} пара     ${lesson.time || 'Час не вказано'}`, fonts.small);
+        const subject = lines(lesson.subject || 'Заняття', fonts.title);
+        const room = lesson.room ? lines(lesson.room, fonts.small, 160) : [];
+        const teacher = lines(teacherDisplayName(String(lesson.teacher || '')), fonts.small, room.length ? 520 : 756);
         return { heading, subject, teacher, room,
-            height: 54 + heading.length * 32 + subject.length * 42 + teacher.length * 32 + room.length * 32 };
+            height: 100 + heading.length * 36 + subject.length * 46 + Math.max(teacher.length * 34, room.length * 34 + 12) };
     });
-    const notice = lines(data.notice || '', '22px Arial');
-    const height = 210 + group.length * 46 + (cards.length ? cards.reduce((sum, card) => sum + card.height + 16, 0) : 130)
-        + notice.length * 30 + 100;
+    const notice = lines(data.notice || '', fonts.footer);
+    const height = 220 + group.length * 36 + (cards.length ? cards.reduce((sum, card) => sum + card.height + 24, 0) : 130)
+        + notice.length * 32 + 110;
     if (height > 16000) throw new Error('Image too large');
     canvas.height = height;
-    ctx.fillStyle = '#120e0c';
+    ctx.fillStyle = colors.background;
     ctx.fillRect(0, 0, canvas.width, height);
-    let y = 54;
-    function draw(textLines, font, color, lineHeight, x = 56) {
+    const glow = ctx.createRadialGradient(450, 120, 0, 450, 120, 720);
+    glow.addColorStop(0, 'rgba(255, 85, 0, 0.12)');
+    glow.addColorStop(1, 'rgba(255, 85, 0, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, canvas.width, height);
+    function roundedRect(x, top, width, boxHeight, radius) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, top);
+        ctx.lineTo(x + width - radius, top);
+        ctx.quadraticCurveTo(x + width, top, x + width, top + radius);
+        ctx.lineTo(x + width, top + boxHeight - radius);
+        ctx.quadraticCurveTo(x + width, top + boxHeight, x + width - radius, top + boxHeight);
+        ctx.lineTo(x + radius, top + boxHeight);
+        ctx.quadraticCurveTo(x, top + boxHeight, x, top + boxHeight - radius);
+        ctx.lineTo(x, top + radius);
+        ctx.quadraticCurveTo(x, top, x + radius, top);
+        ctx.closePath();
+    }
+    let y = 44;
+    function draw(textLines, font, color, lineHeight, x = 72) {
         ctx.font = font;
         ctx.fillStyle = color;
         ctx.textBaseline = 'top';
         for (const line of textLines) { ctx.fillText(line, x, y); y += lineHeight; }
     }
-    draw(['MyKep'], 'bold 32px Arial', '#ff783e', 52);
-    draw(group, 'bold 38px Arial', '#fff8f3', 46);
-    y += 12;
-    draw([label], '26px Arial', '#d2c4bb', 36);
-    y += 26;
+    draw(['MyKep'], `700 44px ${family}`, colors.text, 66, 40);
+    draw(group, fonts.small, colors.muted, 36, 40);
+    y += 18;
+    draw([label], fonts.small, colors.text, 40, 40);
+    y += 24;
     for (const card of cards) {
-        ctx.fillStyle = '#251c17';
-        ctx.fillRect(32, y, 836, card.height);
+        const top = y;
+        roundedRect(40, top, 820, card.height, 28);
+        ctx.fillStyle = colors.card;
+        ctx.fill();
+        ctx.strokeStyle = colors.border;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        y += 30;
+        draw(card.heading, fonts.small, colors.muted, 36);
+        y += 12;
+        draw(card.subject, fonts.title, colors.text, 46);
+        y += 12;
+        ctx.beginPath();
+        ctx.moveTo(72, y);
+        ctx.lineTo(828, y);
+        ctx.stroke();
         y += 22;
-        draw(card.heading, '24px Arial', '#d2c4bb', 32);
-        y += 6;
-        draw(card.subject, 'bold 32px Arial', '#fff8f3', 42);
-        draw(card.teacher, '24px Arial', '#d2c4bb', 32);
-        draw(card.room, '24px Arial', '#ffae7f', 32);
-        y += 42;
+        const bottomStart = y;
+        draw(card.teacher, fonts.small, colors.muted, 34);
+        if (card.room.length) {
+            ctx.font = fonts.small;
+            const width = Math.max(...card.room.map(line => ctx.measureText(line).width)) + 24;
+            roundedRect(828 - width, bottomStart - 6, width, card.room.length * 34 + 12, 14);
+            ctx.fillStyle = colors.badge;
+            ctx.fill();
+            y = bottomStart;
+            draw(card.room, fonts.small, colors.text, 34, 840 - width);
+        }
+        y = top + card.height + 24;
     }
-    if (!cards.length) { draw(['Пар не заплановано'], '32px Arial', '#fff8f3', 46); y += 84; }
-    draw(notice, '22px Arial', '#ffae7f', 30);
+    if (!cards.length) { draw(['Пар не заплановано'], fonts.title, colors.text, 46, 40); y += 84; }
+    draw(notice, fonts.footer, colors.muted, 32, 40);
     y += 16;
     const now = getKyivNow();
     const stamp = `${now.getDate()}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    draw([`Створено ${stamp}`, 'Актуальний розклад: mykep.pp.ua'], '22px Arial', '#d2c4bb', 30);
+    draw([`Створено ${stamp}`, 'Актуальний розклад: mykep.pp.ua'], fonts.footer, colors.muted, 32, 40);
     return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('PNG unavailable')), 'image/png'));
+}
+
+async function refreshScheduleShareFile(force = false) {
+    if (!scheduleShareData) return;
+    const data = { ...scheduleShareData, notice: document.getElementById('schedule-notice').textContent };
+    const signature = JSON.stringify([data.group, data.week, scheduleExportDayLabel(data.day, data.week, data.date), data.lessons, data.notice]);
+    if (!force && signature === scheduleShareSignature) return;
+    scheduleShareSignature = signature;
+    const token = ++scheduleExportToken;
+    scheduleExportFile = null;
+    scheduleSharePrepareError = false;
+    scheduleSharePreparing = !!navigator.share && !!navigator.canShare;
+    showScheduleShareStatus();
+    updateScheduleShareButton();
+    if (!scheduleSharePreparing) return;
+    try {
+        const blob = await createSchedulePNG(data);
+        if (token !== scheduleExportToken) return;
+        const filename = `MyKep-${data.group}-${data.day}.png`.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+        scheduleExportFile = new File([blob], filename, { type: 'image/png' });
+    } catch (error) {
+        if (token !== scheduleExportToken) return;
+        scheduleSharePrepareError = true;
+        console.error('Schedule image generation failed:', error);
+    } finally {
+        if (token === scheduleExportToken) { scheduleSharePreparing = false; updateScheduleShareButton(); }
+    }
 }
 
 function initScheduleSharing() {
     const button = document.getElementById('schedule-share');
-    const panel = document.getElementById('schedule-export');
-    const status = document.getElementById('schedule-export-status');
-    const image = document.getElementById('schedule-export-image');
-    const save = document.getElementById('schedule-export-save');
-    const send = document.getElementById('schedule-export-send');
     button.onclick = async () => {
-        if (!scheduleShareData || button.disabled) return;
-        if (!panel.hidden) { closeScheduleExport(); return; }
-        const data = { ...scheduleShareData, notice: document.getElementById('schedule-notice').textContent };
-        const token = ++scheduleExportToken;
-        panel.hidden = false;
-        panel.closest('main').classList.add('schedule-export-open');
-        image.hidden = save.hidden = send.hidden = true;
-        button.setAttribute('aria-expanded', 'true');
-        status.textContent = 'Готуємо картинку…';
-        try {
-            const blob = await createSchedulePNG(data);
-            // The public CSP allows data images, so preview without permitting blob images.
-            const previewURL = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = () => reject(new Error('Preview unavailable'));
-                reader.readAsDataURL(blob);
-            });
-            if (token !== scheduleExportToken) return;
-            const filename = `MyKep-${data.group}-${data.day}.png`.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
-            scheduleExportURL = URL.createObjectURL(blob);
-            scheduleExportFile = new File([blob], filename, { type: 'image/png' });
-            image.src = previewURL;
-            image.alt = `Розклад ${data.group}: ${scheduleExportDayLabel(data.day, data.week, data.date)}`;
-            image.hidden = save.hidden = false;
-            save.href = scheduleExportURL;
-            save.download = filename;
-            let canShare = false;
-            try { canShare = !!navigator.share && !!navigator.canShare?.({ files: [scheduleExportFile] }); }
-            catch { canShare = false; }
-            send.hidden = !canShare;
-            send.disabled = false;
-            status.textContent = canShare ? 'Надішліть картинку або збережіть PNG.' : 'Збережіть PNG та надішліть його в чат.';
-        } catch (error) {
-            if (token !== scheduleExportToken) return;
-            console.error('Schedule image generation failed:', error);
-            status.textContent = 'Не вдалося створити картинку. Закрийте та спробуйте ще раз.';
+        if (!scheduleShareData || button.disabled || scheduleShareInFlight) return;
+        if (scheduleSharePrepareError) {
+            refreshScheduleShareFile(true);
+            showScheduleShareStatus('Не вдалося підготувати картинку. Спробуйте ще раз.');
+            return;
         }
-    };
-    send.onclick = async () => {
-        if (!scheduleExportFile || send.disabled) return;
+        let canShare = false;
+        try { canShare = !!scheduleExportFile && !!navigator.share && !!navigator.canShare?.({ files: [scheduleExportFile] }); }
+        catch { canShare = false; }
+        if (!canShare) {
+            showScheduleShareStatus('Цей браузер не підтримує поширення картинки. Спробуйте відкрити MyKep у браузері телефона.');
+            return;
+        }
         const token = scheduleExportToken;
-        send.disabled = true;
+        scheduleShareInFlight = true;
+        updateScheduleShareButton();
+        showScheduleShareStatus();
         try {
-            // The file is ready before this tap, preserving native share user activation.
+            // Prepare on day changes so one tap can invoke native share synchronously.
             await navigator.share({ files: [scheduleExportFile], title: 'Розклад MyKep' });
-            if (token === scheduleExportToken) status.textContent = 'Картинку передано в меню поширення.';
         } catch (error) {
-            if (token === scheduleExportToken) status.textContent = error.name === 'AbortError'
-                ? 'Поширення скасовано. Можна спробувати ще раз або зберегти PNG.'
-                : 'Не вдалося відкрити меню поширення. Збережіть PNG та надішліть його в чат.';
-        } finally { if (token === scheduleExportToken) send.disabled = false; }
+            if (token === scheduleExportToken && error.name !== 'AbortError') showScheduleShareStatus('Не вдалося відкрити меню поширення. Спробуйте ще раз.');
+        } finally { scheduleShareInFlight = false; updateScheduleShareButton(); }
     };
-    document.getElementById('schedule-export-close').onclick = () => closeScheduleExport(true);
-    panel.addEventListener('keydown', event => { if (event.key === 'Escape') closeScheduleExport(true); });
 }
 
 initScheduleSharing();

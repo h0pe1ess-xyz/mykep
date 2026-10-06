@@ -8,7 +8,7 @@
 <meta content="MyKep - розклад пар для студентів ФКЕП ІФНТУНГ: заняття на сьогодні й тиждень, аудиторії, викладачі та таймер. Студентський PWA-застосунок з офлайн-доступом." name="description"/>
 <meta content="index, follow, max-image-preview:large" name="robots"/>
 <meta content="MyKep" name="application-name"/>
-<meta content="2.8.0-share.1" name="mykep-build"/>
+<meta content="2.8.0-share.2" name="mykep-build"/>
 <link href="https://mykep.pp.ua/" rel="canonical"/>
 <meta content="website" property="og:type"/>
 <meta content="MyKep" property="og:site_name"/>
@@ -91,7 +91,7 @@
   ]
 }
     </script>
-<script src="/js/boot.js?v=2.8.0-swipe.2"></script><link href="/css/app.css?v=2.8.0-share.1" rel="stylesheet"/><script defer="" src="/js/utils.js?v=2.8.0-search.1"></script><script defer="" src="/js/pwa.js?v=2.8.0-support.3"></script><script defer="" src="/js/api.js?v=2.8.0"></script><script defer="" src="/js/teacher-hints.js?v=2.8.0"></script><script defer="" src="/js/dashboard.js?v=2.8.0-share.1"></script><script defer="" src="/js/schedule-share.js?v=2.8.0-share.1"></script><script defer="" src="/js/schedule.js?v=2.8.0-share.1"></script><script defer="" src="/js/settings.js?v=2.8.0-search.1"></script><script defer="" src="/js/support.js?v=2.8.0-share.1"></script><script defer="" src="/js/onboarding.js?v=2.8.0-search.1"></script><script defer="" src="/js/tabs.js?v=2.8.0-swipe.2"></script><script defer="" src="/js/app.js?v=2.8.0-share.1"></script></head>
+<script src="/js/boot.js?v=2.8.0-swipe.2"></script><link href="/css/app.css?v=2.8.0-share.2" rel="stylesheet"/><script defer="" src="/js/utils.js?v=2.8.0-search.1"></script><script defer="" src="/js/pwa.js?v=2.8.0-support.3"></script><script defer="" src="/js/api.js?v=2.8.0"></script><script defer="" src="/js/teacher-hints.js?v=2.8.0"></script><script defer="" src="/js/dashboard.js?v=2.8.0-share.1"></script><script defer="" src="/js/schedule-share.js?v=2.8.0-share.2"></script><script defer="" src="/js/schedule.js?v=2.8.0-share.1"></script><script defer="" src="/js/settings.js?v=2.8.0-search.1"></script><script defer="" src="/js/support.js?v=2.8.0-share.1"></script><script defer="" src="/js/onboarding.js?v=2.8.0-search.1"></script><script defer="" src="/js/tabs.js?v=2.8.0-swipe.2"></script><script defer="" src="/js/app.js?v=2.8.0-share.2"></script></head>
 <body>
 <h1 class="sr-only page-heading">MyKep - розклад пар ФКЕП ІФНТУНГ</h1>
 <noscript>
@@ -189,6 +189,7 @@
 
 <div class="app-container" id="main-app" style="opacity: 1;"><div class="views" id="views"><div class="views-track"><section aria-label="Розклад" class="view view-schedule page-schedule" data-view="schedule" tabindex="-1"><header class="app-header">
 <h2 class="app-title">MyKep</h2>
+<div class="schedule-header-actions">
 <label class="location-badge week-control" for="schedule-week">
 <span class="sr-only">Тиждень для перегляду розкладу</span>
 <select class="week-select" id="schedule-week">
@@ -199,21 +200,14 @@
 <option value="4">4-й тиждень</option>
 </select>
 </label>
+<button aria-label="Поділитися розкладом дня" class="schedule-share-button" disabled="" id="schedule-share" title="Поділитися розкладом дня" type="button">
+<svg aria-hidden="true" fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24" width="22"><path d="M12 16V3m-4 4 4-4 4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+</button>
+</div>
 </header><p class="schedule-notice" hidden="" id="schedule-notice" role="status"></p><div class="day-picker">
 
 </div><main class="schedule-main">
-<div class="schedule-share-toolbar">
-<button aria-controls="schedule-export" aria-expanded="false" class="settings-btn" disabled="" id="schedule-share" type="button">Поділитися днем</button>
-</div>
-<section aria-label="Картинка розкладу" class="schedule-export" hidden="" id="schedule-export">
-<p aria-live="polite" class="help-text" id="schedule-export-status" role="status"></p>
-<img alt="" hidden="" id="schedule-export-image"/>
-<div class="schedule-export-actions">
-<button class="settings-btn" hidden="" id="schedule-export-send" type="button">Поділитися</button>
-<a class="settings-btn" hidden="" id="schedule-export-save">Зберегти PNG</a>
-<button class="settings-btn" id="schedule-export-close" type="button">Закрити</button>
-</div>
-</section>
+<p aria-live="polite" class="schedule-share-status" hidden="" id="schedule-share-status" role="status"></p>
 <div class="schedule-list" id="dynamic-schedule-list">
 
 </div>

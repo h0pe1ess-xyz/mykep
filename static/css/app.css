@@ -510,17 +510,18 @@ html, body, .app-container,
 .support-report { width: 100%; max-height: 280px; resize: vertical; padding: 12px; margin-top: 8px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-main); color: var(--text-main); font-size: 16px; line-height: 1.5; user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
 .support-status { font-size: 13px; line-height: 1.5; color: #c5b8b0; margin-top: 8px; }
 .support-status:empty { display: none; }
-.schedule-share-toolbar { display: flex; flex-shrink: 0; justify-content: flex-end; margin-bottom: 8px; }
-.schedule-share-toolbar .settings-btn { min-height: 44px; padding: 8px 12px; font-size: 13px; }
-.schedule-share-toolbar .settings-btn:disabled, .schedule-export-actions button:disabled { opacity: 0.5; cursor: default; }
-.schedule-export { flex-shrink: 0; margin-bottom: 16px; }
-.schedule-export[hidden], .schedule-export [hidden] { display: none; }
-.schedule-export img { display: block; width: 100%; height: auto; max-height: 280px; object-fit: contain; margin: 8px 0; border-radius: 12px; }
-.schedule-main.schedule-export-open { overflow-y: auto; }
-.schedule-main.schedule-export-open .schedule-list { flex: none; overflow-y: visible; }
-.schedule-export-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.schedule-export-actions .settings-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 12px; font-size: 13px; text-decoration: none; }
-#schedule-export-status:empty { display: none; }
+.view-schedule { position: relative; }
+.view-schedule .app-header { flex-wrap: nowrap; }
+.schedule-header-actions { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.schedule-header-actions .week-select { max-width: min(176px, calc(100vw - 160px)); padding: 8px; font-size: 12px; }
+.schedule-share-button { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; padding: 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.schedule-share-button:active { color: var(--accent-orange); }
+@media (hover: hover) and (pointer: fine) {
+    .schedule-share-button:hover { color: var(--text-main); background: var(--bg-surface-hover); }
+}
+.schedule-share-button:disabled { opacity: 0.4; cursor: default; background: transparent; }
+.schedule-share-status { position: absolute; left: 16px; right: 16px; bottom: 12px; z-index: 20; padding: 12px 16px; border-radius: 12px; background: var(--pill-dark); color: var(--text-main); font-size: 13px; line-height: 1.5; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3); }
+.schedule-share-status[hidden] { display: none; }
 .pwa-support-links { display: grid; gap: 8px; margin-top: 12px; }
 .pwa-support-link { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 12px; border-radius: 12px; background: var(--pill-dark); color: var(--text-main); text-decoration: none; font-size: 14px; font-weight: 600; }
 .pwa-support-channel { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px; color: #c5b8b0; text-decoration: underline; text-underline-offset: 3px; font-size: 14px; }

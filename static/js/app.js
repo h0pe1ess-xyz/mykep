@@ -27,6 +27,7 @@ const App = (() => {
         const node = document.getElementById(`${tab}-notice`);
         node.textContent = message;
         node.hidden = !message && !retry;
+        if (tab === 'schedule') refreshScheduleShareFile();
         if (retry) {
             const button = document.createElement('button');
             button.type = 'button'; button.className = 'btn btn-secondary';
