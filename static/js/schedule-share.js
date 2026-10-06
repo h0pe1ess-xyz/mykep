@@ -223,7 +223,7 @@ function initScheduleSharing() {
         showScheduleShareStatus();
         try {
             // Prepare on day changes so one tap can invoke native share synchronously.
-            await navigator.share({ files: [scheduleExportFile], title: 'Розклад MyKep' });
+            await navigator.share({ files: [scheduleExportFile] });
         } catch (error) {
             if (token === scheduleExportToken && error.name !== 'AbortError') showScheduleShareStatus('Не вдалося відкрити меню поширення. Спробуйте ще раз.');
         } finally { scheduleShareInFlight = false; updateScheduleShareButton(); }

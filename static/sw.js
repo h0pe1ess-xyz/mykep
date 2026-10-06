@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mykep-cache-v2.8.0-share.2';
+const CACHE_NAME = 'mykep-cache-v2.8.0-share.3';
 const APP_SHELL = [
     "/",
     "/about.html",
@@ -15,7 +15,7 @@ const APP_SHELL = [
     "/js/dashboard.js?v=2.8.0-share.1",
     "/js/onboarding.js?v=2.8.0-search.1",
     "/js/pwa.js?v=2.8.0-support.3",
-    "/js/schedule-share.js?v=2.8.0-share.2",
+    "/js/schedule-share.js?v=2.8.0-share.3",
     "/js/schedule.js?v=2.8.0-share.1",
     "/js/settings.js?v=2.8.0-search.1",
     "/js/support.js?v=2.8.0-share.1",
