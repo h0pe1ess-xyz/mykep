@@ -15,7 +15,7 @@ URL = "https://kep.nung.edu.ua/pages/education/schedule"
 
 
 def normalize_group(value):
-    return re.sub(r"[\s\-–-]", "", str(value)).casefold()
+    return re.sub(r"[\s\-\N{EN DASH}-]", "", str(value)).casefold()
 
 
 def split_groups(value):
@@ -55,6 +55,12 @@ class ScheduleService:
         self.lock = asyncio.Lock()
         self.task = None
         self._built = {}
+        # Diagnostics for the admin panel (never exposed publicly).
+        self.last_attempt_wall = 0.0
+        self.last_error_type = None
+        self.last_duration_ms = None
+        self.refresh_ok = 0
+        self.refresh_failed = 0
 
     def install(self, data, updated_at):
         self.raw = data
@@ -81,6 +87,8 @@ class ScheduleService:
             if self.last_attempt and time.monotonic() - self.last_attempt < RETRY_SECONDS:
                 return False
             self.last_attempt = time.monotonic()
+            self.last_attempt_wall = time.time()
+            started = time.monotonic()
             try:
                 data = await asyncio.to_thread(fetch_schedule_sync)
                 if not valid_snapshot(data):
@@ -91,10 +99,16 @@ class ScheduleService:
                     await db.commit()
                 self.install(data, updated_at)
                 self.last_error = False
+                self.last_error_type = None
+                self.refresh_ok += 1
+                self.last_duration_ms = round((time.monotonic() - started) * 1000)
                 logger.info("Refreshed schedule: %s groups", len(self.groups))
                 return True
             except Exception as exc:
                 self.last_error = True
+                self.last_error_type = type(exc).__name__
+                self.refresh_failed += 1
+                self.last_duration_ms = round((time.monotonic() - started) * 1000)
                 logger.warning("Schedule refresh failed (%s); retaining cached data", type(exc).__name__)
                 return False
 
@@ -106,6 +120,29 @@ class ScheduleService:
     def metadata(self):
         return {"updated_at": datetime.fromtimestamp(self.updated_at, KYIV).isoformat() if self.updated_at else None,
                 "stale": bool(self.raw) and (self.last_error or time.time() - self.updated_at > REFRESH_SECONDS * 2)}
+
+    def diagnostics(self):
+        now = time.time()
+        next_in = None
+        if self.last_attempt:
+            wait = RETRY_SECONDS if self.last_error else REFRESH_SECONDS
+            next_in = max(0, round(wait - (time.monotonic() - self.last_attempt)))
+        return {
+            **self.metadata(),
+            "ready": bool(self.raw),
+            "groups": len(self.groups),
+            "age_seconds": round(now - self.updated_at) if self.updated_at else None,
+            "last_attempt": datetime.fromtimestamp(self.last_attempt_wall, KYIV).isoformat() if self.last_attempt_wall else None,
+            "last_error": self.last_error,
+            "last_error_type": self.last_error_type,
+            "last_duration_ms": self.last_duration_ms,
+            "refresh_ok": self.refresh_ok,
+            "refresh_failed": self.refresh_failed,
+            "refresh_interval": REFRESH_SECONDS,
+            "retry_interval": RETRY_SECONDS,
+            "next_refresh_in": next_in,
+            "retry_blocked_for": max(0, round(RETRY_SECONDS - (time.monotonic() - self.last_attempt))) if self.last_attempt else 0,
+        }
 
     def build(self, group, duration1, duration2, week=None):
         # Minute bucket handles the Saturday rollover; bound memory explicitly.
@@ -130,13 +167,13 @@ def is_lesson_active(weeks_str: str, current_week: int) -> bool:
     try:
         if not weeks_str: return True
         w_str = str(weeks_str).lower().strip()
-        
-        if not w_str or "всі" in w_str or "усі" in w_str or "1-4" in w_str or "щотижня" in w_str: 
+
+        if not w_str or "всі" in w_str or "усі" in w_str or "1-4" in w_str or "щотижня" in w_str:
             return True
-        
+
         w_str = w_str.replace("/", ",").replace("\\", ",").replace(".", ",").replace(";", ",")
         w_str = w_str.replace(" та ", ",").replace(" і ", ",")
-        
+
         clean_str = re.sub(r'[^0-9,\-]', '', w_str)
         if not clean_str: return True
 
@@ -149,7 +186,7 @@ def is_lesson_active(weeks_str: str, current_week: int) -> bool:
         return False
     except Exception as e:
         logger.warning(f"Error filtering active week '{weeks_str}': {e}. Defaulting to True.")
-        return True 
+        return True
 
 def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: int, duration2: int,
                          week: Optional[int] = None) -> Optional[Dict[str, Any]]:
@@ -158,7 +195,7 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
         raise ValueError("Week must be an integer from 1 to 4")
     if not raw_schedule_data:
         return None
-    
+
     group_schedule = None
     search_group = normalize_group(group_name)
     for key, value in raw_schedule_data.items():
@@ -173,7 +210,7 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
     now = datetime.now(KYIV)
     current_weekday = now.weekday()
     reference_date = now
-    
+
     if current_weekday == 6:
         reference_date = now + timedelta(days=1)
     elif current_weekday == 5 and now.hour >= 15:
@@ -193,7 +230,7 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
     shift1_60 = {"1": "08:00 - 09:00", "2": "09:10 - 10:10", "3": "10:30 - 11:30", "4": "11:40 - 12:40"}
     shift2_80 = {"5": "14:10 - 15:30", "6": "15:40 - 17:00", "7": "17:10 - 18:30", "8": "18:40 - 20:00"}
     shift2_60 = {"5": "14:10 - 15:10", "6": "15:20 - 16:20", "7": "16:30 - 17:30", "8": "17:40 - 18:40"}
-    
+
     time_mapping = {}
     time_mapping.update(shift1_80 if int(duration1) == 80 else shift1_60)
     time_mapping.update(shift2_80 if int(duration2) == 80 else shift2_60)
@@ -202,13 +239,13 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
     for day_name, day_date in days_to_check.items():
         week_num = week if week is not None else get_academic_week(day_date.date())
         formatted_day = []
-        
+
         for lesson in normalized_schedule.get(day_name, []):
             week_val = lesson.get("week", lesson.get("weeks", ""))
-            
-            if not is_lesson_active(week_val, week_num): 
+
+            if not is_lesson_active(week_val, week_num):
                 continue
-                
+
             num = str(lesson.get("number"))
             formatted_day.append({
                 "lesson": int(num) if num.isdigit() else 0,
@@ -217,7 +254,7 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
                 "teacher": lesson.get("teacher", ""),
                 "room": lesson.get("cabinet", "")
             })
-            
+
         formatted_day.sort(key=lambda x: x["lesson"])
         full_week_schedule[day_name] = formatted_day
 

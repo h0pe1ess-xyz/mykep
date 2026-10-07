@@ -1,136 +1,162 @@
-// visualViewport responds to iOS browser chrome and the on-screen keyboard.
+'use strict';
+
 function updateViewportSize() {
     const viewport = window.visualViewport;
-    document.documentElement.style.setProperty('--viewport-height', `${viewport ? viewport.height : window.innerHeight}px`);
+    const height = viewport ? viewport.height : window.innerHeight;
+    document.documentElement.style.setProperty('--viewport-height', `${height}px`);
     document.documentElement.style.setProperty('--viewport-top', `${viewport ? viewport.offsetTop : 0}px`);
+    // Keyboard height belongs to the visual viewport, not CSS height queries.
+    document.getElementById('onboarding')?.classList.toggle('onboarding-compact', height < 520);
 }
 updateViewportSize();
 window.addEventListener('resize', updateViewportSize);
 window.visualViewport?.addEventListener('resize', updateViewportSize);
 window.visualViewport?.addEventListener('scroll', updateViewportSize);
 
-document.addEventListener('DOMContentLoaded', () => {
-    const currentPath = window.location.pathname.split('/').pop() || 'index.html';
-    const navLinks = document.querySelectorAll('.bottom-nav a, .bottom-nav button');
-    
-    navLinks.forEach(link => {
-        let linkPath = link.getAttribute('href');
-        if (!linkPath && link.hasAttribute('onclick')) {
-            const match = link.getAttribute('onclick').match(/'([^']+)'/);
-            if (match) linkPath = match[1];
+const App = (() => {
+    const refreshInterval = 5 * 60 * 1000;
+    const days = ['неділя', 'понеділок', 'вівторок', 'середа', 'четвер', "п'ятниця", 'субота'];
+    const targets = {
+        dashboard: { token: 0, signature: '', key: '', lastLoad: 0, pending: false },
+        schedule: { token: 0, signature: '', key: '', lastLoad: 0, pending: false }
+    };
+    let started = false;
+    let settingsReady = false;
+
+    function notice(tab, message, retry = false) {
+        const node = document.getElementById(`${tab}-notice`);
+        node.textContent = message;
+        node.hidden = !message && !retry;
+        if (tab === 'schedule') refreshScheduleShareFile();
+        if (retry) {
+            const button = document.createElement('button');
+            button.type = 'button'; button.className = 'btn btn-secondary';
+            button.textContent = 'Спробувати ще раз';
+            button.onclick = () => load(tab);
+            node.appendChild(button);
         }
-        
-        if (linkPath) linkPath = linkPath.split('/').pop() || 'index.html';
-        if (linkPath === currentPath) {
-            link.classList.add('active');
-            link.setAttribute('aria-current', 'page');
-            link.removeAttribute('onclick');
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-            });
-        }
-    });
-
-    // Content is visible immediately; do not fade the whole page on every tab.
-
-
-});
-
-async function initApplication() {
-    if (!isPWA()) {
-        await showPWAGuide();
     }
 
-    if (storage.get('mykep_onboarded') !== 'true' && !document.getElementById('onboarding')) {
-        window.location.replace('/index.html');
-        return;
+    function clearView(tab) {
+        targets[tab].signature = '';
+        if (tab === 'dashboard') {
+            currentGlobalSchedule = null;
+            clearInterval(dashboardInterval);
+            document.getElementById('dashboard-main').hidden = true;
+        } else {
+            setSchedulePending();
+            document.getElementById('dynamic-schedule-list').replaceChildren();
+        }
     }
-    if (checkOnboarding()) return; 
 
-    initSettings();
-    updateHeaderDisplays();
+    function apply(tab, data, key) {
+        const target = targets[tab];
+        const signature = key + '|' + JSON.stringify(data);
+        if (signature === target.signature) return;
+        target.signature = signature;
+        if (tab === 'dashboard') {
+            document.getElementById('dashboard-main').hidden = false;
+            const today = getKyivNow().getDay();
+            const tomorrow = (today + 1) % 7;
+            startDashboard(data[days[today]] || [], tomorrow === 0 ? [] : (data[days[tomorrow]] || []));
+        } else initSchedulePage(data);
+    }
 
-    if (!document.getElementById('dashboard-main') && !document.getElementById('dynamic-schedule-list')) return;
+    async function load(tab) {
+        if (!started || !targets[tab]) return;
+        const target = targets[tab];
+        const token = ++target.token;
+        // A preview week must never feed the live dashboard timer.
+        const week = tab === 'dashboard' ? 'auto' : getScheduleWeekSelection();
+        const context = scheduleRequestContext(week);
+        const key = context.key + (tab === 'dashboard' ? `|day:${getKyivNow().getDay()}` : '');
+        const cached = getCachedSchedule(week);
+        target.pending = true;
+        if (tab === 'schedule' && target.key !== key) setScheduleSharingPending();
+        target.lastLoad = Date.now();
+        if (cached) {
+            apply(tab, cached.data, key);
+            notice(tab, Date.now() - cached.savedAt > 120000 ?
+                'Показано збережений розклад. Перевіряємо оновлення…' : staleScheduleNotice(cached.meta));
+        } else {
+            if (target.key !== key) clearView(tab);
+            notice(tab, 'Завантаження розкладу…');
+        }
+        target.key = key;
+        const busyNode = document.querySelector(`[data-view="${tab}"] main`);
+        busyNode.setAttribute('aria-busy', 'true');
+        const result = await fetchSchedule(week);
+        if (token !== target.token) return;
+        target.pending = false;
+        busyNode.setAttribute('aria-busy', 'false');
+        notice(tab, result.notice, result.data === null);
+        if (result.data === null) clearView(tab);
+        else apply(tab, result.data, key);
+    }
 
-    const weekSelect = document.getElementById('schedule-week');
-    if (weekSelect) {
+    function enter(tab) {
+        if (!started) return;
+        updateHeaderDisplays();
+        if (tab === 'settings') {
+            if (!settingsReady) { initSettings(); settingsReady = true; }
+            return;
+        }
+        if (tab === 'dashboard') {
+            // Keep the minute guard: returning to a tab does not change its data.
+            // New schedule data still forces a render through startDashboard().
+            tickDashboard();
+            window.requestDashboardFit?.();
+        }
+        const target = targets[tab];
+        const week = tab === 'dashboard' ? 'auto' : getScheduleWeekSelection();
+        const key = scheduleRequestContext(week).key + (tab === 'dashboard' ? `|day:${getKyivNow().getDay()}` : '');
+        if (!target.pending && (!target.lastLoad || key !== target.key || Date.now() - target.lastLoad >= refreshInterval)) load(tab);
+    }
+
+    function reload() {
+        for (const tab of Object.keys(targets)) {
+            ++targets[tab].token;
+            targets[tab].pending = false;
+            targets[tab].lastLoad = 0;
+            targets[tab].key = '';
+            clearView(tab);
+            document.querySelector(`[data-view="${tab}"] main`).setAttribute('aria-busy', 'false');
+            notice(tab, '');
+        }
+        updateHeaderDisplays();
+        enter(Tabs.current);
+    }
+
+    function resume(force = false) {
+        if (!started || document.visibilityState !== 'visible' || document.getElementById('pwa-guide')) return;
+        const target = targets[Tabs.current];
+        if (target && !target.pending && (force || Date.now() - target.lastLoad >= refreshInterval)) load(Tabs.current);
+        else enter(Tabs.current);
+    }
+
+    async function init() {
+        Tabs.init();
+        Tabs.onChange(enter);
+        if (!isPWA()) await showPWAGuide();
+        if (checkOnboarding()) return;
+        started = true;
+        const weekSelect = document.getElementById('schedule-week');
         weekSelect.value = getScheduleWeekSelection();
         weekSelect.addEventListener('change', () => {
             storage.set('mykep_schedule_week', normalizeWeekSelection(weekSelect.value));
             updateHeaderDisplays();
-            loadScheduleView();
+            load('schedule');
         });
+        enter(Tabs.current);
+        setInterval(resume, refreshInterval);
+        document.addEventListener('visibilitychange', () => resume());
+        window.addEventListener('pageshow', event => { if (event.persisted) resume(true); });
+        window.addEventListener('online', () => resume(true));
     }
-    await loadScheduleView();
-}
 
-let scheduleLoadId = 0;
-let renderedScheduleKey = '';
-let renderedScheduleJSON = '';
-let lastVisibleRefresh = 0;
-let scheduleViewReady = false;
-function scheduleWeekForPage() {
-    // The live timer always uses the automatic week, never the preview setting.
-    return document.getElementById('schedule-week')?.value || 'auto';
-}
-function renderScheduleView(data, key) {
-    const json = JSON.stringify(data);
-    if (key === renderedScheduleKey && json === renderedScheduleJSON) return;
-    renderedScheduleKey = key;
-    renderedScheduleJSON = json;
-    const dashboard = document.getElementById('dashboard-main');
-    if (dashboard) {
-        dashboard.hidden = false;
-        const days = ['неділя', 'понеділок', 'вівторок', 'середа', 'четвер', "п'ятниця", 'субота'];
-        startDashboard(data[days[getKyivNow().getDay()]] || []);
-    }
-    if (document.getElementById('dynamic-schedule-list')) initSchedulePage(data);
-}
-async function loadScheduleView() {
-    const loadId = ++scheduleLoadId;
-    scheduleViewReady = true;
-    lastVisibleRefresh = Date.now();
-    const week = scheduleWeekForPage();
-    // Include the day in the render identity so midnight refreshes the dashboard.
-    const key = `${scheduleRequestContext(week).key}|day:${getKyivNow().getDay()}`;
-    const cached = getCachedSchedule(week);
-    const list = document.getElementById('dynamic-schedule-list');
-    if (cached) {
-        scheduleNotice = Date.now() - cached.savedAt > 120000 ?
-            'Показано збережений розклад. Перевіряємо оновлення…' : staleScheduleNotice(cached.meta);
-        renderScheduleView(cached.data, key);
-    } else if (key !== renderedScheduleKey) {
-        scheduleNotice = 'Завантаження розкладу…';
-        if (list) {
-            list.replaceChildren();
-            if (typeof setSchedulePending === 'function') setSchedulePending();
-        }
-        const dashboard = document.getElementById('dashboard-main');
-        if (dashboard) dashboard.hidden = true;
-        // Do not retain another week's cards beneath the new week label.
-        renderedScheduleKey = '';
-        renderedScheduleJSON = '';
-    } else {
-        scheduleNotice = 'Перевіряємо оновлення розкладу…';
-    }
-    showScheduleNotice();
-    list?.setAttribute('aria-busy', 'true');
-    const result = await fetchSchedule(week);
-    if (loadId !== scheduleLoadId) return; // Rapid week changes: latest selection wins.
-    list?.setAttribute('aria-busy', 'false');
-    scheduleNotice = result.notice;
-    showScheduleNotice();
-    if (result.data === null) {
-        renderedScheduleKey = '';
-        renderedScheduleJSON = '';
-        if (typeof setSchedulePending === 'function') setSchedulePending();
-        showScheduleError(loadScheduleView);
-        return;
-    }
-    renderScheduleView(result.data, key);
-}
-
-document.addEventListener('DOMContentLoaded', initApplication);
+    document.addEventListener('DOMContentLoaded', init);
+    return { reload };
+})();
 
 if ('serviceWorker' in navigator) {
     let refreshing = false;
@@ -139,22 +165,8 @@ if ('serviceWorker' in navigator) {
         if (hadController && !refreshing) { refreshing = true; window.location.reload(); }
     });
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(err => {
-            console.error('Service Worker registration failed:', err);
+        navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(error => {
+            console.error('Service Worker registration failed:', error);
         });
     });
 }
-
-function refreshOnResume(force = false) {
-    if (!scheduleViewReady || document.visibilityState !== 'visible' ||
-        storage.get('mykep_onboarded') !== 'true' || document.getElementById('pwa-guide')) return;
-    if (force || Date.now() - lastVisibleRefresh >= 5 * 60 * 1000) {
-        updateHeaderDisplays();
-        loadScheduleView();
-    }
-}
-document.addEventListener('visibilitychange', () => refreshOnResume());
-window.addEventListener('pageshow', event => { if (event.persisted) refreshOnResume(true); });
-window.addEventListener('online', () => refreshOnResume(true));
-// Revalidate in place, without reloading the shell/nav every five minutes.
-setInterval(refreshOnResume, 5 * 60 * 1000);

@@ -1,15 +1,24 @@
 // Storage can be unavailable in private/in-app browsers; don't crash onboarding.
 const storage = {
-    get(key) { try { return localStorage.getItem(key); } catch (_) { return null; } },
-    set(key, value) { try { localStorage.setItem(key, value); return true; } catch (_) { return false; } },
-    remove(key) { try { localStorage.removeItem(key); } catch (_) {} }
+    get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+    set(key, value) { try { localStorage.setItem(key, value); return true; } catch { return false; } },
+    remove(key) { try { localStorage.removeItem(key); } catch {} }
 };
 function escapeHTML(value) {
     return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
 }
 
+function normalizeGroupSearch(value) {
+    // Separators are optional in search; preserve the original group for display/API.
+    return value.normalize('NFKC').toLocaleLowerCase('uk').replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+const kyivDateFormatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Kyiv', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+});
 function getKyivNow() {
-    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Kyiv', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+    const parts = kyivDateFormatter.formatToParts(new Date());
     const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
     return new Date(+values.year, +values.month - 1, +values.day, +values.hour, +values.minute, +values.second);
 }
@@ -26,7 +35,7 @@ function getUserId() {
 function animateValue(obj, start, end, duration) {
     if (!obj) return;
     if (obj._mykepAnimFrame) cancelAnimationFrame(obj._mykepAnimFrame);
-    
+
     if (start === end || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || document.visibilityState === 'hidden') {
         obj.textContent = Math.floor(end) + '%';
         return;
@@ -36,7 +45,7 @@ function animateValue(obj, start, end, duration) {
     const step = (timestamp) => {
         if (!startTimestamp) startTimestamp = timestamp;
         const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-        const easeProgress = progress * (2 - progress); 
+        const easeProgress = progress * (2 - progress);
         obj.textContent = Math.floor(start + easeProgress * (end - start)) + '%';
         if (progress < 1) {
             obj._mykepAnimFrame = window.requestAnimationFrame(step);
@@ -67,30 +76,32 @@ function timeToMins(timeStr) {
 
 function getAcademicWeek() {
     const now = getKyivNow();
-    const baseMonday = new Date(2026, 7, 31); 
+    const baseMonday = new Date(2026, 7, 31);
     let targetDate = new Date(now);
-    
-    if (targetDate.getDay() === 0) { 
+
+    if (targetDate.getDay() === 0) {
         targetDate.setDate(targetDate.getDate() + 1);
-    } else if (targetDate.getDay() === 6 && targetDate.getHours() >= 15) { 
+    } else if (targetDate.getDay() === 6 && targetDate.getHours() >= 15) {
         targetDate.setDate(targetDate.getDate() + 2);
     }
-    
+
     targetDate.setHours(0, 0, 0, 0);
     baseMonday.setHours(0, 0, 0, 0);
-    
+
     const diffDays = Math.floor((Date.UTC(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()) - Date.UTC(2026, 7, 31)) / (1000 * 60 * 60 * 24));
     if (diffDays < 0) return 1;
-    
+
     return (Math.floor(diffDays / 7) % 4) + 1;
 }
 
 function updateHeaderDisplays() {
     const savedGroup = storage.get('mykep_group') || 'ПІ-24-02';
     const headerDisplay = document.getElementById('header-group-text');
-    if (headerDisplay) headerDisplay.innerText = `Група ${savedGroup}`;
+    const groupText = `Група ${savedGroup}`;
+    if (headerDisplay && headerDisplay.textContent !== groupText) headerDisplay.textContent = groupText;
     const weekSelect = document.getElementById('schedule-week');
     if (weekSelect) {
-        weekSelect.options[0].textContent = `Авто · ${getAcademicWeek()}-й тиждень`;
+        const weekText = `Авто · ${getAcademicWeek()}-й тиждень`;
+        if (weekSelect.options[0].textContent !== weekText) weekSelect.options[0].textContent = weekText;
     }
 }

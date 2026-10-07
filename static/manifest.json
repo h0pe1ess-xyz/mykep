@@ -1,7 +1,7 @@
 {
   "name": "MyKep",
   "short_name": "MyKep",
-  "start_url": "/index.html",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#110c0a",
   "theme_color": "#110c0a",
@@ -32,5 +32,15 @@
   "categories": [
     "education",
     "utilities"
+  ],
+  "shortcuts": [
+    {
+      "name": "Розклад",
+      "url": "/schedule.html"
+    },
+    {
+      "name": "Налаштування",
+      "url": "/settings.html"
+    }
   ]
 }

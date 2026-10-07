@@ -1,8 +1,6 @@
 function renderScheduleList(schedule) {
     const listContainer = document.getElementById('dynamic-schedule-list');
     if (!listContainer) return;
-    
-    // A single DOM write; optional entrance never blocks rendering or navigation.
 
     if (!schedule || schedule.length === 0) {
         listContainer.innerHTML = `
@@ -15,10 +13,9 @@ function renderScheduleList(schedule) {
         return;
     }
 
-    listContainer.innerHTML = '';
-    schedule.forEach((lesson, index) => {
-        const delay = Math.min(index * 0.06, 0.36); 
-        const cardHtml = `
+    listContainer.innerHTML = schedule.map((lesson, index) => {
+        const delay = Math.min(index * 0.06, 0.36);
+        return `
             <div class="lesson-card" style="animation: fadeIn var(--transition-normal) both; animation-delay: ${delay}s;">
                 <div class="lesson-top">
                     <span>${escapeHTML(lesson.lesson)}-${getLessonSuffix(lesson.lesson)} пара</span>
@@ -35,20 +32,21 @@ function renderScheduleList(schedule) {
                 </div>
             </div>
         `;
-        listContainer.insertAdjacentHTML('beforeend', cardHtml);
-    });
+    }).join('');
 }
 
 let schedulePageData = null;
 let schedulePickerState = null;
 function setSchedulePending() {
     schedulePageData = null;
+    setScheduleSharingPending();
     document.querySelectorAll('.day-picker button').forEach(button => { button.disabled = true; });
 }
 function initSchedulePage(scheduleDict) {
     const picker = document.querySelector('.day-picker');
     if (!picker) return;
     schedulePageData = scheduleDict;
+    scheduleShareContext = { group: storage.get('mykep_group') || 'ПІ-24-02', week: getScheduleWeekSelection(), date: getKyivNow() };
     document.querySelectorAll('.day-picker button').forEach(button => { button.disabled = false; });
     const days = [
         { id: 'понеділок', short: 'Пн', name: 'Понеділок' },
@@ -62,6 +60,7 @@ function initSchedulePage(scheduleDict) {
     if (schedulePickerState?.signature === signature) {
         // Background updates and week selection keep the chosen day and scroll.
         renderScheduleList(scheduleDict[schedulePickerState.activeDay] || []);
+        setScheduleShareData(scheduleDict[schedulePickerState.activeDay] || [], schedulePickerState.activeDay);
         return;
     }
     const todayMap = ['неділя', 'понеділок', 'вівторок', 'середа', 'четвер', "п'ятниця", 'субота'];
@@ -86,7 +85,10 @@ function initSchedulePage(scheduleDict) {
             item.classList.toggle('active', active);
             item.setAttribute('aria-pressed', String(active));
         });
-        if (schedulePageData) renderScheduleList(schedulePageData[dayId] || []);
+        if (schedulePageData) {
+            renderScheduleList(schedulePageData[dayId] || []);
+            setScheduleShareData(schedulePageData[dayId] || [], dayId);
+        }
         if (vibrate && navigator.vibrate) navigator.vibrate(10);
     }
     function updateArc() {

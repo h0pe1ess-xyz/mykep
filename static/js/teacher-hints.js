@@ -40,12 +40,12 @@ function renderTeacherLabel(value) {
         try {
             const response = await fetch(url, { signal: controller.signal });
             if (response.ok) install(await response.json());
-        } catch (_) { /* Bundled/offline directory remains available. */ }
+        } catch { /* Bundled/offline directory remains available. */ }
         finally { clearTimeout(timeout); }
     }
     function load() {
         if (!loading) loading = Promise.all([
-            loadURL('/data/teacher-hints.json?v=2.6.10'),
+            loadURL('/data/teacher-hints.json?v=2.8.0'),
             loadURL('/api/teacher-hints')
         ]);
         return loading;
