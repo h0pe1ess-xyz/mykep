@@ -9,6 +9,11 @@ let scheduleSharePreparing = false;
 let scheduleShareInFlight = false;
 let scheduleSharePrepareError = false;
 let scheduleShareStatusTimer = null;
+let scheduleShareLogoPromise = null;
+
+function scheduleExportDateLabel(date) {
+    return `${date.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} ${date.getFullYear()}`;
+}
 
 function scheduleExportDayLabel(day, week, now = getKyivNow()) {
     const names = ['неділя', 'понеділок', 'вівторок', 'середа', 'четвер', "п'ятниця", 'субота'];
@@ -18,7 +23,25 @@ function scheduleExportDayLabel(day, week, now = getKyivNow()) {
     if (date.getDay() === 0) date.setDate(date.getDate() + 1);
     else if (date.getDay() === 6 && date.getHours() >= 15) date.setDate(date.getDate() + 2);
     date.setDate(date.getDate() - ((date.getDay() + 6) % 7) + ((names.indexOf(day) + 6) % 7));
-    return `${name} · ${date.getDate()}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
+    return `${name} · ${scheduleExportDateLabel(date)}`;
+}
+
+function loadScheduleShareLogo() {
+    if (scheduleShareLogoPromise) return scheduleShareLogoPromise;
+    scheduleShareLogoPromise = new Promise((resolve, reject) => {
+        const logo = new Image();
+        const timeout = setTimeout(() => { logo.src = ''; finish(new Error('Logo loading timed out')); }, 8000);
+        function finish(error) {
+            clearTimeout(timeout);
+            logo.onload = logo.onerror = null;
+            if (error) { scheduleShareLogoPromise = null; reject(error); }
+            else resolve(logo);
+        }
+        logo.onload = () => finish();
+        logo.onerror = () => finish(new Error('Logo unavailable'));
+        logo.src = '/icons/icon-192.png';
+    });
+    return scheduleShareLogoPromise;
 }
 
 function updateScheduleShareButton() {
@@ -51,8 +74,9 @@ function setScheduleShareData(lessons, day) {
 }
 
 async function createSchedulePNG(data) {
-    // Draw text and shapes locally. No server renderer, external images or uploads.
+    // Draw locally with the app's cached same-origin icon. No renderer or uploads.
     if (!Array.isArray(data.lessons) || data.lessons.length > 32) throw new Error('Schedule too large');
+    const logo = await loadScheduleShareLogo();
     const canvas = document.createElement('canvas');
     canvas.width = 900;
     const ctx = canvas.getContext('2d');
@@ -65,7 +89,8 @@ async function createSchedulePNG(data) {
         border: style.getPropertyValue('--border-color').trim(),
         text: style.getPropertyValue('--text-main').trim(),
         muted: style.getPropertyValue('--text-muted').trim(),
-        badge: style.getPropertyValue('--bg-surface-hover').trim()
+        badge: style.getPropertyValue('--bg-surface-hover').trim(),
+        accent: style.getPropertyValue('--accent-orange').trim()
     };
     const fonts = { title: `600 36px ${family}`, small: `500 26px ${family}`, footer: `24px ${family}` };
     function lines(value, font, width = 756) {
@@ -87,7 +112,7 @@ async function createSchedulePNG(data) {
         if (line) result.push(line.trimEnd());
         return result;
     }
-    const group = lines(data.group, fonts.small, 756);
+    const group = lines(data.group, fonts.small, 692);
     const label = scheduleExportDayLabel(data.day, data.week, data.date);
     const cards = data.lessons.map(lesson => {
         const heading = lines(`${lesson.lesson}-${getLessonSuffix(lesson.lesson)} пара     ${lesson.time || 'Час не вказано'}`, fonts.small);
@@ -98,8 +123,8 @@ async function createSchedulePNG(data) {
             height: 100 + heading.length * 36 + subject.length * 46 + Math.max(teacher.length * 34, room.length * 34 + 12) };
     });
     const notice = lines(data.notice || '', fonts.footer);
-    const height = 220 + group.length * 36 + (cards.length ? cards.reduce((sum, card) => sum + card.height + 24, 0) : 130)
-        + notice.length * 32 + 110;
+    const height = 206 + group.length * 36 + (cards.length ? cards.reduce((sum, card) => sum + card.height + 24, 0) : 130)
+        + notice.length * 32 + 186;
     if (height > 16000) throw new Error('Image too large');
     canvas.height = height;
     ctx.fillStyle = colors.background;
@@ -122,17 +147,22 @@ async function createSchedulePNG(data) {
         ctx.quadraticCurveTo(x, top, x + radius, top);
         ctx.closePath();
     }
-    let y = 44;
+    let y = 40;
     function draw(textLines, font, color, lineHeight, x = 72) {
         ctx.font = font;
         ctx.fillStyle = color;
         ctx.textBaseline = 'top';
         for (const line of textLines) { ctx.fillText(line, x, y); y += lineHeight; }
     }
-    draw(['MyKep'], `700 44px ${family}`, colors.text, 66, 40);
-    draw(group, fonts.small, colors.muted, 36, 40);
-    y += 18;
-    draw([label], fonts.small, colors.text, 40, 40);
+    ctx.save();
+    roundedRect(40, 40, 104, 104, 24);
+    ctx.clip();
+    ctx.drawImage(logo, 40, 40, 104, 104);
+    ctx.restore();
+    draw(['MyKep'], `700 64px ${family}`, colors.accent, 78, 168);
+    draw(group, fonts.small, colors.muted, 36, 168);
+    y += 20;
+    draw([label], `600 34px ${family}`, colors.text, 44, 40);
     y += 24;
     for (const card of cards) {
         const top = y;
@@ -167,10 +197,20 @@ async function createSchedulePNG(data) {
     }
     if (!cards.length) { draw(['Пар не заплановано'], fonts.title, colors.text, 46, 40); y += 84; }
     draw(notice, fonts.footer, colors.muted, 32, 40);
-    y += 16;
+    y += 8;
+    ctx.beginPath();
+    ctx.moveTo(40, y);
+    ctx.lineTo(860, y);
+    ctx.strokeStyle = colors.border;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    y += 20;
+    draw(['Актуальний розклад'], fonts.footer, colors.muted, 32, 40);
+    draw(['mykep.pp.ua'], `600 44px ${family}`, colors.accent, 52, 40);
+    y += 8;
     const now = getKyivNow();
-    const stamp = `${now.getDate()}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    draw([`Створено ${stamp}`, 'Актуальний розклад: mykep.pp.ua'], fonts.footer, colors.muted, 32, 40);
+    const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    draw([`Створено ${scheduleExportDateLabel(now)} · ${time}`], fonts.footer, colors.muted, 32, 40);
     return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('PNG unavailable')), 'image/png'));
 }
 
