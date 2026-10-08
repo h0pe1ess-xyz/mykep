@@ -44,10 +44,7 @@ function renderTeacherLabel(value) {
         finally { clearTimeout(timeout); }
     }
     function load() {
-        if (!loading) loading = Promise.all([
-            loadURL('/data/teacher-hints.json?v=2.8.0'),
-            loadURL('/api/teacher-hints')
-        ]);
+        if (!loading) loading = loadURL('/data/teacher-hints.json?v=2.8.0');
         return loading;
     }
     document.addEventListener('DOMContentLoaded', () => {
