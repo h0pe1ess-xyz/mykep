@@ -86,9 +86,12 @@ ADMIN_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src '
              "frame-ancestors 'none'; base-uri 'none'; form-action 'none'; "
              "require-trusted-types-for 'script'; trusted-types mykep-admin")
 API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
-# Public site: no inline/external scripts are used. Inline style attributes exist
-# in the existing pages, hence 'unsafe-inline' for styles only.
+# Cloudflare injects its analytics beacon at the edge. Allow only that script
+# path (including its version suffix); inline scripts and eval remain blocked.
+# Existing inline style attributes require 'unsafe-inline' for styles only.
 PUBLIC_CSP_VALUE = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                    "script-src-elem 'self' https://static.cloudflareinsights.com/beacon.min.js "
+                    "https://static.cloudflareinsights.com/beacon.min.js/; "
                     "img-src 'self' data:; connect-src 'self'; font-src 'self'; manifest-src 'self'; "
                     "worker-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; "
                     "form-action 'self'")
