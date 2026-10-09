@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mykep-cache-v2.8.1-perf.1';
+const CACHE_NAME = 'mykep-cache-v2.8.1-swipe.1';
 const APP_SHELL = [
     "/",
     "/about.html",
@@ -17,7 +17,7 @@ const APP_SHELL = [
     "/js/schedule.js?v=2.8.0-perf.1",
     "/js/settings.js?v=2.8.1",
     "/js/support.js?v=2.8.0-share.1",
-    "/js/tabs.js?v=2.8.1",
+    "/js/tabs.js?v=2.8.1-swipe.1",
     "/js/teacher-hints.js?v=2.8.0-fix.1",
     "/js/utils.js?v=2.8.0-search.1",
     "/icons/install-144.webp",

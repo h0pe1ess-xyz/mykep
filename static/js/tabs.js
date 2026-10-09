@@ -73,6 +73,14 @@ const Tabs = (() => {
         if (views?.scrollLeft) views.scrollLeft = 0;
     }
 
+    function restoreHistory() {
+        const tab = names.find(name => paths[name] === location.pathname) || 'dashboard';
+        show(tab, { historyMode: 'none' });
+        // The browser already animates Back/Forward; settle the app's transition.
+        track.getAnimations().forEach(animation => animation.finish());
+        resetScroll();
+    }
+
     function renderDrag() {
         frame = 0;
         if (!gesture || gesture.axis !== 'x') return;
@@ -98,12 +106,14 @@ const Tabs = (() => {
         const viewWidth = views.clientWidth;
         if (!viewWidth) return;
         gesture = { id: point.identifier, x: point.clientX, y: point.clientY,
-            index: names.indexOf(current), width: viewWidth, dx: 0, axis: null,
+            index: names.indexOf(current), width: viewWidth, axis: null,
             origin: 0, position: 0, samples: [[event.timeStamp, point.clientX]] };
     }
 
     function move(event) {
         if (!gesture) return;
+        // An uncancelable move belongs to the browser, not our tab carousel.
+        if (!event.cancelable) { reset(); return; }
         if (event.touches.length !== 1) { reset(); return; }
         const point = event.touches[0];
         if (point.identifier !== gesture.id) { reset(); return; }
@@ -119,7 +129,6 @@ const Tabs = (() => {
             track.classList.add('is-dragging');
         }
         if (event.cancelable) event.preventDefault();
-        gesture.dx = dx;
         gesture.samples.push([event.timeStamp, point.clientX]);
         while (gesture.samples.length > 2 && gesture.samples[1][0] < event.timeStamp - 100) gesture.samples.shift();
         const { index, width, origin } = gesture;
@@ -134,9 +143,10 @@ const Tabs = (() => {
         if (isBlocked()) { reset(); return; }
         const { width, samples, index } = gesture;
         const point = [...event.changedTouches].find(touch => touch.identifier === gesture.id);
-        const dx = point ? point.clientX - gesture.x : gesture.dx;
+        if (!point || event.touches.length) { reset(); return; }
+        const dx = point.clientX - gesture.x;
         const first = samples[0];
-        const velocity = point ? (point.clientX - first[1]) / Math.max(event.timeStamp - first[0], 1) : 0;
+        const velocity = (point.clientX - first[1]) / Math.max(event.timeStamp - first[0], 1);
         clickBlockedUntil = performance.now() + 400;
         const passed = Math.abs(dx) >= width * 0.25 ||
             Math.abs(dx) >= 30 && Math.abs(velocity) > 0.35 && Math.sign(velocity) === Math.sign(dx);
@@ -167,12 +177,11 @@ const Tabs = (() => {
         });
         window.addEventListener('popstate', () => {
             document.querySelectorAll('.modal-overlay.active').forEach(modal => modal.classList.remove('active'));
-            const tab = names.find(name => paths[name] === location.pathname) || 'dashboard';
-            show(tab, { historyMode: 'none' });
+            restoreHistory();
         });
         window.addEventListener('resize', reset);
         window.addEventListener('pagehide', reset);
-        window.addEventListener('pageshow', reset);
+        window.addEventListener('pageshow', restoreHistory);
         window.addEventListener('blur', reset);
         document.addEventListener('visibilitychange', reset);
         show(current, { historyMode: 'none' });
