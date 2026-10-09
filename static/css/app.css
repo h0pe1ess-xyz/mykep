@@ -236,7 +236,7 @@ a {
 .duration-options { display: flex; gap: 4px; flex-shrink: 0; }
 .duration-choice { position: relative; cursor: pointer; }
 .duration-choice span { display: grid; place-items: center; min-width: 64px; min-height: 44px; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-surface-hover); color: var(--text-main); font-size: 14px; }
-.duration-choice input:checked + span { border-color: var(--accent-orange); background: #503120; }
+.duration-choice.is-selected span { border-color: var(--accent-orange); background: #503120; }
 .duration-choice input:focus-visible + span { outline: 2px solid var(--accent-orange); outline-offset: 3px; }
 .settings-btn:disabled { opacity: .5; cursor: default; }
 #settings-install-card[hidden] { display: none; }
@@ -664,6 +664,10 @@ html .app-container { display: flex; flex-direction: column; }
 .views { flex: 1 1 0; min-height: 0; min-width: 0; overflow: hidden;
     overscroll-behavior-x: none;
     margin: 0 calc(-1 * var(--app-gutter)); }
+/* Tab positions belong to the transform, never to a second scroll offset. */
+@supports (overflow: clip) {
+    .views { overflow: clip; }
+}
 .views-track { display: flex; height: 100%; width: 100%;
     transform: translate3d(-100%, 0, 0); transition: transform 250ms ease;
     will-change: transform; }

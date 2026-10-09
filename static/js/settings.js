@@ -14,6 +14,8 @@ function initSettings() {
             const value = currentDuration(setting);
             document.querySelectorAll(`input[name="${setting.name}"]`).forEach(input => {
                 input.checked = input.value === value;
+                // WebKit can retain stale :checked styling after modal focus changes.
+                input.closest('.duration-choice').classList.toggle('is-selected', input.checked);
             });
             document.getElementById(`${setting.name}-desc`).textContent =
                 `Стандартно: ${setting.fallback} хв${value !== setting.fallback ? ' · змінено' : ''}`;
@@ -69,6 +71,10 @@ function initSettings() {
         confirmCancelBtn.focus({ preventScroll: true });
     }
     confirmCancelBtn.addEventListener('click', closeConfirmModal);
+    window.addEventListener('popstate', () => {
+        // Tabs may already have hidden the modal; its focus lock still needs cleanup.
+        if (pendingCallback) closeConfirmModal();
+    });
     confirmOkBtn.addEventListener('click', () => {
         const callback = pendingCallback;
         closeConfirmModal();
@@ -106,7 +112,7 @@ function initSettings() {
                 if (next === setting.fallback) { apply(); return; }
                 showConfirmModal(
                     'Змінити тривалість пари?',
-                    `${setting.label}: ${previous} → ${next} хв.\n\nСтандартно: перша зміна 80 хв, друга 60 хв. Змінюйте лише якщо ваша група навчається за іншим розкладом дзвінків.\n\nЧас пар і таймер у MyKep зміняться. Офіційний розклад коледжу залишиться тим самим.`,
+                    `${setting.label}: пари триватимуть ${next} хв замість ${previous}.\n\nЯкщо у вашій групі тривалість пар не змінювали, натисніть «Скасувати».`,
                     'Змінити', apply, true
                 );
             });

@@ -31,6 +31,7 @@ const Tabs = (() => {
         document.documentElement.dataset.tab = tab;
         track.classList.remove('is-dragging');
         track.style.transform = '';
+        resetScroll();
         document.title = titles[tab];
         const activeView = track.querySelector(`[data-view="${tab}"]`);
         activeView.inert = false;
@@ -64,6 +65,12 @@ const Tabs = (() => {
         cancelDrag();
         track?.classList.remove('is-dragging');
         if (track) track.style.transform = '';
+        resetScroll();
+    }
+
+    function resetScroll() {
+        // Fallback for engines without overflow:clip and restored scroll state.
+        if (views?.scrollLeft) views.scrollLeft = 0;
     }
 
     function renderDrag() {
@@ -143,8 +150,9 @@ const Tabs = (() => {
         nav = document.querySelector('.bottom-nav');
         views.addEventListener('touchstart', start, { passive: true });
         views.addEventListener('touchmove', move, { passive: false });
-        views.addEventListener('touchend', end, { passive: true });
-        views.addEventListener('touchcancel', reset, { passive: true });
+        window.addEventListener('touchend', end, { passive: true });
+        document.addEventListener('touchcancel', reset, { passive: true, capture: true });
+        views.addEventListener('scroll', resetScroll, { passive: true });
         views.addEventListener('click', event => {
             if (performance.now() < clickBlockedUntil) {
                 event.preventDefault();
@@ -164,6 +172,8 @@ const Tabs = (() => {
         });
         window.addEventListener('resize', reset);
         window.addEventListener('pagehide', reset);
+        window.addEventListener('pageshow', reset);
+        window.addEventListener('blur', reset);
         document.addEventListener('visibilitychange', reset);
         show(current, { historyMode: 'none' });
     }
