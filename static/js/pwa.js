@@ -57,7 +57,7 @@ async function showPWAGuide(force = false) {
     overlay.setAttribute('aria-describedby', 'pwa-lead');
     overlay.innerHTML = `
         <section class="pwa-card">
-            <img src="/icons/icon-192.png" alt="" class="pwa-icon" width="72" height="72" loading="eager" decoding="async">
+            <img src="/icons/install-144.webp" alt="" class="pwa-icon" width="72" height="72" loading="eager" decoding="async">
             <h2 id="pwa-title" tabindex="-1"></h2>
             <p id="pwa-lead"></p>
             <div id="pwa-content"></div>

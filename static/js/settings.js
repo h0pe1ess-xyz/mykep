@@ -1,21 +1,26 @@
 function initSettings() {
     const clearBtn = document.getElementById('clear-cache-btn');
-    const duration1Toggle = document.getElementById('duration1-toggle');
-    const duration1Desc = document.getElementById('duration1-desc');
-    const duration2Toggle = document.getElementById('duration2-toggle');
-    const duration2Desc = document.getElementById('duration2-desc');
     const resetDurationBtn = document.getElementById('reset-duration-btn');
-
+    const durations = [
+        { name: 'duration1', key: 'mykep_duration1', fallback: '80', label: 'Перша зміна' },
+        { name: 'duration2', key: 'mykep_duration2', fallback: '60', label: 'Друга зміна' }
+    ];
+    function currentDuration(setting) {
+        const value = storage.get(setting.key);
+        return ['60', '80'].includes(value) ? value : setting.fallback;
+    }
     function renderSettings() {
-        for (const [toggle, desc, key, fallback] of [
-            [duration1Toggle, duration1Desc, 'mykep_duration1', '80'],
-            [duration2Toggle, duration2Desc, 'mykep_duration2', '60']
-        ]) {
-            const duration = storage.get(key) || fallback;
-            toggle.classList.toggle('active', duration === '80');
-            toggle.setAttribute('aria-checked', String(duration === '80'));
-            desc.textContent = `Поточна: ${duration} хвилин`;
+        for (const setting of durations) {
+            const value = currentDuration(setting);
+            document.querySelectorAll(`input[name="${setting.name}"]`).forEach(input => {
+                input.checked = input.value === value;
+                // WebKit can retain stale :checked styling after modal focus changes.
+                input.closest('.duration-choice').classList.toggle('is-selected', input.checked);
+            });
+            document.getElementById(`${setting.name}-desc`).textContent =
+                `Стандартно: ${setting.fallback} хв${value !== setting.fallback ? ' · змінено' : ''}`;
         }
+        resetDurationBtn.disabled = durations.every(setting => currentDuration(setting) === setting.fallback);
     }
     function refreshSettings() {
         renderSettings();
@@ -24,9 +29,16 @@ function initSettings() {
     }
     renderSettings();
     const installHelp = document.getElementById('show-install-help');
-    if (installHelp) {
-        if (isPWA()) { installHelp.textContent = 'Встановлено'; installHelp.disabled = true; }
-        else installHelp.onclick = () => showPWAGuide(true);
+    const installCard = document.getElementById('settings-install-card');
+    function updateInstallHelp() {
+        installCard.hidden = isPWA() || pwaInstalledThisPage;
+    }
+    updateInstallHelp();
+    installHelp.onclick = () => showPWAGuide(true);
+    window.addEventListener('appinstalled', updateInstallHelp);
+    window.addEventListener('pageshow', updateInstallHelp);
+    for (const mode of ['standalone', 'fullscreen']) {
+        window.matchMedia(`(display-mode: ${mode})`).addEventListener('change', updateInstallHelp);
     }
     initGroupModal(refreshSettings);
 
@@ -35,109 +47,90 @@ function initSettings() {
     const confirmModalDesc = document.getElementById('confirm-modal-desc');
     const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
     const confirmOkBtn = document.getElementById('confirm-ok-btn');
-
+    const mainApp = document.getElementById('main-app');
     let pendingCallback = null;
+    let returnFocus = null;
+    let previousInert = false;
 
-    function showConfirmModal(title, desc, okText, callback) {
+    function closeConfirmModal() {
+        pendingCallback = null;
+        confirmModal.classList.remove('active');
+        mainApp.inert = previousInert;
+        returnFocus?.focus({ preventScroll: true });
+    }
+    function showConfirmModal(title, desc, okText, callback, durationChange = false) {
         pendingCallback = callback;
-        if (confirmModalTitle) confirmModalTitle.innerText = title;
-        if (confirmModalDesc) confirmModalDesc.innerHTML = desc;
-        if (confirmOkBtn) confirmOkBtn.innerText = okText;
-
-        if (confirmModal) {
-            confirmModal.classList.add('active');
+        returnFocus = document.activeElement;
+        previousInert = mainApp.inert;
+        confirmModalTitle.textContent = title;
+        confirmModalDesc.textContent = desc;
+        confirmOkBtn.textContent = okText;
+        confirmModal.classList.toggle('is-duration-change', durationChange);
+        mainApp.inert = true;
+        confirmModal.classList.add('active');
+        confirmCancelBtn.focus({ preventScroll: true });
+    }
+    confirmCancelBtn.addEventListener('click', closeConfirmModal);
+    window.addEventListener('popstate', () => {
+        // Tabs may already have hidden the modal; its focus lock still needs cleanup.
+        if (pendingCallback) closeConfirmModal();
+    });
+    confirmOkBtn.addEventListener('click', () => {
+        const callback = pendingCallback;
+        closeConfirmModal();
+        callback?.();
+    });
+    confirmModal.addEventListener('click', event => {
+        if (event.target === confirmModal) closeConfirmModal();
+    });
+    confirmModal.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeConfirmModal();
+        } else if (event.key === 'Tab') {
+            if (event.shiftKey && document.activeElement === confirmCancelBtn) {
+                event.preventDefault(); confirmOkBtn.focus();
+            } else if (!event.shiftKey && document.activeElement === confirmOkBtn) {
+                event.preventDefault(); confirmCancelBtn.focus();
+            }
         }
-    }
+    });
 
-    if (confirmCancelBtn) {
-        confirmCancelBtn.addEventListener('click', () => {
-            pendingCallback = null;
-            if (confirmModal) confirmModal.classList.remove('active');
-        });
-    }
-
-    if (confirmOkBtn) {
-        confirmOkBtn.addEventListener('click', () => {
-            if (pendingCallback) pendingCallback();
-            pendingCallback = null;
-            if (confirmModal) confirmModal.classList.remove('active');
-        });
-    }
-
-    function confirmDurationChange(callback) {
-        showConfirmModal(
-            "Зміна тривалості занять",
-            "Рекомендована тривалість занять: 80 хвилин для першої зміни та 60 хвилин для другої.<br><br>Зміна цих параметрів вплине на час початку й завершення пар та роботу таймера в MyKep. Офіційний розклад коледжу при цьому не зміниться.<br><br>Змінюйте тривалість лише тоді, коли для вашої групи діє інший розклад дзвінків. Продовжити?",
-            "Змінити",
-            callback
-        );
-    }
-
-    function isRecommendedState() {
-        if (!duration1Toggle || !duration2Toggle) return false;
-        const dur1Is80 = duration1Toggle.classList.contains('active');
-        const dur2Is60 = !duration2Toggle.classList.contains('active');
-        return dur1Is80 && dur2Is60;
-    }
-
-    if (duration1Toggle) {
-        duration1Toggle.addEventListener('click', () => {
-            const performChange = () => {
-                duration1Toggle.classList.toggle('active');
-                const newDuration = duration1Toggle.classList.contains('active') ? '80' : '60';
-                storage.set('mykep_duration1', newDuration);
-                storage.remove('mykep_schedule');
-                refreshSettings();
-            };
-
-            if (isRecommendedState()) {
-                confirmDurationChange(performChange);
-            } else {
-                performChange();
-            }
-        });
-    }
-
-    if (duration2Toggle) {
-        duration2Toggle.addEventListener('click', () => {
-            const performChange = () => {
-                duration2Toggle.classList.toggle('active');
-                const newDuration = duration2Toggle.classList.contains('active') ? '80' : '60';
-                storage.set('mykep_duration2', newDuration);
-                storage.remove('mykep_schedule');
-                refreshSettings();
-            };
-
-            if (isRecommendedState()) {
-                confirmDurationChange(performChange);
-            } else {
-                performChange();
-            }
-        });
-    }
-
-    if (resetDurationBtn) {
-        resetDurationBtn.addEventListener('click', () => {
-            storage.set('mykep_duration1', '80');
-            storage.set('mykep_duration2', '60');
-            storage.remove('mykep_schedule');
-            refreshSettings();
-        });
-    }
-
-    if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
-            showConfirmModal(
-                "Очищення даних",
-                "Видалити збережений розклад? Це змусить додаток завантажити розклад з сервера заново.",
-                "Видалити",
-                () => {
+    for (const setting of durations) {
+        document.querySelectorAll(`input[name="${setting.name}"]`).forEach(input => {
+            input.addEventListener('change', () => {
+                const previous = currentDuration(setting);
+                const next = input.value;
+                // The saved choice stays selected until the change is confirmed.
+                renderSettings();
+                if (previous === next) return;
+                const apply = () => {
+                    storage.set(setting.key, next);
                     storage.remove('mykep_schedule');
                     refreshSettings();
-                }
-            );
+                };
+                if (next === setting.fallback) { apply(); return; }
+                showConfirmModal(
+                    'Змінити тривалість пари?',
+                    `${setting.label}: пари триватимуть ${next} хв замість ${previous}.\n\nЯкщо у вашій групі тривалість пар не змінювали, натисніть «Скасувати».`,
+                    'Змінити', apply, true
+                );
+            });
         });
     }
+    resetDurationBtn.addEventListener('click', () => {
+        for (const setting of durations) storage.set(setting.key, setting.fallback);
+        storage.remove('mykep_schedule');
+        refreshSettings();
+    });
+    clearBtn.addEventListener('click', () => {
+        showConfirmModal(
+            'Очищення даних',
+            'Видалити збережений розклад? MyKep завантажить його із сервера заново.',
+            'Видалити',
+            () => { storage.remove('mykep_schedule'); refreshSettings(); }
+        );
+    });
 }
 
 function initGroupModal(onChange) {

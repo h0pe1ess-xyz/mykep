@@ -7,7 +7,6 @@ let scheduleExportFile = null;
 let scheduleShareSignature = '';
 let scheduleSharePreparing = false;
 let scheduleShareInFlight = false;
-let scheduleSharePrepareError = false;
 let scheduleShareStatusTimer = null;
 let scheduleShareLogoPromise = null;
 
@@ -50,12 +49,12 @@ function updateScheduleShareButton() {
     button.setAttribute('aria-busy', String(scheduleSharePreparing || scheduleShareInFlight));
 }
 
-function showScheduleShareStatus(message = '') {
+function showScheduleShareStatus(message = '', autoHide = true) {
     clearTimeout(scheduleShareStatusTimer);
     const status = document.getElementById('schedule-share-status');
     status.textContent = message;
     status.hidden = !message;
-    if (message) scheduleShareStatusTimer = setTimeout(() => { status.hidden = true; }, 7000);
+    if (message && autoHide) scheduleShareStatusTimer = setTimeout(() => { status.hidden = true; }, 7000);
 }
 
 function setScheduleSharingPending() {
@@ -63,7 +62,6 @@ function setScheduleSharingPending() {
     scheduleShareData = null;
     scheduleExportFile = null;
     scheduleShareSignature = '';
-    scheduleSharePreparing = false;
     showScheduleShareStatus();
     updateScheduleShareButton();
 }
@@ -214,59 +212,85 @@ async function createSchedulePNG(data) {
     return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('PNG unavailable')), 'image/png'));
 }
 
-async function refreshScheduleShareFile(force = false) {
+function scheduleShareSnapshot() {
+    // Keep the date belonging to the rendered data across a calendar rollover.
+    return { ...scheduleShareData, date: scheduleShareData.date || getKyivNow(), notice: document.getElementById('schedule-notice').textContent };
+}
+
+function refreshScheduleShareFile(force = false) {
     if (!scheduleShareData) return;
-    const data = { ...scheduleShareData, notice: document.getElementById('schedule-notice').textContent };
+    const data = scheduleShareSnapshot();
     const signature = JSON.stringify([data.group, data.week, scheduleExportDayLabel(data.day, data.week, data.date), data.lessons, data.notice]);
     if (!force && signature === scheduleShareSignature) return;
     scheduleShareSignature = signature;
-    const token = ++scheduleExportToken;
+    ++scheduleExportToken;
     scheduleExportFile = null;
-    scheduleSharePrepareError = false;
-    scheduleSharePreparing = !!navigator.share && !!navigator.canShare;
     showScheduleShareStatus();
     updateScheduleShareButton();
-    if (!scheduleSharePreparing) return;
-    try {
-        const blob = await createSchedulePNG(data);
-        if (token !== scheduleExportToken) return;
-        const filename = `MyKep-${data.group}-${data.day}.png`.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
-        scheduleExportFile = new File([blob], filename, { type: 'image/png' });
-    } catch (error) {
-        if (token !== scheduleExportToken) return;
-        scheduleSharePrepareError = true;
-        console.error('Schedule image generation failed:', error);
-    } finally {
-        if (token === scheduleExportToken) { scheduleSharePreparing = false; updateScheduleShareButton(); }
-    }
 }
 
 function initScheduleSharing() {
     const button = document.getElementById('schedule-share');
     button.onclick = async () => {
         if (!scheduleShareData || button.disabled || scheduleShareInFlight) return;
-        if (scheduleSharePrepareError) {
-            refreshScheduleShareFile(true);
-            showScheduleShareStatus('Не вдалося підготувати картинку. Спробуйте ще раз.');
-            return;
-        }
-        let canShare = false;
-        try { canShare = !!scheduleExportFile && !!navigator.share && !!navigator.canShare?.({ files: [scheduleExportFile] }); }
-        catch { canShare = false; }
-        if (!canShare) {
+        if (typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function') {
             showScheduleShareStatus('Цей браузер не підтримує поширення картинки. Спробуйте відкрити MyKep у браузері телефона.');
             return;
         }
+        // Day/data changes only invalidate the file. Rendering starts at the tap.
+        refreshScheduleShareFile();
         const token = scheduleExportToken;
         scheduleShareInFlight = true;
         updateScheduleShareButton();
         showScheduleShareStatus();
+        let generated = false;
         try {
-            // Prepare on day changes so one tap can invoke native share synchronously.
+            if (!scheduleExportFile) {
+                scheduleSharePreparing = true;
+                updateScheduleShareButton();
+                showScheduleShareStatus('Готуємо картинку…', false);
+                const data = scheduleShareSnapshot();
+                try {
+                    const blob = await createSchedulePNG(data);
+                    if (token !== scheduleExportToken || Tabs.current !== 'schedule') return;
+                    const filename = `MyKep-${data.group}-${data.day}.png`.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+                    scheduleExportFile = new File([blob], filename, { type: 'image/png' });
+                    generated = true;
+                } catch (error) {
+                    if (token === scheduleExportToken) {
+                        console.error('Schedule image generation failed:', error);
+                        showScheduleShareStatus('Не вдалося підготувати картинку. Спробуйте ще раз.');
+                    }
+                    return;
+                }
+            }
+            let canShare = false;
+            try { canShare = navigator.canShare({ files: [scheduleExportFile] }); }
+            catch (error) { console.warn('Schedule file sharing unavailable:', error); }
+            if (!canShare) {
+                showScheduleShareStatus('Цей браузер не підтримує поширення картинки. Спробуйте відкрити MyKep у браузері телефона.');
+                return;
+            }
+            // Slow preparation may outlive transient activation. Keep the file
+            // so the next tap can share synchronously, without rendering again.
+            if (navigator.userActivation && !navigator.userActivation.isActive) {
+                showScheduleShareStatus('Картинка готова. Натисніть «Поділитися» ще раз.');
+                return;
+            }
+            showScheduleShareStatus();
             await navigator.share({ files: [scheduleExportFile] });
         } catch (error) {
-            if (token === scheduleExportToken && error.name !== 'AbortError') showScheduleShareStatus('Не вдалося відкрити меню поширення. Спробуйте ще раз.');
-        } finally { scheduleShareInFlight = false; updateScheduleShareButton(); }
+            if (token === scheduleExportToken && error.name !== 'AbortError') {
+                showScheduleShareStatus(generated && error.name === 'NotAllowedError' ?
+                    'Картинка готова. Натисніть «Поділитися» ще раз.' :
+                    'Не вдалося відкрити меню поширення. Спробуйте ще раз.');
+            }
+        } finally {
+            scheduleSharePreparing = false;
+            scheduleShareInFlight = false;
+            if (token !== scheduleExportToken || Tabs.current !== 'schedule') showScheduleShareStatus();
+            updateScheduleShareButton();
+        }
     };
 }
 

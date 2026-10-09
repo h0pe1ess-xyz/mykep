@@ -80,7 +80,15 @@ const App = (() => {
                 'Показано збережений розклад. Перевіряємо оновлення…' : staleScheduleNotice(cached.meta));
         } else {
             if (target.key !== key) clearView(tab);
-            notice(tab, 'Завантаження розкладу…');
+            if (tab === 'schedule' && !schedulePageData) {
+                // Keep the day picker and list in place while the first request loads.
+                notice(tab, '');
+                const status = document.createElement('p');
+                status.className = 'help-text';
+                status.setAttribute('role', 'status');
+                status.textContent = 'Завантаження розкладу…';
+                document.getElementById('dynamic-schedule-list').replaceChildren(status);
+            } else notice(tab, 'Завантаження розкладу…');
         }
         target.key = key;
         const busyNode = document.querySelector(`[data-view="${tab}"] main`);
