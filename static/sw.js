@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mykep-cache-v2.8.1';
+const CACHE_NAME = 'mykep-cache-v2.8.1-perf.1';
 const APP_SHELL = [
     "/",
     "/about.html",
@@ -8,11 +8,11 @@ const APP_SHELL = [
     "/favicon.ico",
     "/data/teacher-hints.json?v=2.8.0",
     "/js/api.js?v=2.8.0-perf.1",
-    "/js/app.js?v=2.8.0-share.2",
+    "/js/app.js?v=2.8.1-perf.1",
     "/js/boot.js?v=2.8.1",
     "/js/dashboard.js?v=2.8.0-share.1",
     "/js/onboarding.js?v=2.8.0-search.1",
-    "/js/pwa.js?v=2.8.0-support.3",
+    "/js/pwa.js?v=2.8.1-perf.1",
     "/js/schedule-share.js?v=2.8.0-perf.1",
     "/js/schedule.js?v=2.8.0-perf.1",
     "/js/settings.js?v=2.8.1",
@@ -20,12 +20,12 @@ const APP_SHELL = [
     "/js/tabs.js?v=2.8.1",
     "/js/teacher-hints.js?v=2.8.0-fix.1",
     "/js/utils.js?v=2.8.0-search.1",
+    "/icons/install-144.webp",
     "/icons/icon-192.png",
     "/icons/icon-512.png",
-    "/icons/maskable-512.png",
     "/icons/maskable-orange-512.png"
 ];
-const OPTIONAL_ASSETS = ["/pfp/1.png", "/pfp/2.webp"];
+const OPTIONAL_ASSETS = ["/pfp/1-192.webp", "/pfp/2.webp"];
 const TAB_PATHS = new Set(['/', '/index.html', '/schedule.html', '/settings.html']);
 
 self.addEventListener('install', event => {
