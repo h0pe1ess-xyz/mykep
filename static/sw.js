@@ -1,23 +1,21 @@
-const CACHE_NAME = 'mykep-cache-v2.8.0-fix.1';
+const CACHE_NAME = 'mykep-cache-v2.8.0-perf.1';
 const APP_SHELL = [
     "/",
     "/about.html",
     "/css/about.css?v=2.8.0",
-    "/css/app.css?v=2.8.0-share.2",
+    "/css/app.css?v=2.8.0-perf.1",
     "/manifest.json",
     "/favicon.ico",
-    "/pfp/1.png",
-    "/pfp/2.webp",
     "/data/teacher-hints.json?v=2.8.0",
-    "/js/api.js?v=2.8.0",
+    "/js/api.js?v=2.8.0-perf.1",
     "/js/app.js?v=2.8.0-share.2",
     "/js/boot.js?v=2.8.0-swipe.2",
     "/js/dashboard.js?v=2.8.0-share.1",
     "/js/onboarding.js?v=2.8.0-search.1",
     "/js/pwa.js?v=2.8.0-support.3",
-    "/js/schedule-share.js?v=2.8.0-share.4",
-    "/js/schedule.js?v=2.8.0-share.1",
-    "/js/settings.js?v=2.8.0-search.1",
+    "/js/schedule-share.js?v=2.8.0-perf.1",
+    "/js/schedule.js?v=2.8.0-perf.1",
+    "/js/settings.js?v=2.8.0-perf.1",
     "/js/support.js?v=2.8.0-share.1",
     "/js/tabs.js?v=2.8.0-swipe.2",
     "/js/teacher-hints.js?v=2.8.0-fix.1",
@@ -27,6 +25,7 @@ const APP_SHELL = [
     "/icons/maskable-512.png",
     "/icons/maskable-orange-512.png"
 ];
+const OPTIONAL_ASSETS = ["/pfp/1.png", "/pfp/2.webp"];
 const TAB_PATHS = new Set(['/', '/index.html', '/schedule.html', '/settings.html']);
 
 self.addEventListener('install', event => {
@@ -58,6 +57,19 @@ self.addEventListener('fetch', event => {
         return;
     }
     const resource = url.pathname + url.search;
+    if (OPTIONAL_ASSETS.includes(resource)) {
+        event.respondWith(caches.open(CACHE_NAME).then(async cache => {
+            const cached = await cache.match(request);
+            if (cached) return cached;
+            const response = await fetch(request);
+            if (response.ok) {
+                try { await cache.put(request, response.clone()); }
+                catch (error) { console.warn('Optional image cache unavailable:', error); }
+            }
+            return response;
+        }));
+        return;
+    }
     if (!APP_SHELL.includes(resource)) return;
     // Shell resources are frozen by CACHE_NAME and versioned asset URLs.
     // A new worker precaches the next release before replacing this cache.

@@ -8,7 +8,7 @@
 <meta content="MyKep - розклад пар для студентів ФКЕП ІФНТУНГ: заняття на сьогодні й тиждень, аудиторії, викладачі та таймер. Студентський PWA-застосунок з офлайн-доступом." name="description"/>
 <meta content="index, follow, max-image-preview:large" name="robots"/>
 <meta content="MyKep" name="application-name"/>
-<meta content="2.8.0-fix.1" name="mykep-build"/>
+<meta content="2.8.0-perf.1" name="mykep-build"/>
 <link href="https://mykep.pp.ua/" rel="canonical"/>
 <meta content="website" property="og:type"/>
 <meta content="MyKep" property="og:site_name"/>
@@ -91,7 +91,7 @@
   ]
 }
     </script>
-<script src="/js/boot.js?v=2.8.0-swipe.2"></script><link href="/css/app.css?v=2.8.0-share.2" rel="stylesheet"/><script defer="" src="/js/utils.js?v=2.8.0-search.1"></script><script defer="" src="/js/pwa.js?v=2.8.0-support.3"></script><script defer="" src="/js/api.js?v=2.8.0"></script><script defer="" src="/js/teacher-hints.js?v=2.8.0-fix.1"></script><script defer="" src="/js/dashboard.js?v=2.8.0-share.1"></script><script defer="" src="/js/schedule-share.js?v=2.8.0-share.4"></script><script defer="" src="/js/schedule.js?v=2.8.0-share.1"></script><script defer="" src="/js/settings.js?v=2.8.0-search.1"></script><script defer="" src="/js/support.js?v=2.8.0-share.1"></script><script defer="" src="/js/onboarding.js?v=2.8.0-search.1"></script><script defer="" src="/js/tabs.js?v=2.8.0-swipe.2"></script><script defer="" src="/js/app.js?v=2.8.0-share.2"></script></head>
+<script src="/js/boot.js?v=2.8.0-swipe.2"></script><link href="/css/app.css?v=2.8.0-perf.1" rel="stylesheet"/><script defer="" src="/js/utils.js?v=2.8.0-search.1"></script><script defer="" src="/js/pwa.js?v=2.8.0-support.3"></script><script defer="" src="/js/api.js?v=2.8.0-perf.1"></script><script defer="" src="/js/teacher-hints.js?v=2.8.0-fix.1"></script><script defer="" src="/js/dashboard.js?v=2.8.0-share.1"></script><script defer="" src="/js/schedule-share.js?v=2.8.0-perf.1"></script><script defer="" src="/js/schedule.js?v=2.8.0-perf.1"></script><script defer="" src="/js/settings.js?v=2.8.0-perf.1"></script><script defer="" src="/js/support.js?v=2.8.0-share.1"></script><script defer="" src="/js/onboarding.js?v=2.8.0-search.1"></script><script defer="" src="/js/tabs.js?v=2.8.0-swipe.2"></script><script defer="" src="/js/app.js?v=2.8.0-share.2"></script></head>
 <body>
 <h1 class="sr-only page-heading">MyKep - розклад пар ФКЕП ІФНТУНГ</h1>
 <noscript>
@@ -308,25 +308,31 @@
 </div>
 <button class="settings-btn" id="open-group-modal">Змінити</button>
 </div>
+<div class="settings-row duration-setting">
+<div class="settings-info">
+<div class="settings-title" id="duration1-label">Пара в першій зміні</div>
+<div class="settings-desc" id="duration1-desc">Стандартно: 80 хв</div>
+</div>
+<div aria-describedby="duration1-desc" aria-labelledby="duration1-label" class="duration-options" role="radiogroup">
+<label class="duration-choice"><input class="sr-only" name="duration1" type="radio" value="60"/><span>60 хв</span></label>
+<label class="duration-choice"><input checked="" class="sr-only" name="duration1" type="radio" value="80"/><span>80 хв</span></label>
+</div>
+</div>
+<div class="settings-row duration-setting">
+<div class="settings-info">
+<div class="settings-title" id="duration2-label">Пара в другій зміні</div>
+<div class="settings-desc" id="duration2-desc">Стандартно: 60 хв</div>
+</div>
+<div aria-describedby="duration2-desc" aria-labelledby="duration2-label" class="duration-options" role="radiogroup">
+<label class="duration-choice"><input checked="" class="sr-only" name="duration2" type="radio" value="60"/><span>60 хв</span></label>
+<label class="duration-choice"><input class="sr-only" name="duration2" type="radio" value="80"/><span>80 хв</span></label>
+</div>
+</div>
 <div class="settings-row">
 <div class="settings-info">
-<div class="settings-title">Тривалість 1-ї зміни</div>
-<div class="settings-desc" id="duration1-desc">Поточна: 80 хвилин</div>
+<div class="settings-title" style="font-size: 13px; color: #a0a0a0;">Стандартна тривалість пар</div>
 </div>
-<button aria-checked="true" aria-label="Тривалість 1-ї зміни: увімкнено - 80 хвилин, вимкнено - 60 хвилин" class="toggle active" id="duration1-toggle" role="switch" type="button"></button>
-</div>
-<div class="settings-row">
-<div class="settings-info">
-<div class="settings-title">Тривалість 2-ї зміни</div>
-<div class="settings-desc" id="duration2-desc">Поточна: 60 хвилин</div>
-</div>
-<button aria-checked="true" aria-label="Тривалість 2-ї зміни: увімкнено - 80 хвилин, вимкнено - 60 хвилин" class="toggle active" id="duration2-toggle" role="switch" type="button"></button>
-</div>
-<div class="settings-row">
-<div class="settings-info">
-<div class="settings-title" style="font-size: 13px; color: #a0a0a0;">Повернути рекомендований розклад</div>
-</div>
-<button class="settings-btn" id="reset-duration-btn">Скинути</button>
+<button class="settings-btn" id="reset-duration-btn" type="button">Відновити</button>
 </div>
 </div>
 <div class="settings-card telegram-channel-card" id="telegram-channel-card">
@@ -358,7 +364,7 @@
 <textarea class="support-report" hidden="" id="support-report" readonly="" rows="9" spellcheck="false"></textarea>
 <p class="support-status" id="support-status" role="status"></p>
 </div>
-<div class="settings-card">
+<div class="settings-card" hidden="" id="settings-install-card">
 <div class="settings-row">
 <div class="settings-info"><div class="settings-title">Встановлення MyKep</div><div class="settings-desc">Інструкція для вашого пристрою</div></div>
 <button class="settings-btn" id="show-install-help" type="button">Інструкція</button>
@@ -413,17 +419,15 @@
 </nav></div>
 
 
-<div aria-labelledby="confirm-modal-title" aria-modal="true" class="modal-overlay" id="confirm-modal" role="dialog">
+<div aria-describedby="confirm-modal-desc" aria-labelledby="confirm-modal-title" aria-modal="true" class="modal-overlay" id="confirm-modal" role="dialog">
 <div class="modal-container" style="text-align: center;">
 <div class="modal-header" style="justify-content: center; padding-bottom: 0; border-bottom: none;">
-<h3 id="confirm-modal-title" style="color: #ff4444; margin-bottom: 10px;">Зміна тривалості занять</h3>
+<h3 id="confirm-modal-title" style="margin-bottom: 10px;">Змінити тривалість пари?</h3>
 </div>
-<div id="confirm-modal-desc" style="padding: 5px 0 20px; font-size: 14px; color: #e0e0e0; line-height: 1.5;">
-                    Рекомендована тривалість занять: 80 хвилин для першої зміни та 60 хвилин для другої.<br/><br/>Зміна цих параметрів вплине на час початку й завершення пар та роботу таймера в MyKep. Офіційний розклад коледжу при цьому не зміниться.<br/><br/>Змінюйте тривалість лише тоді, коли для вашої групи діє інший розклад дзвінків. Продовжити?
-                </div>
-<div style="display: flex; gap: 10px; justify-content: center;">
-<button class="settings-btn" id="confirm-cancel-btn" style="flex: 1; background: rgba(255, 255, 255, 0.1); color: white;">Скасувати</button>
-<button class="settings-btn" id="confirm-ok-btn" style="flex: 1; background: rgba(255, 68, 68, 0.8); color: white; border-color: rgba(255, 68, 68, 0.5);">Змінити</button>
+<div id="confirm-modal-desc"></div>
+<div class="confirm-actions">
+<button class="settings-btn" id="confirm-cancel-btn" type="button">Скасувати</button>
+<button class="settings-btn" id="confirm-ok-btn" type="button">Змінити</button>
 </div>
 </div>
 </div><div aria-label="Вибір групи" aria-modal="true" class="modal-overlay" id="group-modal" role="dialog">

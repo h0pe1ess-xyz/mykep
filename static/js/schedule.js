@@ -106,19 +106,24 @@ function initSchedulePage(scheduleDict) {
             position.item.style.transform = `translateY(${distance * 15}px) scale(${1 - distance * 0.15})`;
             position.item.style.opacity = 1 - distance * 0.6;
         }
-        if (!state.programmatic && closest) renderForDay(closest.item.dataset.day, true);
+        state.closestDay = closest?.item.dataset.day;
     }
     function requestArc() {
         if (!state.frame) state.frame = requestAnimationFrame(updateArc);
     }
+    function finishScroll() {
+        clearTimeout(state.scrollTimeout);
+        state.programmatic = false;
+        cancelAnimationFrame(state.frame);
+        updateArc();
+        if (state.closestDay) renderForDay(state.closestDay, true);
+    }
     picker.onscroll = () => {
         requestArc();
         clearTimeout(state.scrollTimeout);
-        state.scrollTimeout = setTimeout(() => {
-            state.programmatic = false;
-            requestArc();
-        }, 150);
+        state.scrollTimeout = setTimeout(finishScroll, 150);
     };
+    picker.onscrollend = finishScroll;
     items.forEach(item => {
         item.onclick = () => {
             state.programmatic = true;
@@ -128,7 +133,7 @@ function initSchedulePage(scheduleDict) {
             renderForDay(item.dataset.day, true);
             // Also release the guard when tapping an already centered item.
             clearTimeout(state.scrollTimeout);
-            state.scrollTimeout = setTimeout(() => { state.programmatic = false; }, 200);
+            state.scrollTimeout = setTimeout(finishScroll, 200);
         };
     });
     const initial = items.find(item => item.dataset.day === preferredDay) || items[0];

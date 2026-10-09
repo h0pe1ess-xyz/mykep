@@ -1,4 +1,5 @@
 let groupsRequest = null;
+const scheduleRequests = new Map();
 
 // Anonymous: only tells the admin stats whether MyKep runs as an installed PWA.
 function currentDisplayMode() {
@@ -92,10 +93,18 @@ function saveScheduleEntry(entry) {
 function staleScheduleNotice(meta) {
     return meta?.stale ? 'Показано останню збережену версію: сайт коледжу тимчасово недоступний або дані ще оновлюються.' : '';
 }
-async function fetchSchedule(week = 'auto') {
+function fetchSchedule(week = 'auto') {
     const { group, duration1, duration2, key, week: selectedWeek } = scheduleRequestContext(week);
     const query = new URLSearchParams({ group, duration1, duration2, uid: getUserId(), mode: currentDisplayMode() });
     if (selectedWeek !== 'auto') query.set('week', selectedWeek);
+    const requestKey = `${key}|${query}`;
+    if (scheduleRequests.has(requestKey)) return scheduleRequests.get(requestKey);
+    const request = loadScheduleResponse(key, query).finally(() => scheduleRequests.delete(requestKey));
+    scheduleRequests.set(requestKey, request);
+    return request;
+}
+
+async function loadScheduleResponse(key, query) {
     try {
         const result = await fetchJSON(`/api/schedule?${query}`);
         if (!validSchedule(result.data)) throw new Error('Некоректна відповідь сервера.');
