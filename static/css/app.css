@@ -538,16 +538,22 @@ html, body, .app-container,
 a:focus-visible { outline: 2px solid var(--accent-orange); outline-offset: 3px; }
 
 
+html.ios-standalone,
+html.ios-standalone body {
+    height: 100vh;
+    height: 100lvh;
+}
+
 html.ios-standalone .app-container {
-    /* Use viewport edges instead of height APIs that can exclude iOS safe areas. */
+    /* iOS can make the fixed containing block shorter than the full lvh shell. */
     /* Bound installed-app spacing when iOS reports absent browser-toolbar space. */
     --ios-nav-bottom-space: clamp(10px, env(safe-area-inset-bottom, 0px), 16px);
-    position: fixed;
-    inset: 0;
-    height: auto;
+    position: relative;
+    height: 100vh;
+    height: 100lvh;
     width: 100%;
     max-width: none;
-    padding-bottom: calc(58px + var(--ios-nav-bottom-space));
+    padding-bottom: 0;
 }
 
 
@@ -559,11 +565,9 @@ html.ios-standalone .app-container > .main-content {
 }
 
 html.ios-standalone .bottom-nav {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    margin: 0;
+    position: relative;
+    bottom: auto;
+    left: auto;
     padding-top: 10px;
     padding-bottom: var(--ios-nav-bottom-space);
 }

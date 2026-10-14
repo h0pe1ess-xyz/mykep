@@ -174,7 +174,7 @@ async function run() {
                 assert.equal(viewportDiagnostics.clientHeight,810);
                 assert.equal(viewportDiagnostics.fixedBottom,844);
                 assert.equal(viewportDiagnostics.buttons.length,3);
-                assert.equal(viewportDiagnostics.nav.bottom,844);
+                assert.ok(Math.abs(viewportDiagnostics.nav.bottom-844)<0.1);
                 assert.ok(viewportDiagnostics.screen.height>0);
                 assert.equal(diagnostics.countBefore,diagnostics.countAfter);
                 if(diagnostics.uid) assert.ok(!diagnostics.report.includes(diagnostics.uid));
@@ -242,6 +242,56 @@ async function run() {
                 await iosPage.screenshot({path:`.mykep-local/screens/${engine}-ios-navbar.png`});
                 await iosContext.close();
                 console.log(`${engine}: data disclosure triangle and simulated installed-iOS viewport/keyboard regression passed`);
+                // Replay the supplied iPhone report: physical/lvh 956, fixed/dvh 894.
+                // Desktop engines need a CSS shim for that WebKit containing-block bug.
+                const replayContext=await browser.newContext({viewport:{width:440,height:956},serviceWorkers:'block',userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 27_0 like Mac OS X) Version/27.0 Mobile Safari/605.1.15'});
+                const replayPage=await replayContext.newPage();
+                await replayPage.route('**/css/app.css*',async route=>{
+                    const response=await route.fetch();
+                    const css=(await response.text()).replaceAll('100dvh','894px').replaceAll('100svh','894px')
+                        .replaceAll('env(safe-area-inset-top, 0px)','62px').replaceAll('env(safe-area-inset-bottom, 0px)','34px')
+                        .replace(/position:\s*fixed;\s*inset:\s*0;/g,'position:fixed;inset:0 0 62px;')
+                        .replace(/position:\s*fixed;\s*bottom:\s*0;/g,'position:fixed;bottom:62px;');
+                    await route.fulfill({response,body:css+'\nhtml{height:894px;}[style*="position: fixed"][style*="bottom: 0"]{bottom:62px!important;}[style*="height: 100dvh"],[style*="height: 100svh"]{height:894px!important;}[style*="safe-area-inset-top"]{padding-top:62px!important;padding-bottom:34px!important;}'});
+                });
+                await replayPage.addInitScript(()=>{
+                    localStorage.setItem('mykep_onboarded','true');sessionStorage.setItem('mykep_browser_session','yes');
+                    Object.defineProperty(navigator,'standalone',{value:true});
+                    window.replayViewport={width:440,height:894,offsetTop:0,pageTop:0,scale:1,addEventListener(){}};
+                    Object.defineProperty(window,'visualViewport',{value:window.replayViewport});
+                    Object.defineProperty(window,'innerHeight',{get:()=>window.replayViewport.height});
+                    const clientHeight=Object.getOwnPropertyDescriptor(Element.prototype,'clientHeight').get;
+                    Object.defineProperty(Element.prototype,'clientHeight',{get(){return this===document.documentElement?window.replayViewport.height:clientHeight.call(this);}});
+                });
+                await replayPage.goto(server.url+'/schedule.html');
+                await replayPage.waitForFunction(()=>schedulePageData);
+                const checkReplay=async()=>{
+                    await replayPage.waitForFunction(()=>document.querySelector('.views-track').getAnimations().every(a=>a.playState==='finished'));
+                    const report=await replayPage.evaluate(()=>window.mykepViewportReport());
+                    assert.ok(Math.abs(report.units.lvh-956)<0.1);
+                    assert.equal(report.units.dvh,894);
+                    assert.deepEqual(report.safeArea,{top:'62px',bottom:'34px'});
+                    assert.equal(report.fixedBottom,894);
+                    assert.ok(Math.abs(report.app.bottom-956)<0.1,JSON.stringify(report));
+                    assert.ok(Math.abs(report.nav.bottom-956)<0.1,JSON.stringify(report));
+                    assert.ok(Math.abs(Math.max(...report.buttons.map(b=>b.bottom))-940)<0.1,JSON.stringify(report));
+                    assert.ok(await replayPage.locator('.bottom-nav').evaluate(nav=>Array.from(nav.querySelectorAll('a')).every(n=>{
+                        const r=n.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('a')===n;
+                    })));
+                };
+                for(const tab of ['schedule','dashboard','settings']) {
+                    await replayPage.evaluate(tab=>Tabs.show(tab),tab);await checkReplay();
+                }
+                await replayPage.click('#open-group-modal');
+                await replayPage.locator('#modal-search').focus();
+                await replayPage.evaluate(()=>{window.replayViewport.height=450;window.dispatchEvent(new Event('resize'));});
+                assert.ok(Math.abs(await replayPage.locator('.app-container').evaluate(n=>n.getBoundingClientRect().bottom)-956)<0.1);
+                await replayPage.keyboard.press('Escape');
+                await replayPage.evaluate(()=>{window.replayViewport.height=894;window.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('pageshow'));Tabs.show('schedule');});
+                await checkReplay();
+                await replayPage.screenshot({path:`.mykep-local/screens/${engine}-iphone-440x956-replay.png`});
+                await replayContext.close();
+                console.log(`${engine}: supplied 440x956 / 894 fixed-viewport report replay passed`);
                 const calendarContext=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});
                 const calendarPage=await calendarContext.newPage();
                 await calendarPage.clock.install({time:new Date('2026-10-17T20:59:50Z')});
