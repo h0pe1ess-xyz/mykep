@@ -127,7 +127,7 @@ function sourceTimeLabel(meta) {
     const checked=new Date(meta.updated_at);
     if (!Number.isFinite(checked.getTime())) return 'Час перевірки джерела невідомий.';
     const oldYear=+new Intl.DateTimeFormat('en',{timeZone:'Europe/Kyiv',year:'numeric'}).format(checked) !== getKyivNow().getFullYear();
-    return `Джерело перевірено ${checked.toLocaleString('uk-UA',{timeZone:'Europe/Kyiv',day:'2-digit',month:'2-digit',...(oldYear?{year:'numeric'}:{}),hour:'2-digit',minute:'2-digit'})}.`;
+    return `Джерело перевірено ${checked.toLocaleString('uk-UA',{timeZone:'Europe/Kyiv',day:'2-digit',month:'2-digit',...(oldYear?{year:'numeric'}:{}),hour:'2-digit',minute:'2-digit'})}`;
 }
 function staleScheduleNotice(meta) { return meta?.stale ? 'Дані можуть бути застарілими.' : ''; }
 function materializeSchedule(entry, week, group, now = getKyivNow()) {
