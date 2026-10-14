@@ -38,18 +38,30 @@ window.mykepViewportReport = function() {
     const safeArea = { top: safeStyle.paddingTop, bottom: safeStyle.paddingBottom };
     probe.style.padding = '0';
     const units = {};
-    for (const unit of ['vh', 'dvh', 'lvh']) {
+    for (const unit of ['vh', 'dvh', 'lvh', 'svh']) {
         probe.style.height = '';
         probe.style.height = `100${unit}`;
         units[unit] = probe.style.height ? probe.getBoundingClientRect().height : null;
     }
+    probe.style.cssText = 'position:fixed;bottom:0;right:0;width:1px;height:1px;visibility:hidden;pointer-events:none;';
+    const fixedBottom = probe.getBoundingClientRect().bottom;
     probe.remove();
     const viewport = window.visualViewport;
-    return { version: '2.9.4', mode: getMyKepDisplayMode(),
+    const buttons = [...document.querySelectorAll('.bottom-nav a')].map(node => {
+        const box = node.getBoundingClientRect();
+        return {top:box.top,bottom:box.bottom};
+    });
+    return { version: '2.9.5', mode: getMyKepDisplayMode(),
         iosFixActive: document.documentElement.classList.contains('ios-standalone'),
-        innerHeight: window.innerHeight, clientHeight: document.documentElement.clientHeight,
-        visualViewport: viewport ? { height: viewport.height, offsetTop: viewport.offsetTop, scale: viewport.scale } : null,
-        units, safeArea, body: rect('body'), app: rect('.app-container'), nav: rect('.bottom-nav') };
+        screen: {width:window.screen.width,height:window.screen.height,
+            availableHeight:window.screen.availHeight,pixelRatio:window.devicePixelRatio,
+            orientation:window.screen.orientation?.type || null},
+        innerWidth:window.innerWidth,innerHeight:window.innerHeight,
+        clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight,
+        visualViewport: viewport ? {width:viewport.width,height:viewport.height,
+            offsetTop:viewport.offsetTop,pageTop:viewport.pageTop,scale:viewport.scale} : null,
+        scrollY:window.scrollY,fixedBottom,units,safeArea,buttons,
+        root:rect('html'),body:rect('body'),app:rect('.app-container'),nav:rect('.bottom-nav') };
 };
 
 /* Android only: reserve navigation space inside the measured visible viewport.

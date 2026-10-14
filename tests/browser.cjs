@@ -164,6 +164,29 @@ async function run() {
                 });
                 await iosPage.goto(server.url);
                 await iosPage.waitForFunction(()=>typeof Tabs!=='undefined' && document.documentElement.classList.contains('ios-standalone'));
+                const diagnostics=await iosPage.evaluate(()=>{
+                    const count=document.body.childElementCount;
+                    const report=getCurrentSupportReport();
+                    return {report,countBefore:count,countAfter:document.body.childElementCount,uid:localStorage.getItem('mykep_uid'),group:localStorage.getItem('mykep_group')};
+                });
+                const viewportDiagnostics=JSON.parse(diagnostics.report.split('Геометрія екрана: ')[1]);
+                assert.equal(viewportDiagnostics.innerHeight,844);
+                assert.equal(viewportDiagnostics.clientHeight,810);
+                assert.equal(viewportDiagnostics.fixedBottom,844);
+                assert.equal(viewportDiagnostics.buttons.length,3);
+                assert.equal(viewportDiagnostics.nav.bottom,844);
+                assert.ok(viewportDiagnostics.screen.height>0);
+                assert.equal(diagnostics.countBefore,diagnostics.countAfter);
+                if(diagnostics.uid) assert.ok(!diagnostics.report.includes(diagnostics.uid));
+                if(diagnostics.group) assert.ok(!diagnostics.report.includes(diagnostics.group));
+                assert.ok(!diagnostics.report.includes(server.url));
+                await iosPage.evaluate(()=>{
+                    Tabs.show('settings');
+                    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.copiedViewportSupport=text;}}});
+                });
+                await iosPage.click('#support-copy');
+                await iosPage.waitForFunction(()=>Boolean(window.copiedViewportSupport));
+                assert.ok((await iosPage.evaluate(()=>window.copiedViewportSupport)).includes('Геометрія екрана: '));
                 // Substitute only the environment input. Exercise production padding
                 // with both normal home-indicator space and an inflated browser inset.
                 await iosPage.addStyleTag({content:'html{--test-safe-bottom:83px;}html.ios-standalone .app-container{padding-top:71px;}'});
