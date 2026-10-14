@@ -150,6 +150,10 @@ async function run() {
                 // A smaller clientHeight must not leave a gap below the installed app.
                 const iosContext=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) FxiOS/143.0 Mobile/15E148'});
                 const iosPage=await iosContext.newPage();
+                await iosPage.route('**/css/app.css*',async route=>{
+                    const response=await route.fetch();
+                    await route.fulfill({response,body:(await response.text()).replaceAll('env(safe-area-inset-bottom, 0px)','var(--test-safe-bottom, 0px)')});
+                });
                 await iosPage.addInitScript(()=>{
                     localStorage.setItem('mykep_onboarded','true');sessionStorage.setItem('mykep_browser_session','yes');
                     Object.defineProperty(navigator,'standalone',{value:true});
@@ -160,9 +164,9 @@ async function run() {
                 });
                 await iosPage.goto(server.url);
                 await iosPage.waitForFunction(()=>typeof Tabs!=='undefined' && document.documentElement.classList.contains('ios-standalone'));
-                // Desktop engines do not expose iPhone insets. Inject their padding
-                // to check that it reserves content once and keeps the background flush.
-                await iosPage.addStyleTag({content:'html.ios-standalone .app-container{padding-top:71px;padding-bottom:102px;}html.ios-standalone .bottom-nav{padding-bottom:44px;}'});
+                // Substitute only the environment input. Exercise production padding
+                // with both normal home-indicator space and an inflated browser inset.
+                await iosPage.addStyleTag({content:'html{--test-safe-bottom:83px;}html.ios-standalone .app-container{padding-top:71px;}'});
                 const checkEdges=async()=>{
                     await iosPage.waitForFunction(()=>document.querySelector('.views-track').getAnimations().every(a=>a.playState==='finished'));
                     const bounds=await iosPage.evaluate(()=>{
@@ -170,12 +174,13 @@ async function run() {
                         const nav=document.querySelector('.bottom-nav').getBoundingClientRect();
                         const last=document.querySelector(`[data-view="${Tabs.current}"] main`).getBoundingClientRect();
                         const buttonsBottom=Math.max(...Array.from(document.querySelectorAll('.bottom-nav a'),n=>n.getBoundingClientRect().bottom));
-                        return {appTop:app.top,appBottom:app.bottom,navBottom:nav.bottom,navTop:nav.top,buttonsBottom,contentBottom:last.bottom,viewport:innerHeight};
+                        const inset=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--test-safe-bottom'));
+                        return {appTop:app.top,appBottom:app.bottom,navBottom:nav.bottom,navTop:nav.top,buttonsBottom,contentBottom:last.bottom,viewport:innerHeight,expectedBottomSpace:Math.max(10,Math.min(inset,34))};
                     });
                     assert.ok(Math.abs(bounds.appTop)<=1,JSON.stringify(bounds));
                     assert.ok(Math.abs(bounds.appBottom-bounds.viewport)<=1,JSON.stringify(bounds));
                     assert.ok(Math.abs(bounds.navBottom-bounds.viewport)<=1,JSON.stringify(bounds));
-                    assert.ok(bounds.buttonsBottom<=bounds.viewport-34,JSON.stringify(bounds));
+                    assert.ok(Math.abs(bounds.viewport-bounds.buttonsBottom-bounds.expectedBottomSpace)<=1,JSON.stringify(bounds));
                     assert.ok(bounds.contentBottom<=bounds.navTop+1,JSON.stringify(bounds));
                     if(!await iosPage.locator('#main-app').evaluate(n=>n.inert)) {
                         assert.ok(await iosPage.locator('.bottom-nav').evaluate(nav=>Array.from(nav.querySelectorAll('a')).every(n=>{
@@ -188,6 +193,11 @@ async function run() {
                     await iosPage.evaluate(tab=>Tabs.show(tab),tab);
                     await checkEdges();
                 }
+                for(const inset of [0,21,34,83,110]) {
+                    await iosPage.evaluate(inset=>document.documentElement.style.setProperty('--test-safe-bottom',`${inset}px`),inset);
+                    await checkEdges();
+                }
+                await iosPage.evaluate(()=>document.documentElement.style.setProperty('--test-safe-bottom','34px'));
                 // Both underreported and oversized layout measurements are ignored.
                 for(const height of [878,844,700]) {
                     await iosPage.evaluate(height=>{window.testLayoutHeight=height;window.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('pageshow'));},height);
