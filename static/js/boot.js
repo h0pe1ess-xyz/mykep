@@ -51,7 +51,7 @@ window.mykepViewportReport = function() {
         const box = node.getBoundingClientRect();
         return {top:box.top,bottom:box.bottom};
     });
-    return { version: '2.9.8', mode: getMyKepDisplayMode(),
+    return { version: '2.9.9', mode: getMyKepDisplayMode(),
         iosFixActive: document.documentElement.classList.contains('ios-standalone'),
         screen: {width:window.screen.width,height:window.screen.height,
             availableHeight:window.screen.availHeight,pixelRatio:window.devicePixelRatio,
@@ -201,10 +201,16 @@ window.mykepViewportReport = function() {
 /* Fit contents to the actual main track, without viewport/safe-area overrides. */
 (() => {
     let frame = 0;
+    let needsFit = true;
+    let fittedWidth = 0, fittedHeight = 0;
     function fit() {
         frame = 0;
         const main = document.getElementById('dashboard-main');
         if (!main || document.documentElement.dataset.tab !== 'dashboard' || !main.clientHeight) return;
+        const width = main.clientWidth, height = main.clientHeight;
+        if (!needsFit && width === fittedWidth && height === fittedHeight) return;
+        needsFit = false;
+        fittedWidth = width; fittedHeight = height;
         main.dataset.overflow = 'false';
         let fits = false;
         for (let density = 0; density <= 4; density++) {
@@ -220,7 +226,8 @@ window.mykepViewportReport = function() {
         }
         main.dataset.overflow = String(!fits);
     }
-    window.requestDashboardFit = () => {
+    window.requestDashboardFit = (checkOnly = false) => {
+        if (checkOnly !== true) needsFit = true;
         if (!frame) frame = requestAnimationFrame(fit);
     };
     document.addEventListener('DOMContentLoaded', () => {

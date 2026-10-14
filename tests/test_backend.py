@@ -1,4 +1,5 @@
 import copy
+import asyncio
 from contextlib import closing
 import json
 import sqlite3
@@ -133,8 +134,10 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(verify_database(dest))
 
     async def test_refresh_distinct_from_views_and_global_uniques(self):
-        analytics.record_request('synthetic-a', 'ПІ-24-02', '/api/schedule', event_kind='refresh')
-        analytics.record_request('synthetic-c', 'ПІ-24-02', '/api/schedule', event_kind='view')
+        with patch.object(analytics, 'datetime', wraps=datetime) as clock:
+            clock.now.return_value = datetime(2026, 10, 14, 12, tzinfo=KYIV)
+            analytics.record_request('synthetic-a', 'ПІ-24-02', '/api/schedule', event_kind='refresh')
+            analytics.record_request('synthetic-c', 'ПІ-24-02', '/api/schedule', event_kind='view')
         await analytics._queue.join()
         rows = await admin_stats.daily_summaries()
         legacy = next(row for row in rows if row['event_kind'] == 'legacy_request')
@@ -144,6 +147,77 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(stats['specialties'][0]['users'], 3)
         self.assertEqual(stats['courses'][0]['users'], 3)
         self.assertEqual(stats['totals']['views'], 4)
+
+    async def test_rollup_is_not_in_writer_and_restart_catches_up_exactly_once(self):
+        with patch.object(analytics, 'update_daily', wraps=analytics.update_daily) as rollup:
+            analytics.record_request('same-user', 'ПІ-24-01', '/api/schedule', event_kind='view')
+            analytics.record_request('same-user', 'ПІ-24-02', '/api/schedule', event_kind='view')
+            analytics.record_request('same-user', 'ПІ-24-02', '/api/schedule', event_kind='interaction')
+            analytics.record_request('', 'ПІ-24-02', '/api/schedule', event_kind='view')
+            await analytics._queue.join()
+            rollup.assert_not_called()
+        # Simulate committed detail rows left behind after a process crash.
+        with closing(sqlite3.connect(self.path)) as db:
+            before = db.execute('SELECT last_id FROM analytics_rollup_state').fetchone()[0]
+            upper = db.execute('SELECT MAX(id) FROM analytics').fetchone()[0]
+            self.assertLess(before, upper)
+        await analytics.init_analytics_db()
+        await analytics.init_analytics_db()
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute('SELECT last_id FROM analytics_rollup_state').fetchone()[0], upper)
+            self.assertEqual(db.execute("SELECT SUM(views), MAX(users) FROM analytics_daily WHERE group_name='*' AND event_kind='view'").fetchone(), (3, 1))
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM analytics').fetchone()[0], 7)
+        details = await admin_stats.detail_rows()
+        self.assertEqual(len(details), 7)
+        self.assertNotIn('uid', json.dumps(details))
+
+    async def test_rollup_checkpoint_rolls_back_with_aggregate_and_can_retry(self):
+        analytics.record_request('new-user', 'ПІ-24-01', '/api/schedule', event_kind='view')
+        await analytics._queue.join()
+        original = analytics.update_daily
+
+        async def fail_after_update(db):
+            await original(db)
+            raise RuntimeError('simulated interrupted commit')
+
+        with patch.object(analytics, 'update_daily', side_effect=fail_after_update):
+            with self.assertRaises(RuntimeError):
+                await analytics.refresh_daily()
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute('SELECT last_id FROM analytics_rollup_state').fetchone()[0], 3)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM analytics_daily WHERE event_kind='view'").fetchone()[0], 0)
+        await asyncio.gather(analytics.refresh_daily(), analytics.refresh_daily())
+        rows = await admin_stats.daily_summaries()
+        self.assertEqual(next(r for r in rows if r['event_kind'] == 'view')['views'], 1)
+
+    async def test_periodic_rollup_runs_without_new_writer_batch(self):
+        await analytics.stop_writer()
+        completed = asyncio.Event()
+        original = analytics.refresh_daily
+
+        async def observed_refresh():
+            await original()
+            completed.set()
+
+        with patch.object(analytics, 'ROLLUP_INTERVAL', 0), patch.object(analytics, 'refresh_daily', side_effect=observed_refresh):
+            await analytics.start_writer()
+            await asyncio.wait_for(completed.wait(), 5)
+            await analytics.stop_writer()
+
+    async def test_activity_receipt_validates_without_building_schedule(self):
+        import main
+        event = dict(uid='synthetic-action', group='ПІ-24-02', mode='standalone', event='interaction')
+        with patch.object(main.schedule, 'build', side_effect=AssertionError('activity must not build schedules')):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url='https://localhost') as client:
+                self.assertEqual((await client.post('/api/activity', json=event, headers={'Origin':'https://localhost'})).status_code, 204)
+                self.assertEqual((await client.post('/api/activity', json=event, headers={'Origin':'https://foreign.invalid'})).status_code, 403)
+                for invalid in ({**event,'event':'refresh'}, {**event,'group':'x'}, {**event,'mode':'unknown'}, {**event,'uid':'x'*129}):
+                    self.assertEqual((await client.post('/api/activity', json=invalid)).status_code, 422)
+                with patch.object(analytics, 'record_request', return_value=False):
+                    self.assertEqual((await client.post('/api/activity', json=event)).status_code, 503)
+        await analytics._queue.join()
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute("SELECT endpoint,event_kind,display_mode FROM analytics WHERE uid='synthetic-action'").fetchall(), [('/api/schedule','interaction','standalone')])
 
     async def test_corrupt_refresh_retains_good_snapshot(self):
         service = ScheduleService()

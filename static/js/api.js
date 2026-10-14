@@ -3,6 +3,9 @@ const scheduleRequests = new Map();
 const SCHEDULE_CACHE_VERSION = 3;
 const SCHEDULE_CACHE_LIMIT = 12;
 const SCHEDULE_DAYS = ['понеділок', 'вівторок', 'середа', 'четвер', "п'ятниця", 'субота'];
+let scheduleCacheSource;
+let scheduleEntries = [];
+const scheduleViews = new WeakMap();
 function currentDisplayMode() {
     return isPWA() ? 'standalone' : 'browser';
 }
@@ -70,33 +73,53 @@ function scheduleRequestContext(week = 'auto', group = null) {
     return { group, duration1, duration2, week: normalizeWeekSelection(week), key: scheduleCacheKey(group,duration1,duration2) };
 }
 function readScheduleEntries() {
+    const source = storage.get('mykep_schedule');
+    if (source === scheduleCacheSource) return scheduleEntries;
+    scheduleCacheSource = source;
+    scheduleEntries = [];
     try {
-        const cache = JSON.parse(storage.get('mykep_schedule') || 'null');
-        if (cache?.version === 3 && Array.isArray(cache.entries)) return cache.entries.filter(e => typeof e.key === 'string' && (validCycle(e.cycle) || validSchedule(e.data)));
+        const cache = JSON.parse(source || 'null');
+        if (cache?.version === 3 && Array.isArray(cache.entries)) {
+            scheduleEntries = cache.entries.filter(e => e && typeof e.key === 'string' && (validCycle(e.cycle) || validSchedule(e.data)));
+        }
         if (cache?.version === 2 && Array.isArray(cache.entries)) {
             // Preserve exact legacy views until their group obtains a cycle. Never
             // turn an incomplete old week into four supposedly complete weeks.
-            const entries = cache.entries.filter(e => validSchedule(e.data)).map(e => {
+            const entries = cache.entries.filter(e => typeof e?.key === 'string' && validSchedule(e.data)).map(e => {
                 const [group,d1,d2,monday,week] = e.key.split('|');
+                if (!/^\d{4}-\d{1,2}-\d{1,2}$/.test(monday || '')) return null;
                 const [y,m,d] = monday.split('-');
                 return { ...e, key: scheduleCacheKey(group,d1,d2), legacyMonday: `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`, legacyWeek: week };
-            });
-            storage.set('mykep_schedule',JSON.stringify({ version: 3, entries }));
-            return entries;
+            }).filter(Boolean);
+            scheduleEntries = entries;
+            persistScheduleEntries();
         }
     } catch { /* A corrupt cache must not reset independent preferences. */ }
-    return [];
+    return scheduleEntries;
 }
-function cachedScheduleForKey(key) { return readScheduleEntries().find(e => e.key === key && e.cycle) || readScheduleEntries().find(e => e.key === key) || null; }
+function persistScheduleEntries() {
+    const source = JSON.stringify({version:SCHEDULE_CACHE_VERSION,entries:scheduleEntries});
+    if (storage.set('mykep_schedule',source)) scheduleCacheSource = source;
+}
+function cachedScheduleForKey(key) {
+    const entries = readScheduleEntries();
+    return entries.find(e => e.key === key && e.cycle) || entries.find(e => e.key === key) || null;
+}
 function saveScheduleEntry(entry) {
-    const entries = readScheduleEntries().filter(e => e.key !== entry.key);
+    const previous = cachedScheduleForKey(entry.key);
+    const changed = !previous || previous.cycle !== entry.cycle || previous.etag !== entry.etag ||
+        previous.meta?.updated_at !== entry.meta?.updated_at || previous.meta?.stale !== entry.meta?.stale;
+    const entries = scheduleEntries.filter(e => e.key !== entry.key);
     entries.push(entry);
     entries.sort((a,b) => (b.usedAt || b.savedAt || 0)-(a.usedAt || a.savedAt || 0));
     const main = scheduleRequestContext().key;
     const protectedEntry = entries.find(e => e.key === main);
     const retained = entries.filter(e => e.key !== main).slice(0,SCHEDULE_CACHE_LIMIT-(protectedEntry ? 1 : 0));
     if (protectedEntry) retained.unshift(protectedEntry);
-    storage.set('mykep_schedule',JSON.stringify({ version: 3, entries: retained }));
+    scheduleEntries = retained;
+    // Access order and temporary network failures stay in memory. Persist only
+    // source changes, not every conditional check of the same cycle.
+    if (changed) persistScheduleEntries();
 }
 function getCachedSchedule(week = 'auto', group = null) {
     const context = scheduleRequestContext(week,group);
@@ -134,6 +157,11 @@ function materializeSchedule(entry, week, group, now = getKyivNow()) {
     const offline = entry.offline || navigator.onLine === false;
     const manual = ['1','2','3','4'].includes(week);
     const automaticMonday = defaultMonday(entry,group,now);
+    const viewKey = `${week}|${dateKey(now)}|${dateKey(automaticMonday)}`;
+    let views = scheduleViews.get(entry.cycle);
+    if (!views) { views = new Map(); scheduleViews.set(entry.cycle,views); }
+    const cached = views.get(viewKey);
+    if (cached) return {...entry,...cached,notice:scheduleNotice(entry,offline),group};
     const monday = week === 'auto' ? automaticMonday : calendarMonday(now);
     if (week === 'next') monday.setDate(monday.getDate()+7);
     const current = dateKey(calendarMonday(now)), target = dateKey(monday);
@@ -148,22 +176,32 @@ function materializeSchedule(entry, week, group, now = getKyivNow()) {
         const lessons = scheduleOnDate(entry,date,group);
         if (lessons.length) { nextDay = { date: dateKey(date), lessons }; break; }
     }
-    return { ...entry, data, today: scheduleOnDate(entry,now,group), nextDay,
-        calendar: { monday: manual ? null : target, default_monday:dateKey(automaticMonday), cycle, label: manual ? 'Перегляд циклу' : target === current ? 'Поточний тиждень' : 'Наступний тиждень' },
-        notice: `${offline ? 'Немає зв’язку. Офлайн-копія. ' : ''}${staleScheduleNotice(entry.meta)}`, group };
+    const view = {data,today:scheduleOnDate(entry,now,group),nextDay,
+        calendar:{monday:manual ? null : target,default_monday:dateKey(automaticMonday),cycle,label:manual ? 'Перегляд циклу' : target === current ? 'Поточний тиждень' : 'Наступний тиждень'}};
+    if (views.size >= 14) views.clear();
+    views.set(viewKey,view);
+    return {...entry,...view,notice:scheduleNotice(entry,offline),group};
+}
+function scheduleNotice(entry,offline) {
+    return `${offline ? 'Немає зв’язку. Офлайн-копія. ' : ''}${staleScheduleNotice(entry.meta)}`;
 }
 function fetchSchedule(week = 'auto', group = null, event = 'refresh') {
     const context = scheduleRequestContext(week,group);
-    const requestKey = `${context.key}|${event}`;
+    if (event !== 'refresh') recordScheduleAction(event,context.group);
+    const requestKey = context.key;
     if (!scheduleRequests.has(requestKey)) {
-        scheduleRequests.set(requestKey,loadScheduleResponse(context,event).finally(() => scheduleRequests.delete(requestKey)));
+        scheduleRequests.set(requestKey,loadScheduleResponse(context).finally(() => scheduleRequests.delete(requestKey)));
     }
-    return scheduleRequests.get(requestKey).then(entry => entry?.cycle ? materializeSchedule(entry,week,context.group) : entry);
+    return scheduleRequests.get(requestKey).then(entry => {
+        if (entry?.cycle) return materializeSchedule(entry,week,context.group);
+        // A shared failed request still needs the caller's exact legacy week.
+        return entry.legacyFallback ? getCachedSchedule(week,context.group) || entry : entry;
+    });
 }
-async function loadScheduleResponse(context,event) {
+async function loadScheduleResponse(context) {
     const {key,group,duration1,duration2} = context;
     const cached = cachedScheduleForKey(key);
-    const query = new URLSearchParams({group,duration1,duration2,uid:getUserId(),mode:currentDisplayMode(),event});
+    const query = new URLSearchParams({group,duration1,duration2,uid:getUserId(),mode:currentDisplayMode(),event:'refresh'});
     const controller = new AbortController(), timeout = setTimeout(() => controller.abort(),10000);
     try {
         const response = await fetch(`/api/schedule?${query}`,{signal:controller.signal,cache:'no-store',headers: cached?.etag ? {'If-None-Match':cached.etag} : {}});
@@ -174,7 +212,8 @@ async function loadScheduleResponse(context,event) {
             const result = await response.json();
             if (!response.ok || result.status !== 'success') { const error = new Error(result.message); error.status=response.status; throw error; }
             if (!validCycle(result.cycle)) throw new Error('Некоректний цикл розкладу.');
-            entry = {key,cycle:result.cycle,meta:result.meta,etag:response.headers.get('ETag'),savedAt:Date.now()};
+            const cycle = cached?.cycle && JSON.stringify(cached.cycle) === JSON.stringify(result.cycle) ? cached.cycle : result.cycle;
+            entry = {key,cycle,meta:result.meta,etag:response.headers.get('ETag'),savedAt:Date.now()};
         }
         entry.offline=false;
         entry.usedAt=Date.now();
@@ -182,15 +221,27 @@ async function loadScheduleResponse(context,event) {
         return entry;
     } catch (error) {
         if (error.status === 404 || error.status === 422) {
-            storage.set('mykep_schedule',JSON.stringify({version:SCHEDULE_CACHE_VERSION,
-                entries:readScheduleEntries().filter(entry => entry.key !== key)}));
+            scheduleEntries = readScheduleEntries().filter(entry => entry.key !== key);
+            persistScheduleEntries();
         }
         if (error.status !== 404 && error.status !== 422 && cached?.cycle) {
             const entry = {...cached,offline:true,usedAt:Date.now(),meta:{...cached.meta,stale:true}};
             saveScheduleEntry(entry);
             return entry;
         }
-        const legacy = error.status !== 404 && error.status !== 422 ? getCachedSchedule(context.week,group) : null;
-        return legacy || { data:null,notice:error.status === 404 ? error.message : 'Не вдалося завантажити розклад. Перевірте з’єднання й спробуйте ще раз.' };
+        return {data:null,legacyFallback:error.status !== 404 && error.status !== 422,
+            notice:error.status === 404 ? error.message : 'Не вдалося завантажити розклад. Перевірте з’єднання й спробуйте ще раз.'};
     } finally { clearTimeout(timeout); }
+}
+
+function recordScheduleAction(event,group = scheduleRequestContext().group) {
+    // Offline actions were never delivered before. Do not create a durable
+    // tracking queue or retry an ambiguous acknowledgement and double count it.
+    if (navigator.onLine === false) return;
+    fetch('/api/activity', {method:'POST',cache:'no-store',keepalive:true,
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({uid:getUserId(),group,mode:currentDisplayMode(),event})
+    }).then(response => {
+        if (!response.ok) console.warn('Activity was not recorded:',response.status);
+    }).catch(error => console.warn('Activity delivery failed:',error.name));
 }

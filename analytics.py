@@ -11,6 +11,10 @@ from database import connect
 logger = logging.getLogger(__name__)
 _queue = None
 _writer = None
+_rollup = None
+_rollup_stop = None
+ROLLUP_INTERVAL = 60
+_last_rollup_error = False
 _dropped = 0
 _last_write_error = False
 
@@ -53,13 +57,16 @@ async def init_analytics_db():
 
 
 async def start_writer():
-    global _queue, _writer, _dropped, _last_write_error
+    global _queue, _writer, _rollup, _rollup_stop, _dropped, _last_write_error, _last_rollup_error
     if _writer and not _writer.done():
         return
     _queue = asyncio.Queue(maxsize=10000)
     _dropped = 0
     _last_write_error = False
+    _last_rollup_error = False
     _writer = asyncio.create_task(_write_loop(), name='analytics-writer')
+    _rollup_stop = asyncio.Event()
+    _rollup = asyncio.create_task(_rollup_loop(), name='analytics-rollup')
 
 
 DISPLAY_MODES = {'standalone', 'browser'}
@@ -75,10 +82,12 @@ def record_request(uid, group_name, endpoint, user_agent='', display_mode=None, 
         if _queue is None:
             raise asyncio.QueueFull
         _queue.put_nowait(row)
+        return True
     except asyncio.QueueFull:
         _dropped += 1
         if _dropped == 1 or _dropped % 100 == 0:
             logger.warning('Analytics queue unavailable/full: %s events dropped', _dropped)
+        return False
 
 
 async def log_request(uid, group_name, endpoint, user_agent='', display_mode=None):
@@ -111,7 +120,6 @@ async def _write_loop():
             try:
                 async with connect() as db:
                     await db.executemany('INSERT INTO analytics (timestamp, uid, group_name, endpoint, user_agent, display_mode, event_kind) VALUES (?, ?, ?, ?, ?, ?, ?)', batch)
-                    await update_daily(db)
                     await db.commit()
                 _last_write_error = False
                 break
@@ -129,7 +137,12 @@ async def _write_loop():
 
 
 async def stop_writer():
-    global _writer, _queue
+    global _writer, _queue, _rollup
+    if _rollup:
+        # Let an active transaction close normally, including its SQLite thread.
+        _rollup_stop.set()
+        await asyncio.gather(_rollup, return_exceptions=True)
+        _rollup = None
     if _writer and not _writer.done():
         try:
             await asyncio.wait_for(_queue.put(None), timeout=5)
@@ -140,12 +153,39 @@ async def stop_writer():
             await asyncio.gather(_writer, return_exceptions=True)
     _writer = None
     _queue = None
+    await refresh_daily()
 
 
 def writer_status():
     return {'running': bool(_writer and not _writer.done()),
             'pending': _queue.qsize() if _queue else 0,
-            'dropped': _dropped, 'write_error': _last_write_error}
+            'dropped': _dropped, 'write_error': _last_write_error,
+            'rollup_error': _last_rollup_error}
+
+
+async def refresh_daily():
+    # Checkpoint and aggregates commit together. BEGIN IMMEDIATE serializes
+    # catch-up across web/bot processes without blocking event-loop readers.
+    async with connect() as db:
+        await db.execute('BEGIN IMMEDIATE')
+        await update_daily(db)
+        await db.commit()
+
+
+async def _rollup_loop():
+    global _last_rollup_error
+    while not _rollup_stop.is_set():
+        try:
+            await asyncio.wait_for(_rollup_stop.wait(), ROLLUP_INTERVAL)
+            return
+        except asyncio.TimeoutError:
+            pass
+        try:
+            await refresh_daily()
+            _last_rollup_error = False
+        except Exception:
+            _last_rollup_error = True
+            logger.exception('Analytics rollup failed; checkpoint will be retried')
 
 
 async def _rows(query, params=()):
@@ -169,6 +209,8 @@ async def update_daily(db):
     checkpoint = await db.execute_fetchall('SELECT last_id FROM analytics_rollup_state WHERE id=1')
     last_id = checkpoint[0][0] if checkpoint else 0
     upper = (await db.execute_fetchall('SELECT COALESCE(MAX(id),0) FROM analytics'))[0][0]
+    if upper == last_id:
+        return
     days = await db.execute_fetchall('SELECT DISTINCT SUBSTR(timestamp,1,10) FROM analytics WHERE id>? AND id<=?', (last_id, upper))
     for (day,) in days:
         params = (day, _next_day(day))

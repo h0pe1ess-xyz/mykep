@@ -1,7 +1,11 @@
 const scheduleCaption = document.querySelector('.schedule-caption');
+let renderedScheduleList = null;
 function renderScheduleList(schedule) {
     const listContainer = document.getElementById('dynamic-schedule-list');
     if (!listContainer) return;
+    const signature = JSON.stringify(schedule || []);
+    if (renderedScheduleList === signature && listContainer.contains(scheduleCaption)) return;
+    renderedScheduleList = signature;
 
     if (!schedule || schedule.length === 0) {
         listContainer.innerHTML = `
@@ -15,10 +19,9 @@ function renderScheduleList(schedule) {
         return;
     }
 
-    listContainer.innerHTML = schedule.map((lesson, index) => {
-        const delay = Math.min(index * 0.06, 0.36);
+    listContainer.innerHTML = schedule.map(lesson => {
         return `
-            <div class="lesson-card" style="animation: fadeIn var(--transition-normal) both; animation-delay: ${delay}s;">
+            <div class="lesson-card">
                 <div class="lesson-top">
                     <span>${escapeHTML(lesson.lesson)}-${getLessonSuffix(lesson.lesson)} пара</span>
                     <span>${escapeHTML(lesson.time)}</span>
@@ -43,6 +46,7 @@ let schedulePageData = null;
 let schedulePickerState = null;
 function setSchedulePending() {
     schedulePageData = null;
+    renderedScheduleList = null;
     setScheduleSharingPending();
     document.querySelectorAll('.day-picker button').forEach(button => { button.disabled = true; });
 }
@@ -168,18 +172,27 @@ function renderScheduleContext(calendar,group) {
     const selection=getScheduleWeekSelection();
     const automaticIsNext=calendar?.default_monday
         ? calendar.default_monday !== dateKey(calendarMonday()) : calendar?.label === 'Наступний тиждень';
-    select.options[0].textContent=automaticIsNext ? 'Наступний' : 'Цей тиждень';
+    const automaticLabel=automaticIsNext ? 'Наступний' : 'Цей тиждень';
+    if (select.options[0].textContent !== automaticLabel) select.options[0].textContent=automaticLabel;
     let current=select.querySelector('option[value=current]');
     if (automaticIsNext && !current) {
         current=document.createElement('option');
         current.value='current'; current.textContent='Цей тиждень';
         select.insertBefore(current,select.options[1]);
     } else if (!automaticIsNext) current?.remove();
+    let next = select.querySelector('option[value=next]');
+    if (selection === 'next' && !automaticIsNext && !next) {
+        next = document.createElement('option');
+        next.value = 'next'; next.textContent = 'Наступний';
+        select.insertBefore(next,select.options[1]);
+    } else if (selection !== 'next' || automaticIsNext) next?.remove();
     // Preserve an explicit current-week preference while both views coincide.
-    select.value=selection === 'current' && !automaticIsNext ? 'auto' : selection;
+    select.value=(selection === 'current' && !automaticIsNext || selection === 'next' && automaticIsNext) ? 'auto' : selection;
+    let description;
     if (calendar?.monday) {
         const monday = parseLocalDate(calendar.monday), end = new Date(monday); end.setDate(end.getDate()+5);
-        label.textContent = `${calendar.label.replace(' тиждень','')} · ${monday.toLocaleDateString('uk-UA',{day:'numeric',month:'short'})} – ${end.toLocaleDateString('uk-UA',{day:'numeric',month:'short'})} · ${calendar.cycle}-й тиждень`;
-    } else label.textContent = `${calendar?.cycle || getScheduleWeekSelection()}-й тиждень · без календарної дати`;
+        description = `${calendar.label.replace(' тиждень','')} · ${monday.toLocaleDateString('uk-UA',{day:'numeric',month:'short'})} – ${end.toLocaleDateString('uk-UA',{day:'numeric',month:'short'})} · ${calendar.cycle}-й тиждень`;
+    } else description = `${calendar?.cycle || getScheduleWeekSelection()}-й тиждень · без календарної дати`;
+    if (label.textContent !== description) label.textContent=description;
 }
 let currentScheduleCalendar = null;

@@ -9,13 +9,19 @@ function cycleFixture() {
     ]]))]));
 }
 async function startFixtureServer({root=path.resolve('static'),port=0}={}) {
-    const cycle=cycleFixture(),events=[];
+    const cycle=cycleFixture(),events=[],requests=[];
     const groups=['ПІ-24-02','ЕК(11)-24-03',...Array.from({length:60},(_,i)=>`ТЕСТ-24-${String(i).padStart(2,'0')}`)];
     let buildSuffix='',breakAsset=false,edgeHTML=false;
     const server=http.createServer((req,res)=>{
         const url=new URL(req.url,'http://localhost');
         if (url.pathname.startsWith('/api/')) {
+            requests.push(url.pathname);
             res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json; charset=utf-8');
+            if (url.pathname==='/api/activity' && req.method==='POST') {
+                let body='';req.on('data',chunk=>body+=chunk);
+                req.on('end',()=>{events.push(JSON.parse(body).event);res.statusCode=204;res.end();});
+                return;
+            }
             if (url.pathname==='/api/groups') return res.end(JSON.stringify({status:'success',data:groups}));
             if (url.pathname==='/api/teacher-hints') return res.end(fs.readFileSync(path.join(root,'data/teacher-hints.json')));
             if (url.pathname==='/api/schedule') {
@@ -28,8 +34,8 @@ async function startFixtureServer({root=path.resolve('static'),port=0}={}) {
             res.statusCode=404;return res.end('{}');
         }
         const relative=['/','/schedule.html','/settings.html'].includes(url.pathname)?'index.html':decodeURIComponent(url.pathname).slice(1);
-        const file=relative.startsWith('previews/')?path.resolve(relative):path.resolve(root,relative);
-        const allowed=relative.startsWith('previews/') ? path.resolve('previews') : path.resolve(root);
+        const file=path.resolve(root,relative);
+        const allowed=path.resolve(root);
         if (!file.startsWith(allowed+path.sep)) {res.statusCode=403;return res.end();}
         if (breakAsset && relative==='js/settings.js') {res.statusCode=503;return res.end();}
         try {
@@ -42,7 +48,7 @@ async function startFixtureServer({root=path.resolve('static'),port=0}={}) {
         } catch {res.statusCode=404;res.end();}
     });
     await new Promise(resolve=>server.listen(port,'127.0.0.1',resolve));
-    return {url:`http://127.0.0.1:${server.address().port}`,events,server,
+    return {url:`http://127.0.0.1:${server.address().port}`,events,requests,server,
         setBuild:s=>buildSuffix=s,breakAsset:s=>breakAsset=s,edgeHTML:s=>edgeHTML=s,close:()=>new Promise(resolve=>server.close(resolve))};
 }
 module.exports={startFixtureServer,cycleFixture};

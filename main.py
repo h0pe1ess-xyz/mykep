@@ -5,7 +5,8 @@ import hashlib
 import json
 from datetime import datetime, date
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Literal, Optional
+from pydantic import BaseModel, Field
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
@@ -189,6 +190,27 @@ async def teacher_directory():
     if not teachers.teachers:
         return JSONResponse(status_code=503, content={'status': 'error'})
     return {'teachers': teachers.teachers, 'updated_at': teachers.updated_at}
+
+
+class ActivityEvent(BaseModel):
+    uid: str = Field(max_length=128)
+    group: str = Field(min_length=2, max_length=64)
+    mode: Literal['standalone', 'browser']
+    event: Literal['view', 'interaction']
+
+
+@app.post('/api/activity', status_code=204)
+async def record_activity(request: Request, event: ActivityEvent):
+    # A small action receipt does not build/serialize four schedule cycles.
+    # Keep the existing schedule endpoint for historical reporting semantics.
+    origin = request.headers.get('origin')
+    if origin and origin != str(request.base_url).rstrip('/'):
+        return Response(status_code=403)
+    accepted = analytics.record_request(event.uid, event.group, '/api/schedule',
+                                        request.headers.get('user-agent', ''), event.mode, event.event)
+    if not accepted:
+        return Response(status_code=503, headers={'Retry-After': '30'})
+    return Response(status_code=204)
 
 
 @app.get('/api/groups')

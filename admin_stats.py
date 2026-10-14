@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 from config import COLLEGE_SIZE, KYIV
 from database import connect
 
-from analytics import VIEWS
+from analytics import VIEWS, refresh_daily
 RANGES = {'1': 1, '7': 7, '14': 14, '30': 30, '90': 90, 'all': None}
 WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
 _cache = {}
@@ -374,6 +374,7 @@ async def export_group_rows():
 
 
 async def daily_summaries(limit=90):
+    await refresh_daily()
     rows = await _rows('SELECT day, event_kind, views, users FROM analytics_daily WHERE group_name=\'*\' ORDER BY day DESC, event_kind LIMIT ?', (limit,))
     return [dict(zip(('day','event_kind','views','users'), row)) for row in rows]
 

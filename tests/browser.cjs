@@ -73,6 +73,9 @@ async function run() {
                 const dayGeometry=await page.locator('.day-picker').boundingBox();
                 const eventsBefore=server.events.length;
                 await page.locator(`.day-item[data-day="${otherDay}"]`).click();
+                await page.waitForFunction(()=>schedulePickerState.activeDay===document.querySelector('.day-item.active').dataset.day);
+                assert.equal(await page.evaluate(()=>scheduleRequests.size),0);
+                await page.evaluate(()=>{App.load('schedule');});
                 await page.waitForFunction(()=>scheduleRequests.size>0);
                 assert.equal(await page.locator('#schedule-notice').isVisible(),false);
                 const switchedGeometry=await page.locator('.day-picker').boundingBox();

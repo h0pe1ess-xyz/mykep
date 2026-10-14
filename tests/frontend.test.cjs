@@ -15,7 +15,7 @@ function fixture() {
         const cycle=Object.fromEntries([1,2,3,4].map(w=>[w,Object.fromEntries(SCHEDULE_DAYS.map(d=>[d,[]]))]));
         cycle[3]['субота']=[sampleLesson]; cycle[4]['понеділок']=[{...sampleLesson,lesson:1,time:'08:00 - 09:20'}];
         const entry={key:'ПІ-24-02|80|60',cycle,savedAt:1,meta:{updated_at:'2026-10-14T10:00:00+03:00',stale:false}};`);
-    return {data,run};
+    return {data,run,context};
 }
 test('calendar week waits for actual Saturday end, Sunday advances, Monday resets',()=>{
     const {run}=fixture();
@@ -74,4 +74,54 @@ test('bounded eviction protects main group, retains other groups and uses all of
     assert.equal(offline.data['понеділок'].length,1);
     assert.equal(offline.meta.updated_at,'2026-10-14T10:00:00+03:00');
     assert.equal(offline.meta.stale,true);
+});
+
+test('cache validates once, reuses views, and invalidates after replacement or removal',()=>{
+    const {run,data}=fixture();
+    run(`storage.set('mykep_schedule',JSON.stringify({version:3,entries:[entry]}));
+        let validations=0; const validate=validCycle; validCycle=(...args)=>{validations++;return validate(...args);};
+        const first=getCachedSchedule('auto');
+        for(let i=0;i<20;i++) {readScheduleEntries();getCachedSchedule('auto');}`);
+    assert.equal(run('validations'),1);
+    assert.equal(run(`first.data === getCachedSchedule('auto').data`),true);
+    run(`storage.remove('mykep_schedule');`);
+    assert.equal(run(`readScheduleEntries().length`),0);
+    data.set('mykep_schedule','broken');
+    assert.equal(run(`readScheduleEntries().length`),0);
+    run(`storage.set('mykep_schedule',JSON.stringify({version:3,entries:[entry]}));`);
+    assert.equal(run(`readScheduleEntries().length`),1);
+    assert.equal(run('validations'),2);
+});
+
+test('unchanged 304 checks coalesce across weeks and event kinds without persistent writes',async()=>{
+    const {run}=fixture();
+    run(`saveScheduleEntry(entry); let requests=0,writes=0,release;
+        const save=storage.set;storage.set=(key,value)=>{if(key==='mykep_schedule')writes++;return save(key,value);};
+        const gate=new Promise(resolve=>release=resolve);
+        fetch=async url=>{if(url==='/api/activity')return {ok:true};requests++;await gate;return {status:304,headers:{get:key=>key==='X-Source-Checked-At'?entry.meta.updated_at:'false'}};};`);
+    const first=run(`fetchSchedule('auto',null,'view')`);
+    const second=run(`fetchSchedule('4',null,'interaction')`);
+    run('release()');
+    const [auto,manual]=await Promise.all([first,second]);
+    assert.equal(run('requests'),1);
+    assert.equal(run('writes'),0);
+    assert.equal(manual.calendar.cycle,4);
+    assert.equal(auto.calendar.monday,'2026-10-12');
+    await run(`fetchSchedule('current')`);
+    assert.equal(run('writes'),0);
+    run(`fetch=async()=>({status:304,headers:{get:key=>key==='X-Source-Checked-At'?'2026-10-14T11:00:00+03:00':'false'}});`);
+    await run(`fetchSchedule()`);
+    assert.equal(run('writes'),1);
+    assert.equal(run(`getCachedSchedule().data===getCachedSchedule().data`),true);
+});
+
+test('failed coalesced requests use each exact legacy week and never invent missing cycles',async()=>{
+    const {run}=fixture();
+    run(`storage.set('mykep_schedule',JSON.stringify({version:2,entries:[
+        {key:'ПІ-24-02|80|60|2026-10-12|3',data:cycle[3]},
+        {key:'ПІ-24-02|80|60|2026-10-12|4',data:cycle[4]}]}));`);
+    const [third,fourth,first]=await Promise.all([run(`fetchSchedule('3')`),run(`fetchSchedule('4')`),run(`fetchSchedule('1')`)]);
+    assert.equal(third.data['понеділок'].length,0);
+    assert.equal(fourth.data['понеділок'].length,1);
+    assert.equal(first.data,null);
 });
