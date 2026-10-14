@@ -539,17 +539,17 @@ a:focus-visible { outline: 2px solid var(--accent-orange); outline-offset: 3px; 
 
 
 html.ios-standalone,
-html.ios-standalone body {
+html.ios-standalone body,
+html.ios-standalone .app-container {
+    /* Add the top inset only when the status bar overlays the web content. */
     height: 100vh;
-    height: 100lvh;
+    height: min(100lvh, calc(100svh + env(safe-area-inset-top, 0px)));
 }
 
 html.ios-standalone .app-container {
     /* iOS can make the fixed containing block shorter than the full lvh shell. */
     --ios-nav-bottom-space: max(10px, env(safe-area-inset-bottom, 0px));
     position: relative;
-    height: 100vh;
-    height: 100lvh;
     width: 100%;
     max-width: none;
     padding-bottom: 0;

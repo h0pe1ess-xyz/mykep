@@ -84,6 +84,7 @@ async function run() {
                 assert.equal(await page.evaluate(()=>dayRerenders),0);
                 await page.evaluate(()=>restoreDayFetch());
                 assert.equal(await page.locator('#schedule-notice').isVisible(),false);
+                await page.waitForFunction(()=>!schedulePickerState.programmatic);
                 // File-only sharing is mocked at the platform boundary; PNG is real.
                 await page.evaluate(()=>{
                     window.testShares=[];
@@ -91,6 +92,8 @@ async function run() {
                     Object.defineProperty(navigator,'share',{configurable:true,value:async options=>{const f=options.files?.[0];window.testShares.push({keys:Object.keys(options),type:f?.type,size:f?.size,active:navigator.userActivation.isActive});}});
                 });
                 await page.click('#schedule-share');
+                await page.waitForFunction(()=>window.testShares.length===1 || (scheduleExportFile && !scheduleShareInFlight));
+                if(!await page.evaluate(()=>window.testShares.length)) await page.click('#schedule-share');
                 await page.waitForFunction(()=>window.testShares.length===1);
                 const share=await page.evaluate(()=>testShares[0]);
                 assert.deepEqual(share.keys,['files']);assert.equal(share.type,'image/png');assert.ok(share.size>1000);
@@ -309,6 +312,50 @@ async function run() {
                 await replayPage.screenshot({path:`.mykep-local/screens/${engine}-iphone-440x956-replay.png`});
                 await replayContext.close();
                 console.log(`${engine}: supplied 440x956 / 894 fixed-viewport report replay passed`);
+                // Firefox-installed PWA report: native status bar outside the web
+                // layer, screen/lvh 926, drawable viewport 879, safe-area-top 0.
+                const containedContext=await browser.newContext({viewport:{width:428,height:879},screen:{width:428,height:926},serviceWorkers:'block',userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) Version/26.0 Mobile Safari/605.1.15'});
+                const containedPage=await containedContext.newPage();
+                await containedPage.route('**/css/app.css*',async route=>{
+                    const response=await route.fetch();
+                    const css=(await response.text()).replaceAll('100lvh','926px').replaceAll('100vh','926px')
+                        .replaceAll('env(safe-area-inset-top, 0px)','0px').replaceAll('env(safe-area-inset-bottom, 0px)','34px');
+                    await route.fulfill({response,body:css+'\n[style*="height: 100lvh"],[style*="height: 100vh"]{height:926px!important;}[style*="safe-area-inset-top"]{padding-top:0!important;padding-bottom:34px!important;}'});
+                });
+                await containedPage.addInitScript(()=>{
+                    localStorage.setItem('mykep_onboarded','true');sessionStorage.setItem('mykep_browser_session','yes');
+                    Object.defineProperty(navigator,'standalone',{value:true});
+                    window.containedViewport={width:428,height:879,offsetTop:0,pageTop:0,scale:1,addEventListener(){}};
+                    Object.defineProperty(window,'visualViewport',{value:window.containedViewport});
+                });
+                await containedPage.goto(server.url);
+                await containedPage.waitForFunction(()=>currentGlobalSchedule);
+                const checkContained=async()=>{
+                    await containedPage.waitForFunction(()=>document.querySelector('.views-track').getAnimations().every(a=>a.playState==='finished'));
+                    const report=await containedPage.evaluate(()=>window.mykepViewportReport());
+                    assert.equal(report.screen.height,926);
+                    assert.ok(Math.abs(report.units.lvh-926)<0.1);
+                    assert.ok(Math.abs(report.units.svh-879)<0.1);
+                    assert.deepEqual(report.safeArea,{top:'0px',bottom:'34px'});
+                    for(const key of ['root','body','app','nav']) assert.ok(Math.abs(report[key].bottom-879)<0.1,JSON.stringify(report));
+                    assert.ok(Math.abs(Math.max(...report.buttons.map(b=>b.bottom))-845)<0.1,JSON.stringify(report));
+                    assert.ok(await containedPage.locator('.bottom-nav').evaluate(nav=>Array.from(nav.querySelectorAll('a')).every(n=>{
+                        const r=n.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('a')===n;
+                    })));
+                };
+                for(const tab of ['dashboard','schedule','settings']) {
+                    await containedPage.evaluate(tab=>Tabs.show(tab),tab);await checkContained();
+                }
+                await containedPage.click('#open-group-modal');
+                await containedPage.locator('#modal-search').focus();
+                await containedPage.evaluate(()=>{window.containedViewport.height=450;window.dispatchEvent(new Event('resize'));});
+                assert.ok(Math.abs(await containedPage.locator('.app-container').evaluate(n=>n.getBoundingClientRect().bottom)-879)<0.1);
+                await containedPage.keyboard.press('Escape');
+                await containedPage.evaluate(()=>{window.containedViewport.height=879;window.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('pageshow'));Tabs.show('dashboard');});
+                await checkContained();
+                await containedPage.screenshot({path:`.mykep-local/screens/${engine}-iphone-contained-428x879.png`});
+                await containedContext.close();
+                console.log(`${engine}: supplied Firefox-installed 428x879 / lvh 926 report replay passed`);
                 const calendarContext=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});
                 const calendarPage=await calendarContext.newPage();
                 await calendarPage.clock.install({time:new Date('2026-10-17T20:59:50Z')});
