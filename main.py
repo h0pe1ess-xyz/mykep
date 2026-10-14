@@ -1,17 +1,21 @@
 import asyncio
 import logging
 import time
+import hashlib
+import json
+from datetime import datetime, date
 from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 
-from config import ADMIN_COOKIE_SECURE, ADMIN_DEV_LOGIN, BASE_DIR, BOT_MODE, PUBLIC_CSP, TELEGRAM_BOT_TOKEN
+from config import ADMIN_COOKIE_SECURE, ADMIN_DEV_LOGIN, BASE_DIR, BOT_MODE, PUBLIC_CSP, TELEGRAM_BOT_TOKEN, KYIV
 from database import init_database
-from schedule_service import ScheduleService
+from schedule_service import ScheduleService, calendar_metadata
+from teacher_hints import TeacherHintsService
 import admin_api
 import admin_auth
 import analytics
@@ -23,6 +27,7 @@ logging.getLogger('httpx').setLevel(logging.WARNING)
 logging.getLogger('httpcore').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 schedule = ScheduleService()
+teachers = TeacherHintsService()
 admin_api.bind(schedule)
 ADMIN_DIR = BASE_DIR / 'admin_static'
 
@@ -52,6 +57,8 @@ async def lifespan(app):
     tasks = [asyncio.create_task(_admin_housekeeping(), name='admin-housekeeping')]
     try:
         await schedule.load()
+        await teachers.load()
+        tasks.append(asyncio.create_task(teachers.run(), name='teacher-refresh'))
         # Start serving immediately from last good data. A cold start returns 503
         # promptly rather than starting one upstream request for every visitor.
         tasks.append(asyncio.create_task(schedule.run(), name='schedule-refresh'))
@@ -152,17 +159,36 @@ async def get_schedule(request: Request,
                        duration2: int = Query(60),
                        uid: Optional[str] = Query(None, max_length=128),
                        week: Optional[int] = Query(None, ge=1, le=4),
-                       mode: Optional[str] = Query(None, max_length=16)):
+                       mode: Optional[str] = Query(None, max_length=16),
+                       monday: Optional[date] = Query(None),
+                       event: Optional[str] = Query(None, pattern='^(view|interaction|refresh)$')):
     if duration1 not in (60, 80) or duration2 not in (60, 80):
         return JSONResponse(status_code=422, content={'status': 'error', 'message': 'Тривалість має бути 60 або 80 хвилин.'})
     if not schedule.raw:
         return JSONResponse(status_code=503, headers={'Retry-After': '30'}, content={
             'status': 'error', 'message': 'Розклад тимчасово недоступний. Спробуйте за хвилину.'})
-    data = schedule.build(group, duration1, duration2, week=week)
+    if monday and (monday.weekday() != 0 or week is not None):
+        return JSONResponse(status_code=422, content={'status': 'error', 'message': 'Вкажіть понеділок календарного тижня або цикл.'})
+    data = schedule.build(group, duration1, duration2, week=week, monday=monday)
     if data is None:
         return JSONResponse(status_code=404, content={'status': 'error', 'message': 'Групу не знайдено. Перевірте назву в налаштуваннях.'})
-    analytics.record_request(uid, group, '/api/schedule', request.headers.get('user-agent', ''), mode)
-    return {'status': 'success', 'data': data, 'meta': schedule.metadata()}
+    analytics.record_request(uid, group, '/api/schedule', request.headers.get('user-agent', ''), mode, event or 'legacy_request')
+    cycle = {str(w): schedule.build(group, duration1, duration2, week=w, ignore_start=True) for w in range(1, 5)}
+    current = schedule.build(group, duration1, duration2)
+    calendar = calendar_metadata(datetime.now(KYIV), current)
+    tag = '"' + hashlib.sha256(json.dumps([data, cycle, calendar], sort_keys=True, ensure_ascii=False).encode()).hexdigest() + '"'
+    meta = schedule.metadata()
+    headers = {'ETag': tag, 'X-Source-Checked-At': meta['updated_at'] or '', 'X-Source-Stale': str(meta['stale']).lower()}
+    if request.headers.get('if-none-match') == tag:
+        return Response(status_code=304, headers=headers)
+    return JSONResponse({'status': 'success', 'data': data, 'cycle': cycle, 'calendar': calendar, 'meta': meta}, headers=headers)
+
+
+@app.get('/api/teacher-hints')
+async def teacher_directory():
+    if not teachers.teachers:
+        return JSONResponse(status_code=503, content={'status': 'error'})
+    return {'teachers': teachers.teachers, 'updated_at': teachers.updated_at}
 
 
 @app.get('/api/groups')

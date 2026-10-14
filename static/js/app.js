@@ -37,6 +37,11 @@ const App = (() => {
         }
     }
 
+    function updateFreshness(tab,meta) {
+        const node=tab === 'schedule' ? scheduleCaption.querySelector('#schedule-data-time') : document.getElementById(`${tab}-data-time`);
+        if (node) node.textContent=sourceTimeLabel(meta);
+    }
+
     function clearView(tab) {
         targets[tab].signature = '';
         if (tab === 'dashboard') {
@@ -49,35 +54,35 @@ const App = (() => {
         }
     }
 
-    function apply(tab, data, key) {
+    function apply(tab, result, key) {
         const target = targets[tab];
-        const signature = key + '|' + JSON.stringify(data);
+        const data = result.data;
+        const signature = key + '|' + JSON.stringify([data,result.calendar,result.today,result.nextDay]);
         if (signature === target.signature) return;
         target.signature = signature;
         if (tab === 'dashboard') {
             document.getElementById('dashboard-main').hidden = false;
-            const today = getKyivNow().getDay();
-            const tomorrow = (today + 1) % 7;
-            startDashboard(data[days[today]] || [], tomorrow === 0 ? [] : (data[days[tomorrow]] || []));
-        } else initSchedulePage(data);
+            startDashboard(result.today || data[days[getKyivNow().getDay()]] || [], result.nextDay);
+        } else initSchedulePage(data, result.calendar, result.group || storage.get('mykep_group'));
     }
 
-    async function load(tab) {
+    async function load(tab, event = 'refresh') {
         if (!started || !targets[tab]) return;
         const target = targets[tab];
         const token = ++target.token;
         // A preview week must never feed the live dashboard timer.
         const week = tab === 'dashboard' ? 'auto' : getScheduleWeekSelection();
-        const context = scheduleRequestContext(week);
-        const key = context.key + (tab === 'dashboard' ? `|day:${getKyivNow().getDay()}` : '');
-        const cached = getCachedSchedule(week);
+        const group = null;
+        const context = scheduleRequestContext(week,group);
+        const key = context.key + `|${week}|day:${dateKey(getKyivNow())}`;
+        const cached = getCachedSchedule(week,group);
         target.pending = true;
         if (tab === 'schedule' && target.key !== key) setScheduleSharingPending();
         target.lastLoad = Date.now();
         if (cached) {
-            apply(tab, cached.data, key);
-            notice(tab, Date.now() - cached.savedAt > 120000 ?
-                'Показано збережений розклад. Перевіряємо оновлення…' : staleScheduleNotice(cached.meta));
+            apply(tab, cached, key);
+            updateFreshness(tab,cached.meta);
+            notice(tab, cached.notice);
         } else {
             if (target.key !== key) clearView(tab);
             if (tab === 'schedule' && !schedulePageData) {
@@ -93,16 +98,17 @@ const App = (() => {
         target.key = key;
         const busyNode = document.querySelector(`[data-view="${tab}"] main`);
         busyNode.setAttribute('aria-busy', 'true');
-        const result = await fetchSchedule(week);
+        const result = await fetchSchedule(week,group,event);
         if (token !== target.token) return;
         target.pending = false;
         busyNode.setAttribute('aria-busy', 'false');
+        updateFreshness(tab,result.meta);
         notice(tab, result.notice, result.data === null);
         if (result.data === null) clearView(tab);
-        else apply(tab, result.data, key);
+        else apply(tab, result, key);
     }
 
-    function enter(tab) {
+    function enter(tab, userAction = false) {
         if (!started) return;
         updateHeaderDisplays();
         if (tab === 'settings') {
@@ -117,8 +123,14 @@ const App = (() => {
         }
         const target = targets[tab];
         const week = tab === 'dashboard' ? 'auto' : getScheduleWeekSelection();
-        const key = scheduleRequestContext(week).key + (tab === 'dashboard' ? `|day:${getKyivNow().getDay()}` : '');
-        if (!target.pending && (!target.lastLoad || key !== target.key || Date.now() - target.lastLoad >= refreshInterval)) load(tab);
+        const group = null;
+        const key = scheduleRequestContext(week,group).key + `|${week}|day:${dateKey(getKyivNow())}`;
+        const cached = getCachedSchedule(week,group);
+        if (cached) {
+            apply(tab,cached,key);
+            updateFreshness(tab,cached.meta);
+        }
+        if (!target.pending && (userAction || !target.lastLoad || key !== target.key || Date.now() - target.lastLoad >= refreshInterval)) load(tab,userAction ? 'view' : 'refresh');
     }
 
     function reload() {
@@ -144,7 +156,7 @@ const App = (() => {
 
     async function init() {
         Tabs.init();
-        Tabs.onChange(enter);
+        Tabs.onChange(tab => enter(tab,true));
         if (!isPWA()) await showPWAGuide();
         if (checkOnboarding()) return;
         started = true;
@@ -153,17 +165,21 @@ const App = (() => {
         weekSelect.addEventListener('change', () => {
             storage.set('mykep_schedule_week', normalizeWeekSelection(weekSelect.value));
             updateHeaderDisplays();
-            load('schedule');
+            load('schedule','interaction');
         });
-        enter(Tabs.current);
-        setInterval(resume, refreshInterval);
+        enter(Tabs.current,true);
+        setInterval(resume, 10000);
         document.addEventListener('visibilitychange', () => resume());
         window.addEventListener('pageshow', event => { if (event.persisted) resume(true); });
         window.addEventListener('online', () => resume(true));
     }
 
     document.addEventListener('DOMContentLoaded', init);
-    return { reload };
+    return { reload, load, enter, noteInteraction() {
+        fetchSchedule(getScheduleWeekSelection(),null,'interaction').then(result => {
+            if (result.meta) updateFreshness('schedule',result.meta);
+        });
+    } };
 })();
 
 if ('serviceWorker' in navigator) {

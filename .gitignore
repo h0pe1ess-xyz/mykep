@@ -39,10 +39,6 @@ flake.nix
 flake.lock
 result
 
-# Internal docs & tests (not for the public repo)
-tests/
-docs/
-
 # AI agent files (local only)
 GEMINI.md
 findings.md

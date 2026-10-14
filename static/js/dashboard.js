@@ -35,13 +35,28 @@ function updateTimerDisplay(percentage) {
     }
 }
 
-function tomorrowLessonMessage(schedule) {
-    const starts = (schedule || []).map(lesson => String(lesson.time || '').split(' - ')[0])
-        .filter(time => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)).sort();
-    return starts.length ? `Завтра пари о ${starts[0]}.` : 'Завтра пар не заплановано.';
+function tomorrowLessonMessage(nextDay) {
+    if (!nextDay?.lessons?.length) return 'Найближчих занять у циклі не заплановано.';
+    const date = parseLocalDate(nextDay.date).toLocaleDateString('uk-UA',{weekday:'long',day:'numeric',month:'long'});
+    const starts = nextDay.lessons.map(l => l.time.split(' - ')[0]).sort();
+    const ends = nextDay.lessons.map(l => l.time.split(' - ')[1]).sort();
+    return `${date}: пари ${starts[0]}–${ends.at(-1)}.`;
+}
+function lessonIntervals(lessons) {
+    const slots = new Map();
+    for (const lesson of lessons || []) {
+        if (!slots.has(lesson.time)) slots.set(lesson.time,[]);
+        slots.get(lesson.time).push(lesson);
+    }
+    return [...slots.entries()].map(([time,items]) => ({...items[0],time,
+        subject:items.map(l => l.subject).join(' / '), teacher:[...new Set(items.map(l => l.teacher))].join('; '),
+        room:[...new Set(items.map(l => l.room).filter(Boolean))].join(' / '),
+        start:timeToMins(time.split(' - ')[0]), end:timeToMins(time.split(' - ')[1])
+    })).sort((a,b) => a.start-b.start || a.end-b.end);
 }
 
-function renderDashboard(schedule, tomorrow = []) {
+function renderDashboard(schedule, tomorrow = null) {
+    schedule = lessonIntervals(schedule);
     const main = document.getElementById('dashboard-main');
     const gaugeMain = document.getElementById('minutes-left');
     const gaugeSub = document.getElementById('current-room');
@@ -52,7 +67,13 @@ function renderDashboard(schedule, tomorrow = []) {
     const progressThumb = document.getElementById('day-progress-thumb');
     const progressText = document.getElementById('day-progress-text');
 
+    const progressSection = document.querySelector('.progress-section');
+    if (progressSection) progressSection.hidden = !schedule.length;
     if (!schedule || schedule.length === 0) {
+        if (progressText?._mykepAnimFrame) cancelAnimationFrame(progressText._mykepAnimFrame);
+        if (progressText) progressText.textContent = '0%';
+        if (progressFill) progressFill.style.width = '0%';
+        if (progressThumb) progressThumb.style.left = '0%';
         updateTimerDisplay(100);
         if (gaugeMain) { gaugeMain.innerHTML = `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`; }
         if (gaugeSub) gaugeSub.innerHTML = `Вихідний`;
@@ -79,7 +100,7 @@ function renderDashboard(schedule, tomorrow = []) {
         if (currentMins >= end) previousLessonEnd = end;
         if (currentMins >= start && currentMins < end) {
             currentLesson = { ...lesson, start, end };
-            nextLesson = schedule[i + 1] || null;
+            nextLesson = schedule.find(candidate => candidate.start > start) || null;
             break;
         } else if (currentMins < start) {
             nextLesson = lesson;
@@ -203,7 +224,7 @@ function renderDashboard(schedule, tomorrow = []) {
 }
 
 let currentGlobalSchedule = null;
-let tomorrowGlobalSchedule = [];
+let tomorrowGlobalSchedule = null;
 let dashboardInterval = null;
 let lastDashboardMinute = '';
 function tickDashboard(force = false) {
@@ -215,7 +236,7 @@ function tickDashboard(force = false) {
     renderDashboard(currentGlobalSchedule, tomorrowGlobalSchedule);
     window.requestDashboardFit?.();
 }
-function startDashboard(schedule, tomorrow = []) {
+function startDashboard(schedule, tomorrow = null) {
     currentGlobalSchedule = schedule;
     tomorrowGlobalSchedule = tomorrow;
     tickDashboard(true);

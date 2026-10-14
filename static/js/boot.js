@@ -5,16 +5,34 @@ document.documentElement.dataset.tab = location.pathname === '/schedule.html' ? 
 function getMyKepDisplayMode(nav = navigator, view = window) {
     const ua = nav.userAgent || '';
     const ios = /iPad|iPhone|iPod/i.test(ua) || (/Macintosh/i.test(ua) && nav.maxTouchPoints > 1);
-    const standalone = nav.standalone === true || view.matchMedia('(display-mode: standalone)').matches;
+    const standalone = nav.standalone === true || view.matchMedia('(display-mode: standalone)').matches ||
+        view.matchMedia('(display-mode: fullscreen)').matches;
     return { ios, standalone };
 }
 function updateMyKepDisplayMode() {
     const mode = getMyKepDisplayMode();
     document.documentElement.classList.toggle('ios-standalone', mode.ios && mode.standalone);
+    updateMyKepIOSLayoutHeight();
+}
+function updateMyKepIOSLayoutHeight() {
+    const root = document.documentElement;
+    if (!root.classList.contains('ios-standalone')) {
+        root.style.removeProperty('--ios-layout-height');
+        return;
+    }
+    // Keep the legacy lvh shell, but cap it at the actual layout viewport.
+    // visualViewport can shrink for the keyboard without shrinking this shell.
+    if (document.activeElement?.matches('input, textarea, [contenteditable="true"]')) return;
+    const height = root.clientHeight;
+    const value = `${height}px`;
+    if (height > 0 && root.style.getPropertyValue('--ios-layout-height') !== value) root.style.setProperty('--ios-layout-height', value);
 }
 updateMyKepDisplayMode();
 window.matchMedia('(display-mode: standalone)').addEventListener?.('change', updateMyKepDisplayMode);
+window.matchMedia('(display-mode: fullscreen)').addEventListener?.('change', updateMyKepDisplayMode);
 window.addEventListener('pageshow', updateMyKepDisplayMode);
+window.addEventListener('resize', updateMyKepIOSLayoutHeight);
+document.addEventListener('DOMContentLoaded', updateMyKepIOSLayoutHeight);
 
 /* Optional local diagnosis from Safari's console; never sends anything.
  * No group, URL, credentials, localStorage or other user data is included.
@@ -43,7 +61,7 @@ window.mykepViewportReport = function() {
     }
     probe.remove();
     const viewport = window.visualViewport;
-    return { version: '2.8.1', mode: getMyKepDisplayMode(),
+    return { version: '2.9.0', mode: getMyKepDisplayMode(),
         iosFixActive: document.documentElement.classList.contains('ios-standalone'),
         innerHeight: window.innerHeight, clientHeight: document.documentElement.clientHeight,
         visualViewport: viewport ? { height: viewport.height, offsetTop: viewport.offsetTop, scale: viewport.scale } : null,
@@ -196,9 +214,9 @@ window.mykepViewportReport = function() {
         for (let density = 0; density <= 4; density++) {
             main.dataset.density = String(density);
             const style = getComputedStyle(main);
-            const children = [...main.children].filter(node => getComputedStyle(node).display !== 'none');
-            const needed = children.reduce((height, node) => {
-                const css = getComputedStyle(node);
+            const children = [...main.children].map(node => ({node,css:getComputedStyle(node)}))
+                .filter(({css}) => css.display !== 'none');
+            const needed = children.reduce((height, {node,css}) => {
                 return height + node.getBoundingClientRect().height + parseFloat(css.marginTop || 0) + parseFloat(css.marginBottom || 0);
             }, 0) + Math.max(0, children.length - 1) * (parseFloat(style.rowGap) || 0)
                 + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);

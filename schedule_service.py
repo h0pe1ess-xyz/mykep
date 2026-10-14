@@ -33,16 +33,87 @@ def fetch_schedule_sync():
         if not match:
             raise ValueError("Schedule data not found in source")
         data = chompjs.parse_js_object(response.text[match.end() - 1:])
-        if not valid_snapshot(data):
-            raise ValueError("Invalid schedule data; keeping last good snapshot")
+        validate_snapshot(data)
         return data
 
 
+DAYS = ('понеділок', 'вівторок', 'середа', 'четвер', "п'ятниця", 'субота')
+
+
+def day_key(value: str) -> str:
+    return value.strip().lower().replace('’', "'").replace('ʼ', "'")
+
+
+def parse_condition(value: str) -> tuple[frozenset[int], Optional[date]]:
+    """The date is metadata, never part of the cycle-week list."""
+    if not isinstance(value, str):
+        raise ValueError('Week condition must be text')
+    text = value.lower().strip().replace('–', '-').replace('—', '-').replace('−', '-')
+    start = None
+    match = re.search(r'\s*\(\s*(?:з|від)\s+(\d{2}\.\d{2}\.\d{4})\s*\)\s*$', text)
+    if match:
+        start = datetime.strptime(match[1], '%d.%m.%Y').date()
+        text = text[:match.start()].strip()
+    if text in ('', 'всі', 'усі', 'всі тижні', 'усі тижні', 'щотижня'):
+        return frozenset((1, 2, 3, 4)), start
+    text = re.sub(r'\s+(?:та|і)\s+', ',', text)
+    text = re.sub(r'[/\\;.]+', ',', text)
+    if not re.fullmatch(r'[1-4]\s*(?:-\s*[1-4])?(?:\s*,\s*[1-4]\s*(?:-\s*[1-4])?)*', text):
+        raise ValueError('Unrecognized week condition')
+    weeks = set()
+    for part in text.split(','):
+        bounds = [int(n.strip()) for n in part.split('-')]
+        if len(bounds) == 2:
+            if bounds[0] > bounds[1]:
+                raise ValueError('Reversed week range')
+            weeks.update(range(bounds[0], bounds[1] + 1))
+        else:
+            weeks.add(bounds[0])
+    return frozenset(weeks), start
+
+
+def snapshot_counts(data: dict) -> dict:
+    return {'groups': len(data), 'lessons': sum(len(ls) for days in data.values() for ls in days.values())}
+
+
+def validate_snapshot(data: dict) -> None:
+    if not isinstance(data, dict) or not data:
+        raise ValueError('Empty or invalid snapshot')
+    for group, days in data.items():
+        if not isinstance(group, str) or not group.strip() or not isinstance(days, dict) or not days:
+            raise ValueError('Invalid group or days')
+        normalized_days = set()
+        for day, lessons in days.items():
+            if not isinstance(day, str) or day_key(day) not in DAYS or day_key(day) in normalized_days:
+                raise ValueError('Invalid or duplicate day')
+            normalized_days.add(day_key(day))
+            if not isinstance(lessons, list):
+                raise ValueError('Invalid lesson list')
+            for lesson in lessons:
+                if not isinstance(lesson, dict):
+                    raise ValueError('Invalid lesson')
+                number = lesson.get('number')
+                if isinstance(number, bool) or str(number) not in tuple(map(str, range(1, 9))):
+                    raise ValueError('Invalid lesson number')
+                for field in ('subject', 'teacher', 'cabinet'):
+                    if not isinstance(lesson.get(field), str):
+                        raise ValueError('Missing lesson field')
+                if not lesson['subject'].strip():
+                    raise ValueError('Empty subject')
+                for field in ('subgroup', 'condition'):
+                    if field in lesson and not isinstance(lesson[field], str):
+                        raise ValueError('Invalid lesson context')
+                parse_condition(lesson.get('week', lesson.get('weeks', '')))
+                if 'week' in lesson and 'weeks' in lesson and lesson['week'] != lesson['weeks']:
+                    raise ValueError('Conflicting week conditions')
+
+
 def valid_snapshot(data):
-    return (isinstance(data, dict) and bool(data) and
-            all(isinstance(days, dict) and all(isinstance(lessons, list) and
-                all(isinstance(lesson, dict) for lesson in lessons)
-                for lessons in days.values()) for days in data.values()))
+    try:
+        validate_snapshot(data)
+        return True
+    except (ValueError, TypeError):
+        return False
 
 
 class ScheduleService:
@@ -58,11 +129,19 @@ class ScheduleService:
         # Diagnostics for the admin panel (never exposed publicly).
         self.last_attempt_wall = 0.0
         self.last_error_type = None
+        self.last_error_reason = None
         self.last_duration_ms = None
         self.refresh_ok = 0
         self.refresh_failed = 0
+        self.counts = {}
+        self.previous_counts = {}
 
     def install(self, data, updated_at):
+        validate_snapshot(data)
+        self.previous_counts = self.counts
+        self.counts = snapshot_counts(data)
+        if self.previous_counts and any(self.counts[k] < self.previous_counts[k] for k in self.counts):
+            logger.warning('Schedule size decreased: %s -> %s; inspect semester/source changes', self.previous_counts, self.counts)
         self.raw = data
         self.groups = sorted({g for key in data for g in split_groups(key)})
         self.updated_at = updated_at
@@ -91,8 +170,7 @@ class ScheduleService:
             started = time.monotonic()
             try:
                 data = await asyncio.to_thread(fetch_schedule_sync)
-                if not valid_snapshot(data):
-                    raise ValueError("Invalid snapshot")
+                validate_snapshot(data)
                 updated_at = time.time()
                 async with connect() as db:
                     await db.execute("INSERT OR REPLACE INTO schedule_snapshot VALUES (1, ?, ?)", (json.dumps(data, ensure_ascii=False), updated_at))
@@ -100,6 +178,7 @@ class ScheduleService:
                 self.install(data, updated_at)
                 self.last_error = False
                 self.last_error_type = None
+                self.last_error_reason = None
                 self.refresh_ok += 1
                 self.last_duration_ms = round((time.monotonic() - started) * 1000)
                 logger.info("Refreshed schedule: %s groups", len(self.groups))
@@ -107,6 +186,7 @@ class ScheduleService:
             except Exception as exc:
                 self.last_error = True
                 self.last_error_type = type(exc).__name__
+                self.last_error_reason = str(exc)[:160] if isinstance(exc, ValueError) else None
                 self.refresh_failed += 1
                 self.last_duration_ms = round((time.monotonic() - started) * 1000)
                 logger.warning("Schedule refresh failed (%s); retaining cached data", type(exc).__name__)
@@ -130,11 +210,14 @@ class ScheduleService:
         return {
             **self.metadata(),
             "ready": bool(self.raw),
+            "counts": self.counts,
+            "previous_counts": self.previous_counts,
             "groups": len(self.groups),
             "age_seconds": round(now - self.updated_at) if self.updated_at else None,
             "last_attempt": datetime.fromtimestamp(self.last_attempt_wall, KYIV).isoformat() if self.last_attempt_wall else None,
             "last_error": self.last_error,
             "last_error_type": self.last_error_type,
+            "last_error_reason": self.last_error_reason,
             "last_duration_ms": self.last_duration_ms,
             "refresh_ok": self.refresh_ok,
             "refresh_failed": self.refresh_failed,
@@ -144,11 +227,10 @@ class ScheduleService:
             "retry_blocked_for": max(0, round(RETRY_SECONDS - (time.monotonic() - self.last_attempt))) if self.last_attempt else 0,
         }
 
-    def build(self, group, duration1, duration2, week=None):
-        # Minute bucket handles the Saturday rollover; bound memory explicitly.
-        key = (normalize_group(group), duration1, duration2, week, int(time.time() // 60))
+    def build(self, group, duration1, duration2, week=None, monday=None, ignore_start=False):
+        key = (normalize_group(group), duration1, duration2, week, monday, ignore_start, datetime.now(KYIV).date())
         if key not in self._built:
-            result = build_group_schedule(self.raw, group, duration1, duration2, week=week)
+            result = build_group_schedule(self.raw, group, duration1, duration2, week=week, monday=monday, ignore_start=ignore_start)
             if result is None:
                 return None
             if len(self._built) >= 1024:
@@ -163,33 +245,29 @@ def get_academic_week(target_date: date) -> int:
     if delta_days < 0: return 1
     return (delta_days // 7 % 4) + 1
 
-def is_lesson_active(weeks_str: str, current_week: int) -> bool:
-    try:
-        if not weeks_str: return True
-        w_str = str(weeks_str).lower().strip()
+def is_lesson_active(weeks_str: str, current_week: int, lesson_date: Optional[date] = None) -> bool:
+    weeks, start = parse_condition(weeks_str)
+    if start and lesson_date is None:
+        raise ValueError('A dated condition needs a concrete lesson date')
+    return current_week in weeks and (start is None or lesson_date >= start)
 
-        if not w_str or "всі" in w_str or "усі" in w_str or "1-4" in w_str or "щотижня" in w_str:
-            return True
 
-        w_str = w_str.replace("/", ",").replace("\\", ",").replace(".", ",").replace(";", ",")
-        w_str = w_str.replace(" та ", ",").replace(" і ", ",")
+def subgroup_for(lesson: dict) -> Optional[dict]:
+    explicit = lesson.get('subgroup')
+    subject = lesson['subject']
+    match = re.search(r'\(\s*(\d+)\s*(підгрупа|група)\s*\)', subject, re.I)
+    if explicit:
+        return {'context': subject.strip(), 'value': explicit, 'label': explicit}
+    if not match:
+        return None
+    # A selection belongs to this subject and marker kind, never all subjects.
+    context = (subject[:match.start()] + subject[match.end():]).strip() + '|' + match[2].lower()
+    return {'context': context, 'value': match[1], 'label': f'{match[1]} {match[2]}'}
 
-        clean_str = re.sub(r'[^0-9,\-]', '', w_str)
-        if not clean_str: return True
-
-        for part in [p.strip() for p in clean_str.split(",") if p.strip()]:
-            if "-" in part:
-                s, e = map(int, part.split("-"))
-                if s <= current_week <= e: return True
-            else:
-                if int(part) == current_week: return True
-        return False
-    except Exception as e:
-        logger.warning(f"Error filtering active week '{weeks_str}': {e}. Defaulting to True.")
-        return True
 
 def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: int, duration2: int,
-                         week: Optional[int] = None) -> Optional[Dict[str, Any]]:
+                         week: Optional[int] = None, monday: Optional[date] = None,
+                         ignore_start: bool = False, now: Optional[datetime] = None) -> Optional[Dict[str, Any]]:
     """Build schedule for a single group from the in-memory raw data. No network calls."""
     if week is not None and (type(week) is not int or week not in (1, 2, 3, 4)):
         raise ValueError("Week must be an integer from 1 to 4")
@@ -205,26 +283,10 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
     if group_schedule is None:
         return None
 
-    normalized_schedule = {str(k).lower().strip(): v for k, v in group_schedule.items()}
-
-    now = datetime.now(KYIV)
-    current_weekday = now.weekday()
-    reference_date = now
-
-    if current_weekday == 6:
-        reference_date = now + timedelta(days=1)
-    elif current_weekday == 5 and now.hour >= 15:
-        reference_date = now + timedelta(days=2)
-
-    base_monday = reference_date - timedelta(days=reference_date.weekday())
-    days_to_check = {
-        "понеділок": base_monday,
-        "вівторок": base_monday + timedelta(days=1),
-        "середа": base_monday + timedelta(days=2),
-        "четвер": base_monday + timedelta(days=3),
-        "п'ятниця": base_monday + timedelta(days=4),
-        "субота": base_monday + timedelta(days=5)
-    }
+    normalized_schedule = {day_key(k): v for k, v in group_schedule.items()}
+    now = now or datetime.now(KYIV)
+    base_monday = monday or (now.date() - timedelta(days=now.weekday()))
+    days_to_check = {day: base_monday + timedelta(days=i) for i, day in enumerate(DAYS)}
 
     shift1_80 = {"1": "08:00 - 09:20", "2": "09:30 - 10:50", "3": "11:10 - 12:30", "4": "12:40 - 14:00"}
     shift1_60 = {"1": "08:00 - 09:00", "2": "09:10 - 10:10", "3": "10:30 - 11:30", "4": "11:40 - 12:40"}
@@ -237,13 +299,19 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
 
     full_week_schedule = {}
     for day_name, day_date in days_to_check.items():
-        week_num = week if week is not None else get_academic_week(day_date.date())
+        week_num = week if week is not None else get_academic_week(day_date)
         formatted_day = []
 
+        seen = set()
         for lesson in normalized_schedule.get(day_name, []):
+            identity = json.dumps(lesson, sort_keys=True, ensure_ascii=False)
+            if identity in seen:
+                continue
+            seen.add(identity)
             week_val = lesson.get("week", lesson.get("weeks", ""))
 
-            if not is_lesson_active(week_val, week_num):
+            weeks, starts_on = parse_condition(week_val)
+            if week_num not in weeks or (not ignore_start and starts_on and day_date < starts_on):
                 continue
 
             num = str(lesson.get("number"))
@@ -252,7 +320,10 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
                 "time": time_mapping.get(num, "00:00 - 00:00"),
                 "subject": lesson.get("subject", ""),
                 "teacher": lesson.get("teacher", ""),
-                "room": lesson.get("cabinet", "")
+                "room": lesson.get("cabinet", ""),
+                "condition": week_val,
+                "starts_on": starts_on.isoformat() if starts_on else None,
+                "subgroup": subgroup_for(lesson)
             })
 
         formatted_day.sort(key=lambda x: x["lesson"])
@@ -260,3 +331,13 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
 
     return full_week_schedule
 
+
+
+def calendar_metadata(now: datetime, data: dict) -> dict:
+    monday = now.date() - timedelta(days=now.weekday())
+    saturday = data.get('субота', [])
+    end = max((l['time'].split(' - ')[1] for l in saturday), default='00:00')
+    upcoming = now.weekday() == 6 or (now.weekday() == 5 and now.strftime('%H:%M') >= end)
+    return {'today': now.date().isoformat(), 'current_monday': monday.isoformat(),
+            'default_monday': (monday + timedelta(days=7 if upcoming else 0)).isoformat(),
+            'current_cycle': get_academic_week(monday)}

@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 from config import COLLEGE_SIZE, KYIV
 from database import connect
 
-VIEWS = "endpoint = '/api/schedule'"
+from analytics import VIEWS
 RANGES = {'1': 1, '7': 7, '14': 14, '30': 30, '90': 90, 'all': None}
 WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
 _cache = {}
@@ -80,7 +80,7 @@ def _pct(a, b):
 
 def parse_group(name):
     """ПІ-24-02 -> ('ПІ', 2024). Returns (None, None) when unknown."""
-    m = re.match(r'^\s*([^\d\s\-\N{EN DASH}]+)[\s\-\N{EN DASH}]*(\d{2})', str(name or ''))
+    m = re.match(r'^\s*([^\d\s\-\N{EN DASH}()]+)(?:\(\d{1,2}\))?[\s\-\N{EN DASH}]+(\d{2})(?:[\s\-\N{EN DASH}]|$)', str(name or ''))
     if not m:
         return None, None
     return m.group(1).upper(), 2000 + int(m.group(2))
@@ -241,18 +241,21 @@ async def _stats(range_key):
         WHERE {where} AND group_name != '' GROUP BY group_name ORDER BY 2 DESC LIMIT 400""", p)
     groups = [{'group': g, 'views': c, 'users': u} for g, c, u in group_rows]
     spec_views, spec_users, year_views, year_users = Counter(), Counter(), Counter(), Counter()
-    uid_group_rows = await _rows(f"""SELECT group_name, COUNT(DISTINCT NULLIF(uid,'')) FROM analytics
-        WHERE {where} AND group_name != '' GROUP BY group_name""", p)
+    uid_group_rows = await _rows(f"""SELECT DISTINCT group_name, uid FROM analytics
+        WHERE {where} AND group_name != '' AND uid != ''""", p)
     for g in groups:
         spec, year = parse_group(g['group'])
         spec_views[spec or 'Інше'] += g['views']
         if year:
             year_views[year] += g['views']
-    for g, u in uid_group_rows:
+    spec_members, year_members = defaultdict(set), defaultdict(set)
+    for g, uid in uid_group_rows:
         spec, year = parse_group(g)
-        spec_users[spec or 'Інше'] += u
+        spec_members[spec or 'Інше'].add(uid)
         if year:
-            year_users[year] += u
+            year_members[year].add(uid)
+    spec_users.update({key: len(members) for key, members in spec_members.items()})
+    year_users.update({key: len(members) for key, members in year_members.items()})
     specialties = [{'name': k, 'views': v, 'users': spec_users.get(k, 0)} for k, v in spec_views.most_common(20)]
     courses = []
     for year, v in sorted(year_views.items(), reverse=True):
@@ -275,6 +278,7 @@ async def _stats(range_key):
     views_per_user = round(total_views / total_users, 1) if total_users else 0
 
     return {
+        'semantics': 'До оновлення: успішні запити API (legacy_request). Нові view/interaction: відкриття та дії користувача. refresh: технічні перевірки, виключені з переглядів.',
         'range': range_key, 'start': s0, 'end': today.isoformat(), 'days': ndays,
         'totals': {'views': total_views, 'users': total_users, 'views_per_user': views_per_user,
                    'avg_daily_views': round(total_views / ndays, 1) if ndays else 0,
@@ -367,3 +371,15 @@ async def export_group_rows():
     rows = await _rows(f"""SELECT group_name, COUNT(*), COUNT(DISTINCT NULLIF(uid,''))
         FROM analytics WHERE {VIEWS} AND group_name != '' GROUP BY 1 ORDER BY 2 DESC""")
     return [('group', 'views', 'unique_users')] + [tuple(r) for r in rows]
+
+
+async def daily_summaries(limit=90):
+    rows = await _rows('SELECT day, event_kind, views, users FROM analytics_daily WHERE group_name=\'*\' ORDER BY day DESC, event_kind LIMIT ?', (limit,))
+    return [dict(zip(('day','event_kind','views','users'), row)) for row in rows]
+
+
+async def detail_rows(before=None, limit=50):
+    # Detail without exporting browser IDs or raw User-Agent strings.
+    rows = await _rows(f"SELECT id,timestamp,group_name,event_kind,display_mode,{PLATFORM_SQL} FROM analytics WHERE id < ? ORDER BY id DESC LIMIT ?",
+                       (before or 9223372036854775807, limit))
+    return [dict(zip(('id','timestamp','group','event_kind','display_mode','platform'), row)) for row in rows]

@@ -17,10 +17,8 @@ function scheduleExportDateLabel(date) {
 function scheduleExportDayLabel(day, week, now = getKyivNow()) {
     const names = ['неділя', 'понеділок', 'вівторок', 'середа', 'четвер', "п'ятниця", 'субота'];
     const name = day.charAt(0).toUpperCase() + day.slice(1);
-    if (week !== 'auto') return `${name} · ${week}-й тиждень`;
+    if (['1','2','3','4'].includes(week)) return `${name} · ${week}-й тиждень`;
     const date = new Date(now);
-    if (date.getDay() === 0) date.setDate(date.getDate() + 1);
-    else if (date.getDay() === 6 && date.getHours() >= 15) date.setDate(date.getDate() + 2);
     date.setDate(date.getDate() - ((date.getDay() + 6) % 7) + ((names.indexOf(day) + 6) % 7));
     return `${name} · ${scheduleExportDateLabel(date)}`;
 }

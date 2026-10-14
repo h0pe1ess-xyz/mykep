@@ -5,6 +5,7 @@ import hmac
 import io
 import json
 import logging
+from typing import Optional
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Query, Request
@@ -283,6 +284,7 @@ async def server(request: Request):
         'requests': server_metrics.request_summary(60),
         'schedule': _schedule.diagnostics() if _schedule else None,
         'analytics_writer': analytics.writer_status(),
+        'analytics_storage': await analytics.storage_status(),
         'bot': {'mode': BOT_MODE, 'state': _bot_state()},
         'security': {'secure_cookie': ADMIN_COOKIE_SECURE, 'dev_login_enabled': ADMIN_DEV_LOGIN,
                      'telegram_login_configured': bool(TELEGRAM_BOT_TOKEN), 'admins': len(ADMIN_IDS),
@@ -346,6 +348,18 @@ def _csv_safe(value):
     # Prevent CSV/formula injection when opened in Excel/Sheets.
     text = str(value)
     return "'" + text if text[:1] in ('=', '+', '-', '@', '\t', '\r') else text
+
+
+@router.get('/analytics/daily')
+async def analytics_daily(request: Request, limit: int = Query(90, ge=1, le=366)):
+    await require_session(request)
+    return {'status': 'success', 'data': await admin_stats.daily_summaries(limit)}
+
+
+@router.get('/analytics/details')
+async def analytics_details(request: Request, before: Optional[int] = Query(None, ge=1), limit: int = Query(50, ge=1, le=100)):
+    await require_session(request)
+    return {'status': 'success', 'data': await admin_stats.detail_rows(before, limit)}
 
 
 @router.get('/export/{kind}.csv')

@@ -3,7 +3,9 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
-from config import KYIV
+from config import KYIV, DB_PATH
+from pathlib import Path
+from backup_database import migration_backup
 from database import connect
 
 logger = logging.getLogger(__name__)
@@ -14,7 +16,14 @@ _last_write_error = False
 
 
 async def init_analytics_db():
+    # Back up the target, including WAL, before any schema change. Never touch a
+    # different deployment database or replace historical rows.
     async with connect() as db:
+        columns = {row[1] for row in await db.execute_fetchall('PRAGMA table_info(analytics)')}
+    if columns and ('event_kind' not in columns or 'display_mode' not in columns):
+        await asyncio.to_thread(migration_backup, Path(DB_PATH))
+    async with connect() as db:
+        await db.execute('BEGIN IMMEDIATE')
         await db.execute('''CREATE TABLE IF NOT EXISTS analytics (
             id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL,
             uid TEXT, group_name TEXT, endpoint TEXT, user_agent TEXT)''')
@@ -25,10 +34,21 @@ async def init_analytics_db():
         columns = {row[1] for row in await db.execute_fetchall('PRAGMA table_info(analytics)')}
         if 'display_mode' not in columns:
             await db.execute('ALTER TABLE analytics ADD COLUMN display_mode TEXT')
+        if 'event_kind' not in columns:
+            await db.execute("ALTER TABLE analytics ADD COLUMN event_kind TEXT NOT NULL DEFAULT 'legacy_request'")
         await db.execute('CREATE INDEX IF NOT EXISTS idx_analytics_endpoint_ts ON analytics(endpoint, timestamp)')
         await db.execute('''CREATE TABLE IF NOT EXISTS bot_reports (
             report_date TEXT NOT NULL, admin_id INTEGER NOT NULL,
             PRIMARY KEY (report_date, admin_id))''')
+        await db.execute('''CREATE TABLE IF NOT EXISTS analytics_daily (
+            day TEXT NOT NULL, group_name TEXT NOT NULL, event_kind TEXT NOT NULL,
+            views INTEGER NOT NULL, users INTEGER NOT NULL,
+            PRIMARY KEY(day, group_name, event_kind))''')
+        await db.execute('''CREATE TABLE IF NOT EXISTS analytics_rollup_state (
+            id INTEGER PRIMARY KEY CHECK(id=1), last_id INTEGER NOT NULL)''')
+        await db.execute('''CREATE TABLE IF NOT EXISTS analytics_size (
+            day TEXT PRIMARY KEY, bytes INTEGER NOT NULL, details INTEGER NOT NULL)''')
+        await update_daily(db)
         await db.commit()
 
 
@@ -45,12 +65,12 @@ async def start_writer():
 DISPLAY_MODES = {'standalone', 'browser'}
 
 
-def record_request(uid, group_name, endpoint, user_agent='', display_mode=None):
+def record_request(uid, group_name, endpoint, user_agent='', display_mode=None, event_kind='legacy_request'):
     global _dropped
     mode = display_mode if display_mode in DISPLAY_MODES else None
     row = (datetime.now(KYIV).strftime('%Y-%m-%d %H:%M:%S'),
            str(uid or '')[:128], str(group_name).strip().upper()[:64],
-           str(endpoint)[:64], str(user_agent)[:512], mode)
+           str(endpoint)[:64], str(user_agent)[:512], mode, event_kind)
     try:
         if _queue is None:
             raise asyncio.QueueFull
@@ -90,7 +110,8 @@ async def _write_loop():
         for attempt in range(3):
             try:
                 async with connect() as db:
-                    await db.executemany('INSERT INTO analytics (timestamp, uid, group_name, endpoint, user_agent, display_mode) VALUES (?, ?, ?, ?, ?, ?)', batch)
+                    await db.executemany('INSERT INTO analytics (timestamp, uid, group_name, endpoint, user_agent, display_mode, event_kind) VALUES (?, ?, ?, ?, ?, ?, ?)', batch)
+                    await update_daily(db)
                     await db.commit()
                 _last_write_error = False
                 break
@@ -141,7 +162,33 @@ def _next_day(day):
 
 
 # Old /api/groups rows are intentionally excluded from reports, not deleted.
-VIEWS = "endpoint = '/api/schedule'"
+VIEWS = "endpoint = '/api/schedule' AND event_kind IN ('legacy_request','view','interaction')"
+
+
+async def update_daily(db):
+    checkpoint = await db.execute_fetchall('SELECT last_id FROM analytics_rollup_state WHERE id=1')
+    last_id = checkpoint[0][0] if checkpoint else 0
+    upper = (await db.execute_fetchall('SELECT COALESCE(MAX(id),0) FROM analytics'))[0][0]
+    days = await db.execute_fetchall('SELECT DISTINCT SUBSTR(timestamp,1,10) FROM analytics WHERE id>? AND id<=?', (last_id, upper))
+    for (day,) in days:
+        params = (day, _next_day(day))
+        await db.execute('''INSERT OR REPLACE INTO analytics_daily
+            SELECT SUBSTR(timestamp,1,10), group_name, event_kind, COUNT(*), COUNT(DISTINCT NULLIF(uid,''))
+            FROM analytics WHERE endpoint='/api/schedule' AND timestamp>=? AND timestamp<? GROUP BY 1,2,3''', params)
+        # Global uniques are computed from detail, never summed across groups.
+        await db.execute('''INSERT OR REPLACE INTO analytics_daily
+            SELECT SUBSTR(timestamp,1,10), '*', event_kind, COUNT(*), COUNT(DISTINCT NULLIF(uid,''))
+            FROM analytics WHERE endpoint='/api/schedule' AND timestamp>=? AND timestamp<? GROUP BY 1,3''', params)
+    await db.execute('INSERT OR REPLACE INTO analytics_rollup_state VALUES (1,?)', (upper,))
+    size = sum(path.stat().st_size for path in (Path(DB_PATH), Path(DB_PATH + '-wal')) if path.exists())
+    await db.execute('INSERT OR REPLACE INTO analytics_size VALUES (?,?,?)', (_today(), size, upper))
+
+
+async def storage_status():
+    samples = await _rows('SELECT day,bytes,details FROM analytics_size ORDER BY day DESC LIMIT 30')
+    details = (await _rows('SELECT COUNT(*) FROM analytics'))[0][0]
+    return {'details': details, 'automatic_deletion': False,
+            'samples': [dict(zip(('day', 'bytes', 'details'), row)) for row in samples]}
 
 
 async def get_today_stats():

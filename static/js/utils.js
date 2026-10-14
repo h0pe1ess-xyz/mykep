@@ -74,34 +74,11 @@ function timeToMins(timeStr) {
     return (hours || 0) * 60 + (minutes || 0);
 }
 
-function getAcademicWeek() {
-    const now = getKyivNow();
-    const baseMonday = new Date(2026, 7, 31);
-    let targetDate = new Date(now);
-
-    if (targetDate.getDay() === 0) {
-        targetDate.setDate(targetDate.getDate() + 1);
-    } else if (targetDate.getDay() === 6 && targetDate.getHours() >= 15) {
-        targetDate.setDate(targetDate.getDate() + 2);
-    }
-
-    targetDate.setHours(0, 0, 0, 0);
-    baseMonday.setHours(0, 0, 0, 0);
-
-    const diffDays = Math.floor((Date.UTC(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()) - Date.UTC(2026, 7, 31)) / (1000 * 60 * 60 * 24));
-    if (diffDays < 0) return 1;
-
-    return (Math.floor(diffDays / 7) % 4) + 1;
-}
+function getAcademicWeek() { return cycleWeek(getKyivNow()); }
 
 function updateHeaderDisplays() {
     const savedGroup = storage.get('mykep_group') || 'ПІ-24-02';
     const headerDisplay = document.getElementById('header-group-text');
     const groupText = `Група ${savedGroup}`;
     if (headerDisplay && headerDisplay.textContent !== groupText) headerDisplay.textContent = groupText;
-    const weekSelect = document.getElementById('schedule-week');
-    if (weekSelect) {
-        const weekText = `Авто · ${getAcademicWeek()}-й тиждень`;
-        if (weekSelect.options[0].textContent !== weekText) weekSelect.options[0].textContent = weekText;
-    }
 }

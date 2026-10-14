@@ -1,3 +1,4 @@
+const scheduleCaption = document.querySelector('.schedule-caption');
 function renderScheduleList(schedule) {
     const listContainer = document.getElementById('dynamic-schedule-list');
     if (!listContainer) return;
@@ -10,6 +11,7 @@ function renderScheduleList(schedule) {
                 <p style="font-size: 13px; color: var(--text-muted);">На цей день пар не заплановано</p>
             </div>
         `;
+        listContainer.append(scheduleCaption);
         return;
     }
 
@@ -22,6 +24,7 @@ function renderScheduleList(schedule) {
                     <span>${escapeHTML(lesson.time)}</span>
                 </div>
                 <div class="lesson-title">${escapeHTML(lesson.subject)}</div>
+                ${lesson.starts_on ? `<p class="lesson-condition">З ${escapeHTML(lesson.starts_on.split('-').reverse().join('.'))} · ${escapeHTML(lesson.condition || '')}</p>` : ''}
                 <div class="lesson-divider"></div>
                 <div class="lesson-bottom">
                     <div class="teacher-name">
@@ -33,6 +36,7 @@ function renderScheduleList(schedule) {
             </div>
         `;
     }).join('');
+    listContainer.append(scheduleCaption);
 }
 
 let schedulePageData = null;
@@ -42,11 +46,14 @@ function setSchedulePending() {
     setScheduleSharingPending();
     document.querySelectorAll('.day-picker button').forEach(button => { button.disabled = true; });
 }
-function initSchedulePage(scheduleDict) {
+function initSchedulePage(scheduleDict, calendar = null, group = null) {
     const picker = document.querySelector('.day-picker');
     if (!picker) return;
     schedulePageData = scheduleDict;
-    scheduleShareContext = { group: storage.get('mykep_group') || 'ПІ-24-02', week: getScheduleWeekSelection(), date: getKyivNow() };
+    currentScheduleCalendar = calendar;
+    group = group || storage.get('mykep_group') || 'ПІ-24-02';
+    scheduleShareContext = { group, week: getScheduleWeekSelection(), date: calendar?.monday ? parseLocalDate(calendar.monday) : getKyivNow() };
+    renderScheduleContext(calendar,group);
     document.querySelectorAll('.day-picker button').forEach(button => { button.disabled = false; });
     const days = [
         { id: 'понеділок', short: 'Пн', name: 'Понеділок' },
@@ -56,7 +63,7 @@ function initSchedulePage(scheduleDict) {
         { id: "п'ятниця", short: 'Пт', name: "П'ятниця" }
     ];
     if (scheduleDict['субота']?.length) days.push({ id: 'субота', short: 'Сб', name: 'Субота' });
-    const signature = days.map(day => day.id).join('|');
+    const signature = days.map(day => day.id).join('|') + JSON.stringify(calendar) + dateKey(getKyivNow());
     if (schedulePickerState?.signature === signature) {
         // Background updates and week selection keep the chosen day and scroll.
         renderScheduleList(scheduleDict[schedulePickerState.activeDay] || []);
@@ -64,18 +71,27 @@ function initSchedulePage(scheduleDict) {
         return;
     }
     const todayMap = ['неділя', 'понеділок', 'вівторок', 'середа', 'четвер', "п'ятниця", 'субота'];
-    const preferredDay = schedulePickerState?.activeDay || todayMap[getKyivNow().getDay()];
+    const sameCalendar=schedulePickerState?.monday === calendar?.monday;
+    const containsToday=calendar?.monday === dateKey(calendarMonday());
+    const preferredDay = sameCalendar ? schedulePickerState?.activeDay : containsToday || !calendar?.monday ? todayMap[getKyivNow().getDay()] : 'понеділок';
     if (schedulePickerState) {
         cancelAnimationFrame(schedulePickerState.frame);
         clearTimeout(schedulePickerState.scrollTimeout);
     }
-    const state = { signature, activeDay: null, frame: 0, scrollTimeout: 0, programmatic: false };
+    const state = { signature, monday:calendar?.monday, activeDay: null, frame: 0, scrollTimeout: 0, programmatic: false };
     schedulePickerState = state;
-    picker.innerHTML = days.map(day => `
-        <button type="button" class="day-item" data-day="${escapeHTML(day.id)}" aria-label="${escapeHTML(day.name)}" aria-pressed="false">
+    picker.innerHTML = days.map((day,i) => {
+        const date = calendar?.monday ? parseLocalDate(calendar.monday) : null;
+        if (date) date.setDate(date.getDate()+i);
+        const today = date && dateKey(date) === dateKey(getKyivNow());
+        day.dateLabel = date ? `${date.getDate()}.${String(date.getMonth()+1).padStart(2,'0')}` : '';
+        day.today = today;
+        return `
+        <button type="button" class="day-item" data-day="${escapeHTML(day.id)}" aria-label="${escapeHTML(day.name + (day.dateLabel ? ' ' + day.dateLabel : '') + (day.today ? ' · сьогодні' : ''))}" aria-pressed="false" ${day.today ? 'aria-current="date"' : ''}>
             <span class="day-num">${day.short}</span>
             <span class="day-name">${day.name}</span>
-        </button>`).join('');
+            <span class="day-date">${day.dateLabel}</span>
+        </button>`; }).join('');
     const items = [...picker.querySelectorAll('.day-item')];
     function renderForDay(dayId, vibrate = false) {
         if (state.activeDay === dayId) return;
@@ -90,6 +106,7 @@ function initSchedulePage(scheduleDict) {
             setScheduleShareData(schedulePageData[dayId] || [], dayId);
         }
         if (vibrate && navigator.vibrate) navigator.vibrate(10);
+        if (vibrate) App.noteInteraction();
     }
     function updateArc() {
         state.frame = 0;
@@ -143,3 +160,17 @@ function initSchedulePage(scheduleDict) {
     }
     requestArc();
 }
+
+
+function renderScheduleContext(calendar,group) {
+    const label = scheduleCaption.querySelector('#schedule-week-label');
+    const select=document.getElementById('schedule-week');
+    select.options[0].textContent=calendar?.label === 'Наступний тиждень' && getScheduleWeekSelection() === 'auto' ? 'Наступний' : 'Цей тиждень';
+    const current=select.querySelector('option[value=current]');
+    current.hidden=!(calendar?.label === 'Наступний тиждень' && getScheduleWeekSelection() === 'auto' || getScheduleWeekSelection() === 'current');
+    if (calendar?.monday) {
+        const monday = parseLocalDate(calendar.monday), end = new Date(monday); end.setDate(end.getDate()+5);
+        label.textContent = `${calendar.label.replace(' тиждень','')} · ${monday.toLocaleDateString('uk-UA',{day:'numeric',month:'short'})} – ${end.toLocaleDateString('uk-UA',{day:'numeric',month:'short'})} · ${calendar.cycle}-й тиждень`;
+    } else label.textContent = `${calendar?.cycle || getScheduleWeekSelection()}-й тиждень · без календарної дати`;
+}
+let currentScheduleCalendar = null;

@@ -22,7 +22,11 @@ function renderTeacherLabel(value) {
         if (timestamp < latestTimestamp) return;
         const next = Object.create(null);
         for (const [key, value] of Object.entries(payload.teachers)) {
-            if (typeof value === 'string' && value.trim() && value.length <= 300) next[key] = value;
+            if (typeof value === 'string' && value.trim() && value.length <= 300) {
+                const normalized=teacherHintKey(key);
+                if (normalized in next && next[normalized] !== value) next[normalized]=null;
+                else if (!(normalized in next)) next[normalized]=value;
+            }
         }
         if (!Object.keys(next).length) return;
         teacherDirectory = next;
@@ -39,14 +43,20 @@ function renderTeacherLabel(value) {
         const timeout = setTimeout(() => controller.abort(), 8000);
         try {
             const response = await fetch(url, { signal: controller.signal });
-            if (response.ok) install(await response.json());
+            if (response.ok) { const payload=await response.json(); install(payload); if (url.startsWith('/api/') && Object.keys(teacherDirectory).length) storage.set('mykep_teachers',JSON.stringify(payload)); }
         } catch { /* Bundled/offline directory remains available. */ }
         finally { clearTimeout(timeout); }
     }
     function load() {
-        if (!loading) loading = loadURL('/data/teacher-hints.json?v=2.8.0');
+        if (!loading) loading = (async () => {
+            try { install(JSON.parse(storage.get('mykep_teachers') || 'null')); } catch { /* Bundled fallback follows. */ }
+            await loadURL('/data/teacher-hints.json?v=2.9.0');
+            await loadURL('/api/teacher-hints');
+        })().finally(() => { loading=null; });
         return loading;
     }
+    window.addEventListener('online',load);
+    setInterval(() => { if (document.visibilityState === 'visible') load(); },3600000);
     document.addEventListener('DOMContentLoaded', () => {
         if (document.getElementById('dashboard-main') || document.getElementById('dynamic-schedule-list')) load();
     });

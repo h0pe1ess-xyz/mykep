@@ -49,26 +49,17 @@ function initSettings() {
     const confirmOkBtn = document.getElementById('confirm-ok-btn');
     const mainApp = document.getElementById('main-app');
     let pendingCallback = null;
-    let returnFocus = null;
-    let previousInert = false;
-
     function closeConfirmModal() {
+        Dialogs.close(confirmModal);
         pendingCallback = null;
-        confirmModal.classList.remove('active');
-        mainApp.inert = previousInert;
-        returnFocus?.focus({ preventScroll: true });
     }
-    function showConfirmModal(title, desc, okText, callback, durationChange = false) {
+    function showConfirmModal(title, desc, okText, callback, durationChange = false, returnFocus = document.activeElement) {
         pendingCallback = callback;
-        returnFocus = document.activeElement;
-        previousInert = mainApp.inert;
         confirmModalTitle.textContent = title;
         confirmModalDesc.textContent = desc;
         confirmOkBtn.textContent = okText;
         confirmModal.classList.toggle('is-duration-change', durationChange);
-        mainApp.inert = true;
-        confirmModal.classList.add('active');
-        confirmCancelBtn.focus({ preventScroll: true });
+        Dialogs.open(confirmModal,confirmCancelBtn,() => { pendingCallback=null; },returnFocus);
     }
     confirmCancelBtn.addEventListener('click', closeConfirmModal);
     window.addEventListener('popstate', () => {
@@ -80,22 +71,6 @@ function initSettings() {
         closeConfirmModal();
         callback?.();
     });
-    confirmModal.addEventListener('click', event => {
-        if (event.target === confirmModal) closeConfirmModal();
-    });
-    confirmModal.addEventListener('keydown', event => {
-        if (event.key === 'Escape') {
-            event.preventDefault();
-            closeConfirmModal();
-        } else if (event.key === 'Tab') {
-            if (event.shiftKey && document.activeElement === confirmCancelBtn) {
-                event.preventDefault(); confirmOkBtn.focus();
-            } else if (!event.shiftKey && document.activeElement === confirmOkBtn) {
-                event.preventDefault(); confirmCancelBtn.focus();
-            }
-        }
-    });
-
     for (const setting of durations) {
         document.querySelectorAll(`input[name="${setting.name}"]`).forEach(input => {
             input.addEventListener('change', () => {
@@ -106,21 +81,19 @@ function initSettings() {
                 if (previous === next) return;
                 const apply = () => {
                     storage.set(setting.key, next);
-                    storage.remove('mykep_schedule');
                     refreshSettings();
                 };
                 if (next === setting.fallback) { apply(); return; }
                 showConfirmModal(
                     'Змінити тривалість пари?',
                     `${setting.label}: пари триватимуть ${next} хв замість ${previous}.\n\nЯкщо у вашій групі тривалість пар не змінювали, натисніть «Скасувати».`,
-                    'Змінити', apply, true
+                    'Змінити', apply, true, input
                 );
             });
         });
     }
     resetDurationBtn.addEventListener('click', () => {
         for (const setting of durations) storage.set(setting.key, setting.fallback);
-        storage.remove('mykep_schedule');
         refreshSettings();
     });
     clearBtn.addEventListener('click', () => {
@@ -128,7 +101,7 @@ function initSettings() {
             'Очищення даних',
             'Видалити збережений розклад? MyKep завантажить його із сервера заново.',
             'Видалити',
-            () => { storage.remove('mykep_schedule'); refreshSettings(); }
+            () => { storage.remove('mykep_schedule'); refreshSettings(); }, false, clearBtn
         );
     });
 }
@@ -178,12 +151,12 @@ function initGroupModal(onChange) {
             div.addEventListener('click', () => {
                 if (grp !== savedGroup) {
                     storage.set('mykep_group', grp);
-                    storage.remove('mykep_schedule');
                     savedGroup = grp;
                     currentGroupDisplay.textContent = `Поточна: ${grp}`;
+                    Dialogs.close(modal);
                     onChange();
                 } else {
-                    modal.classList.remove('active');
+                    Dialogs.close(modal);
                 }
             });
             groupList.appendChild(div);
@@ -191,17 +164,17 @@ function initGroupModal(onChange) {
     }
 
     openBtn.addEventListener('click', () => {
-        modal.classList.add('active');
+        Dialogs.open(modal,closeBtn,null,openBtn);
         loadGroups();
     });
 
     closeBtn.addEventListener('click', () => {
-        modal.classList.remove('active');
+        Dialogs.close(modal);
     });
 
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
-            modal.classList.remove('active');
+            Dialogs.close(modal);
         }
     });
 

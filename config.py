@@ -11,7 +11,7 @@ DB_PATH = str(Path(os.getenv('MYKEP_DB_PATH', str(BASE_DIR / 'schedule.db'))).ex
 KYIV = ZoneInfo('Europe/Kyiv')
 REFRESH_SECONDS = max(60, int(os.getenv('SCHEDULE_REFRESH_SECONDS', '1800')))
 RETRY_SECONDS = max(5, int(os.getenv('SCHEDULE_RETRY_SECONDS', '30')))
-APP_VERSION = '2.7.0'
+APP_VERSION = (BASE_DIR / 'VERSION').read_text(encoding='utf-8').strip()
 
 # The statistics bot is superseded by the web admin panel. It stays in the
 # repository and can be re-enabled with BOT_MODE=embedded or external.

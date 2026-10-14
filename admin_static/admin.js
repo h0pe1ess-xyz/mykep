@@ -488,6 +488,8 @@
             h('div', { class: 'toolbar' }, [rangeControl(), h('div', { class: 'toolbar-actions' }, [
                 h('button', { type: 'button', class: 'btn btn-ghost small', text: 'CSV за днями', on: { click: ev => download(ev, 'daily') } }),
                 h('button', { type: 'button', class: 'btn btn-ghost small', text: 'CSV за групами', on: { click: ev => download(ev, 'groups') } })])]),
+            h('p', { class: 'muted small', text: d.semantics }),
+            analyticsDetails(),
             h('p', { class: 'muted small range-note', text: `${fmtDate(d.start)} - ${fmtDate(d.end)} · ${d.days} дн.` }),
             h('div', { class: 'kpi-grid' }, [
                 kpi('Переглядів', fmt(t.views), { accent: true, hint: `≈ ${fmt(t.avg_daily_views)} на день` }),
@@ -560,6 +562,34 @@
             C.donut(brow, { unit: 'людей', items: d.browsers.map(x => ({ label: x.name, value: x.users })) });
             renderGroups(groupsBox, d.groups);
         });
+    }
+    function analyticsDetails() {
+        const output=h('div', { role:'status' });
+        let before=null;
+        async function loadDetails(button, reset=false) {
+            button.disabled=true;
+            if (reset) { before=null; output.replaceChildren(); }
+            try {
+                const rows=await api('/analytics/details?limit=50' + (before ? '&before=' + before : ''));
+                if (!rows.length) output.append(h('p',{text:'Більше записів немає.'}));
+                for (const row of rows) output.append(h('p',{class:'small',text:`${row.timestamp} · ${row.group || '-'} · ${row.event_kind} · ${row.platform} · ${row.display_mode || 'невідомо'}`}));
+                before=rows.at(-1)?.id || before;
+                button.textContent='Ще 50 записів';
+            } catch { output.append(h('p',{text:'Не вдалося завантажити деталі. Спробуйте ще раз.'})); }
+            finally { button.disabled=false; }
+        }
+        const details=h('details',{},[h('summary',{text:'Деталі та денні підсумки аналітики'}),
+            h('button',{type:'button',class:'btn small',text:'Завантажити деталі',on:{click:ev=>loadDetails(ev.currentTarget)}}),
+            h('button',{type:'button',class:'btn small',text:'Денні підсумки',on:{click:async ev=>{
+                const button=ev.currentTarget; button.disabled=true;
+                try {
+                    const rows=await api('/analytics/daily');
+                    output.replaceChildren(...rows.map(row=>h('p',{class:'small',text:`${row.day} · ${row.event_kind}: ${row.views} подій, ${row.users} користувачів`})));
+                    if (!rows.length) output.textContent='Денних підсумків поки немає.';
+                } catch { output.textContent='Не вдалося завантажити підсумки. Спробуйте ще раз.'; }
+                finally { button.disabled=false; }
+            }}}),output]);
+        return details;
     }
     function metricToggle() {
         const opts = [['both', 'Обидва'], ['views', 'Перегляди'], ['users', 'Люди']];
@@ -644,7 +674,8 @@
                 s.memory ? meter("Пам'ять сервера", `${fmtBytes(s.memory.used)} / ${fmtBytes(s.memory.total)}`, s.memory.percent, `процес MyKep: ${fmtBytes(s.process.rss)}`)
                     : tile("Пам'ять процесу", fmtBytes(s.process.rss)),
                 s.disk ? meter('Диск', `${fmtBytes(s.disk.used)} / ${fmtBytes(s.disk.total)}`, s.disk.percent, `вільно ${fmtBytes(s.disk.free)}`) : tile('Диск', '-'),
-                tile('База даних', fmtBytes(s.database.size), `WAL: ${fmtBytes(s.database.wal)}`),
+                tile('База даних', fmtBytes(s.database.size), `WAL: ${fmtBytes(s.database.wal)} · деталей: ${fmt(d.analytics_storage?.details)} · автоматичного видалення немає`),
+                tile('Ріст БД за збереженими вимірами', d.analytics_storage?.samples?.length > 1 ? fmtBytes(Math.max(0,d.analytics_storage.samples[0].bytes-d.analytics_storage.samples.at(-1).bytes)) : 'Очікуємо наступний день', 'Розмір БД разом із WAL; порівняння до 30 днів'),
                 tile('Event loop', s.event_loop_lag_ms.current === null ? '-' : `${fmt(s.event_loop_lag_ms.current)} мс`,
                     `макс. за 2 хв: ${s.event_loop_lag_ms.max_2min === null ? '-' : fmt(s.event_loop_lag_ms.max_2min) + ' мс'}`, s.event_loop_lag_ms.max_2min > 250 ? 'warning' : null),
                 tile('Процес', `PID ${s.pid}`, `потоків: ${fmt(s.process.threads)} · файлів: ${fmt(s.process.open_fds)}`),
@@ -658,9 +689,10 @@
                     ['Статус', !sc || !sc.ready ? 'Немає даних' : sc.stale ? 'Застарілий кеш' : 'Актуальний', !sc || !sc.ready ? 'critical' : sc.stale ? 'warning' : 'ok'],
                     ['Оновлено', sc && sc.updated_at ? `${fmtDateTime(sc.updated_at)} (${fmtAgo(sc.updated_at)})` : '-'],
                     ['Груп', sc ? fmt(sc.groups) : '-'],
+                    ['Записів джерела / попередньо', sc?.counts ? `${fmt(sc.counts.lessons)} / ${fmt(sc.previous_counts?.lessons)}` : '-'],
                     ['Остання спроба', sc && sc.last_attempt ? fmtDateTime(sc.last_attempt) : '-'],
                     ['Тривалість оновлення', sc && sc.last_duration_ms !== null ? `${fmt(sc.last_duration_ms)} мс` : '-'],
-                    ['Остання помилка', sc && sc.last_error_type ? sc.last_error_type : 'немає', sc && sc.last_error_type ? 'warning' : null],
+                    ['Остання помилка', sc && sc.last_error_type ? `${sc.last_error_type}${sc.last_error_reason ? ': ' + sc.last_error_reason : ''}` : 'немає', sc && sc.last_error_type ? 'warning' : null],
                     ['Успішних / невдалих', sc ? `${fmt(sc.refresh_ok)} / ${fmt(sc.refresh_failed)}` : '-'],
                     ['Наступне оновлення', sc && sc.next_refresh_in !== null ? `через ${fmtDuration(sc.next_refresh_in)}` : '-'],
                     ['Інтервал', sc ? `${fmtDuration(sc.refresh_interval)} (повтор ${fmtDuration(sc.retry_interval)})` : '-']
