@@ -133,7 +133,8 @@ function staleScheduleNotice(meta) { return meta?.stale ? 'Дані можуть
 function materializeSchedule(entry, week, group, now = getKyivNow()) {
     const offline = entry.offline || navigator.onLine === false;
     const manual = ['1','2','3','4'].includes(week);
-    const monday = week === 'auto' ? defaultMonday(entry,group,now) : calendarMonday(now);
+    const automaticMonday = defaultMonday(entry,group,now);
+    const monday = week === 'auto' ? automaticMonday : calendarMonday(now);
     if (week === 'next') monday.setDate(monday.getDate()+7);
     const current = dateKey(calendarMonday(now)), target = dateKey(monday);
     const cycle = manual ? +week : cycleWeek(monday);
@@ -148,7 +149,7 @@ function materializeSchedule(entry, week, group, now = getKyivNow()) {
         if (lessons.length) { nextDay = { date: dateKey(date), lessons }; break; }
     }
     return { ...entry, data, today: scheduleOnDate(entry,now,group), nextDay,
-        calendar: { monday: manual ? null : target, cycle, label: manual ? 'Перегляд циклу' : target === current ? 'Поточний тиждень' : 'Наступний тиждень' },
+        calendar: { monday: manual ? null : target, default_monday:dateKey(automaticMonday), cycle, label: manual ? 'Перегляд циклу' : target === current ? 'Поточний тиждень' : 'Наступний тиждень' },
         notice: `${offline ? 'Немає зв’язку. Офлайн-копія. ' : ''}${staleScheduleNotice(entry.meta)}`, group };
 }
 function fetchSchedule(week = 'auto', group = null, event = 'refresh') {

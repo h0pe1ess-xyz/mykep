@@ -161,7 +161,8 @@ const App = (() => {
         if (checkOnboarding()) return;
         started = true;
         const weekSelect = document.getElementById('schedule-week');
-        weekSelect.value = getScheduleWeekSelection();
+        const initialWeek=getScheduleWeekSelection();
+        weekSelect.value = initialWeek === 'current' ? 'auto' : initialWeek;
         weekSelect.addEventListener('change', () => {
             storage.set('mykep_schedule_week', normalizeWeekSelection(weekSelect.value));
             updateHeaderDisplays();

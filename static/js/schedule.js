@@ -165,9 +165,18 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
 function renderScheduleContext(calendar,group) {
     const label = scheduleCaption.querySelector('#schedule-week-label');
     const select=document.getElementById('schedule-week');
-    select.options[0].textContent=calendar?.label === 'Наступний тиждень' && getScheduleWeekSelection() === 'auto' ? 'Наступний' : 'Цей тиждень';
-    const current=select.querySelector('option[value=current]');
-    current.hidden=!(calendar?.label === 'Наступний тиждень' && getScheduleWeekSelection() === 'auto' || getScheduleWeekSelection() === 'current');
+    const selection=getScheduleWeekSelection();
+    const automaticIsNext=calendar?.default_monday
+        ? calendar.default_monday !== dateKey(calendarMonday()) : calendar?.label === 'Наступний тиждень';
+    select.options[0].textContent=automaticIsNext ? 'Наступний' : 'Цей тиждень';
+    let current=select.querySelector('option[value=current]');
+    if (automaticIsNext && !current) {
+        current=document.createElement('option');
+        current.value='current'; current.textContent='Цей тиждень';
+        select.insertBefore(current,select.options[1]);
+    } else if (!automaticIsNext) current?.remove();
+    // Preserve an explicit current-week preference while both views coincide.
+    select.value=selection === 'current' && !automaticIsNext ? 'auto' : selection;
     if (calendar?.monday) {
         const monday = parseLocalDate(calendar.monday), end = new Date(monday); end.setDate(end.getDate()+5);
         label.textContent = `${calendar.label.replace(' тиждень','')} · ${monday.toLocaleDateString('uk-UA',{day:'numeric',month:'short'})} – ${end.toLocaleDateString('uk-UA',{day:'numeric',month:'short'})} · ${calendar.cycle}-й тиждень`;

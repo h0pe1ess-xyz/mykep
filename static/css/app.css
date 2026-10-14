@@ -546,8 +546,7 @@ html.ios-standalone body {
 
 html.ios-standalone .app-container {
     /* iOS can make the fixed containing block shorter than the full lvh shell. */
-    /* Bound installed-app spacing when iOS reports absent browser-toolbar space. */
-    --ios-nav-bottom-space: clamp(10px, env(safe-area-inset-bottom, 0px), 16px);
+    --ios-nav-bottom-space: max(10px, env(safe-area-inset-bottom, 0px));
     position: relative;
     height: 100vh;
     height: 100lvh;
@@ -725,7 +724,7 @@ html.android-viewport .bottom-nav::after {
 .view-schedule > .schedule-notice { grid-area: 2 / 1; }
 .view-schedule > .day-picker { grid-area: 3 / 1; }
 .view-schedule > main { grid-area: 4 / 1; }
-.schedule-header-actions .week-control { min-width: 0; padding: 0; overflow: visible; }
+.schedule-header-actions .week-control { min-width: 0; padding: 0; overflow: visible; border-radius: 10px; }
 .schedule-header-actions .week-select { width: 176px; max-width: min(176px,calc(100vw - 166px)); min-width: 0; padding: 10px 8px; }
 
 .schedule-caption { padding: 12px 0 20px; flex-shrink: 0; }
@@ -733,4 +732,4 @@ html.android-viewport .bottom-nav::after {
 .data-time { margin: 3px 0 0; color: #aa978c; font-size: 10px; line-height: 1.5; }
 
 .schedule-header-actions .week-select:focus { outline: none; }
-.schedule-header-actions .week-control:focus-within { outline: 2px solid var(--accent-orange); outline-offset: 3px; }
+.schedule-header-actions .week-control:focus-within { box-shadow: 0 0 0 2px var(--accent-orange); }

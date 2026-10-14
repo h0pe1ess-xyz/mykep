@@ -10,12 +10,24 @@ async function run() {
             try {
                 const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,isMobile:true});
                 const page=await context.newPage(),errors=[];
+                await page.clock.install({time:new Date('2026-10-14T10:00:00Z')});
                 page.on('pageerror',e=>errors.push(e.message));
                 await page.addInitScript(()=>{
-                    localStorage.setItem('mykep_onboarded','true');localStorage.setItem('mykep_group','ПІ-24-02');localStorage.setItem('mykep_uid','synthetic-browser-test');sessionStorage.setItem('mykep_browser_session','yes');
+                    localStorage.setItem('mykep_onboarded','true');localStorage.setItem('mykep_group','ПІ-24-02');localStorage.setItem('mykep_uid','synthetic-browser-test');localStorage.setItem('mykep_schedule_week','current');sessionStorage.setItem('mykep_browser_session','yes');
                 });
                 await page.goto(server.url+'/schedule.html');
                 await page.waitForFunction(()=>typeof schedulePageData!=='undefined' && schedulePageData);
+                const weekOptions=await page.locator('#schedule-week option').allTextContents();
+                assert.equal(new Set(weekOptions).size,weekOptions.length);
+                assert.equal(await page.locator('#schedule-week option[value=current]').count(),0);
+                assert.equal(await page.locator('#schedule-week').inputValue(),'auto');
+                assert.equal(await page.evaluate(()=>getScheduleWeekSelection()),'current');
+                await page.locator('#schedule-week').focus();
+                const focusRing=await page.locator('.week-control').evaluate(n=>({radius:getComputedStyle(n).borderRadius,shadow:getComputedStyle(n).boxShadow,outline:getComputedStyle(n).outlineStyle}));
+                assert.equal(focusRing.radius,'10px');
+                assert.match(focusRing.shadow,/2px/);
+                assert.equal(focusRing.outline,'none');
+                await page.screenshot({path:`.mykep-local/screens/${engine}-week-focus.png`});
                 assert.match(await page.locator('#schedule-week-label').textContent(),/(Поточний|Наступний).*тиждень/);
                 assert.equal(await page.locator('.schedule-context,#schedule-group,#subgroup-choices').count(),0);
                 assert.equal(await page.locator('#schedule-notice').isVisible(),false);
@@ -45,7 +57,7 @@ async function run() {
                 await choosePrimary('ПІ-24-02');
                 assert.equal(await page.evaluate(()=>localStorage.getItem('mykep_uid')),'synthetic-browser-test');
                 await context.setOffline(false);
-                await page.selectOption('#schedule-week','current');
+                await page.selectOption('#schedule-week','auto');
                 await page.waitForFunction(()=>!document.getElementById('schedule-week-label').textContent.includes('без календарної дати'));
                 // Hold the fetch at the JS boundary: WebKit worker-owned requests
                 // can bypass page.route(), even when the worker does not cache API.
@@ -152,7 +164,7 @@ async function run() {
                 const iosPage=await iosContext.newPage();
                 await iosPage.route('**/css/app.css*',async route=>{
                     const response=await route.fetch();
-                    await route.fulfill({response,body:(await response.text()).replaceAll('env(safe-area-inset-bottom, 0px)','var(--test-safe-bottom, 0px)')});
+                    await route.fulfill({response,body:(await response.text()).replaceAll('env(safe-area-inset-bottom, 0px)','var(--test-safe-bottom, 0px)').replaceAll('env(safe-area-inset-top, 0px)','var(--test-safe-top, 0px)')});
                 });
                 await iosPage.addInitScript(()=>{
                     localStorage.setItem('mykep_onboarded','true');sessionStorage.setItem('mykep_browser_session','yes');
@@ -189,7 +201,7 @@ async function run() {
                 assert.ok((await iosPage.evaluate(()=>window.copiedViewportSupport)).includes('Геометрія екрана: '));
                 // Substitute only the environment input. Exercise production padding
                 // with both normal home-indicator space and an inflated browser inset.
-                await iosPage.addStyleTag({content:'html{--test-safe-bottom:83px;}html.ios-standalone .app-container{padding-top:71px;}'});
+                await iosPage.addStyleTag({content:'html{--test-safe-bottom:34px;--test-safe-top:47px;}'});
                 const checkEdges=async()=>{
                     await iosPage.waitForFunction(()=>document.querySelector('.views-track').getAnimations().every(a=>a.playState==='finished'));
                     const bounds=await iosPage.evaluate(()=>{
@@ -198,7 +210,7 @@ async function run() {
                         const last=document.querySelector(`[data-view="${Tabs.current}"] main`).getBoundingClientRect();
                         const buttonsBottom=Math.max(...Array.from(document.querySelectorAll('.bottom-nav a'),n=>n.getBoundingClientRect().bottom));
                         const inset=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--test-safe-bottom'));
-                        return {appTop:app.top,appBottom:app.bottom,navBottom:nav.bottom,navTop:nav.top,buttonsBottom,contentBottom:last.bottom,viewport:innerHeight,expectedBottomSpace:Math.max(10,Math.min(inset,16))};
+                        return {appTop:app.top,appBottom:app.bottom,navBottom:nav.bottom,navTop:nav.top,buttonsBottom,contentBottom:last.bottom,viewport:innerHeight,expectedBottomSpace:Math.max(10,inset)};
                     });
                     assert.ok(Math.abs(bounds.appTop)<=1,JSON.stringify(bounds));
                     assert.ok(Math.abs(bounds.appBottom-bounds.viewport)<=1,JSON.stringify(bounds));
@@ -232,9 +244,14 @@ async function run() {
                 await checkEdges();
                 assert.equal(await iosPage.locator('#modal-search').evaluate(n=>n===document.activeElement),true);
                 await iosPage.keyboard.press('Escape');
-                await iosPage.setViewportSize({width:844,height:390});
-                await checkEdges();
+                assert.match(await iosPage.evaluate(()=>getSupportDevice().browser),/Firefox/);
+                for(const [width,height,top,bottom] of [[320,568,0,0],[375,667,0,0],[390,844,47,34],[440,956,62,34],[956,440,0,21]]) {
+                    await iosPage.setViewportSize({width,height});
+                    await iosPage.evaluate(({top,bottom})=>{document.documentElement.style.setProperty('--test-safe-top',`${top}px`);document.documentElement.style.setProperty('--test-safe-bottom',`${bottom}px`);},{top,bottom});
+                    await checkEdges();
+                }
                 await iosPage.setViewportSize({width:390,height:844});
+                await iosPage.evaluate(()=>{document.documentElement.style.setProperty('--test-safe-top','47px');document.documentElement.style.setProperty('--test-safe-bottom','34px');});
                 await checkEdges();
                 await iosPage.evaluate(()=>Tabs.show('schedule'));
                 await iosPage.waitForFunction(()=>schedulePageData);
@@ -274,7 +291,7 @@ async function run() {
                     assert.equal(report.fixedBottom,894);
                     assert.ok(Math.abs(report.app.bottom-956)<0.1,JSON.stringify(report));
                     assert.ok(Math.abs(report.nav.bottom-956)<0.1,JSON.stringify(report));
-                    assert.ok(Math.abs(Math.max(...report.buttons.map(b=>b.bottom))-940)<0.1,JSON.stringify(report));
+                    assert.ok(Math.abs(Math.max(...report.buttons.map(b=>b.bottom))-922)<0.1,JSON.stringify(report));
                     assert.ok(await replayPage.locator('.bottom-nav').evaluate(nav=>Array.from(nav.querySelectorAll('a')).every(n=>{
                         const r=n.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('a')===n;
                     })));
@@ -304,10 +321,19 @@ async function run() {
                 await calendarPage.evaluate(()=>Tabs.show('schedule'));
                 await calendarPage.waitForFunction(()=>schedulePageData);
                 assert.match(await calendarPage.locator('#schedule-week-label').textContent(),/Наступний/);
+                assert.equal(await calendarPage.locator('#schedule-week option[value=auto]').textContent(),'Наступний');
+                assert.equal(await calendarPage.locator('#schedule-week option[value=current]').textContent(),'Цей тиждень');
+                await calendarPage.selectOption('#schedule-week','current');
+                await calendarPage.waitForFunction(()=>currentScheduleCalendar?.label==='Поточний тиждень');
+                assert.equal(await calendarPage.locator('#schedule-week option[value=auto]').textContent(),'Наступний');
+                const sundayOptions=await calendarPage.locator('#schedule-week option').allTextContents();
+                assert.equal(new Set(sundayOptions).size,sundayOptions.length);
                 await calendarPage.clock.setSystemTime(new Date('2026-10-18T20:59:50Z'));
                 await calendarPage.clock.runFor(20000);
-                await calendarPage.waitForFunction(()=>document.getElementById('schedule-week-label').textContent.includes('Поточний'));
+                await calendarPage.waitForFunction(()=>currentScheduleCalendar?.monday==='2026-10-19');
                 assert.equal(await calendarPage.locator('.day-item[aria-current="date"]').getAttribute('data-day'),'понеділок');
+                assert.equal(await calendarPage.locator('#schedule-week option[value=current]').count(),0);
+                assert.equal(await calendarPage.locator('#schedule-week').inputValue(),'auto');
                 await calendarContext.close();
                 console.log(`${engine}: Kyiv midnight and Sunday-to-Monday week change without restart passed`);
                 if (engine==='chromium') {
@@ -322,6 +348,7 @@ async function run() {
                     await page.waitForFunction(async()=> (await caches.keys()).includes('mykep-cache-vtest-upgrade'));
                     await page.waitForFunction(async old=>!(await caches.keys()).includes(old),old);
                     await context.setOffline(true);await page.reload();
+                    await page.locator('#main-app').waitFor({state:'attached'});
                     assert.ok(await page.locator('#main-app').count());
                     await context.setOffline(false);
                     server.setBuild('broken-upgrade');server.breakAsset(true);
