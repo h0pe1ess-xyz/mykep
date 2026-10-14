@@ -538,18 +538,13 @@ html, body, .app-container,
 a:focus-visible { outline: 2px solid var(--accent-orange); outline-offset: 3px; }
 
 
-html.ios-standalone body,
 html.ios-standalone .app-container {
-    height: 100vh;
-    height: 100lvh;
-}
-
-html.ios-standalone .app-container {
-
+    /* Use viewport edges instead of height APIs that can exclude iOS safe areas. */
+    position: fixed;
+    inset: 0;
+    height: auto;
     width: 100%;
     max-width: none;
-    max-height: var(--ios-layout-height, 100lvh);
-
     padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
 }
 
@@ -562,8 +557,7 @@ html.ios-standalone .app-container > .main-content {
 }
 
 html.ios-standalone .bottom-nav {
-
-    position: absolute;
+    position: fixed;
     bottom: 0;
     left: 0;
     width: 100%;

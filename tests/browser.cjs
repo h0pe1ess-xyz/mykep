@@ -147,7 +147,7 @@ async function run() {
                 await disclosure.locator('summary').focus();await page.keyboard.press('Enter');
                 assert.equal(await disclosure.evaluate(n=>n.open),false);
                 console.log(`${engine}: offline cycles/group settings, all subgroup variants, modal/keyboard, PNG file, simultaneous lessons, empty progress, swipe/history, widths passed`);
-                // Reproduce an installed-iOS lvh shell exceeding its layout viewport.
+                // A smaller clientHeight must not leave a gap below the installed app.
                 const iosContext=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) FxiOS/143.0 Mobile/15E148'});
                 const iosPage=await iosContext.newPage();
                 await iosPage.addInitScript(()=>{
@@ -159,19 +159,54 @@ async function run() {
                     Object.defineProperty(window,'visualViewport',{value:{height:710,offsetTop:0,scale:1,addEventListener(){}}});
                 });
                 await iosPage.goto(server.url);
-                await iosPage.waitForFunction(()=>document.documentElement.style.getPropertyValue('--ios-layout-height')==='810px');
-                const navBottom=()=>iosPage.locator('.bottom-nav').evaluate(n=>n.getBoundingClientRect().bottom);
-                // Removing the new cap reproduces the 34px overflow.
-                await iosPage.locator('.app-container').evaluate(n=>n.style.maxHeight='none');
-                assert.ok(await navBottom()>810);
-                await iosPage.locator('.app-container').evaluate(n=>n.style.removeProperty('max-height'));
-                assert.ok(await navBottom()<=811);
-                await iosPage.evaluate(()=>{window.testLayoutHeight=844;window.dispatchEvent(new Event('resize'));});
-                assert.ok(Math.abs(await navBottom()-844)<=1); // Smaller visualViewport must not shrink Safari.
-                await iosPage.evaluate(()=>{const input=document.createElement('input');document.body.append(input);input.focus();window.testLayoutHeight=450;window.dispatchEvent(new Event('resize'));});
-                assert.ok(Math.abs(await navBottom()-844)<=1);
-                await iosPage.evaluate(()=>{document.activeElement.blur();window.testLayoutHeight=700;window.dispatchEvent(new Event('pageshow'));});
-                assert.ok(await navBottom()<=701);
+                await iosPage.waitForFunction(()=>typeof Tabs!=='undefined' && document.documentElement.classList.contains('ios-standalone'));
+                // Desktop engines do not expose iPhone insets. Inject their padding
+                // to check that it reserves content once and keeps the background flush.
+                await iosPage.addStyleTag({content:'html.ios-standalone .app-container{padding-top:71px;padding-bottom:102px;}html.ios-standalone .bottom-nav{padding-bottom:44px;}'});
+                const checkEdges=async()=>{
+                    await iosPage.waitForFunction(()=>document.querySelector('.views-track').getAnimations().every(a=>a.playState==='finished'));
+                    const bounds=await iosPage.evaluate(()=>{
+                        const app=document.querySelector('.app-container').getBoundingClientRect();
+                        const nav=document.querySelector('.bottom-nav').getBoundingClientRect();
+                        const last=document.querySelector(`[data-view="${Tabs.current}"] main`).getBoundingClientRect();
+                        const buttonsBottom=Math.max(...Array.from(document.querySelectorAll('.bottom-nav a'),n=>n.getBoundingClientRect().bottom));
+                        return {appTop:app.top,appBottom:app.bottom,navBottom:nav.bottom,navTop:nav.top,buttonsBottom,contentBottom:last.bottom,viewport:innerHeight};
+                    });
+                    assert.ok(Math.abs(bounds.appTop)<=1,JSON.stringify(bounds));
+                    assert.ok(Math.abs(bounds.appBottom-bounds.viewport)<=1,JSON.stringify(bounds));
+                    assert.ok(Math.abs(bounds.navBottom-bounds.viewport)<=1,JSON.stringify(bounds));
+                    assert.ok(bounds.buttonsBottom<=bounds.viewport-34,JSON.stringify(bounds));
+                    assert.ok(bounds.contentBottom<=bounds.navTop+1,JSON.stringify(bounds));
+                    if(!await iosPage.locator('#main-app').evaluate(n=>n.inert)) {
+                        assert.ok(await iosPage.locator('.bottom-nav').evaluate(nav=>Array.from(nav.querySelectorAll('a')).every(n=>{
+                            const r=n.getBoundingClientRect();
+                            return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('a')===n;
+                        })),'all navbar buttons remain exposed to touch');
+                    }
+                };
+                for(const tab of ['schedule','dashboard','settings']) {
+                    await iosPage.evaluate(tab=>Tabs.show(tab),tab);
+                    await checkEdges();
+                }
+                // Both underreported and oversized layout measurements are ignored.
+                for(const height of [878,844,700]) {
+                    await iosPage.evaluate(height=>{window.testLayoutHeight=height;window.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('pageshow'));},height);
+                    await checkEdges();
+                }
+                await iosPage.click('#open-group-modal');
+                await iosPage.locator('#modal-search').focus();
+                await iosPage.evaluate(()=>{window.testLayoutHeight=450;window.dispatchEvent(new Event('resize'));});
+                await checkEdges();
+                assert.equal(await iosPage.locator('#modal-search').evaluate(n=>n===document.activeElement),true);
+                await iosPage.keyboard.press('Escape');
+                await iosPage.setViewportSize({width:844,height:390});
+                await checkEdges();
+                await iosPage.setViewportSize({width:390,height:844});
+                await checkEdges();
+                await iosPage.evaluate(()=>Tabs.show('schedule'));
+                await iosPage.waitForFunction(()=>schedulePageData);
+                await checkEdges();
+                await iosPage.screenshot({path:`.mykep-local/screens/${engine}-ios-navbar.png`});
                 await iosContext.close();
                 console.log(`${engine}: data disclosure triangle and simulated installed-iOS viewport/keyboard regression passed`);
                 const calendarContext=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});

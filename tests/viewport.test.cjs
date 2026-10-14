@@ -14,24 +14,15 @@ function viewport({ua='iPhone',standalone=true,fullscreen=false,height=810}={}) 
     return {root,styles,classes,listeners,document,navigator};
 }
 
-test('installed iOS caps lvh by layout height and updates on rotation/pageshow',()=>{
+test('installed iOS selects its shell and pageshow updates the display mode',()=>{
     const v=viewport();
-    assert.equal(v.styles.get('--ios-layout-height'),'810px');
-    v.root.clientHeight=390;v.listeners.resize();
-    assert.equal(v.styles.get('--ios-layout-height'),'390px');
-    v.root.clientHeight=844;v.listeners.pageshow();
-    assert.equal(v.styles.get('--ios-layout-height'),'844px');
+    assert.equal(v.classes.has('ios-standalone'),true);
     v.navigator.standalone=false;v.listeners.pageshow();
-    assert.equal(v.styles.has('--ios-layout-height'),false);
     assert.equal(v.classes.has('ios-standalone'),false);
 });
 
-test('keyboard focus cannot collapse iOS shell; zero measurement is ignored',()=>{
-    const v=viewport({height:844});
-    v.document.activeElement={matches:()=>true};v.root.clientHeight=450;v.listeners.resize();
-    assert.equal(v.styles.get('--ios-layout-height'),'844px');
-    v.document.activeElement=null;v.root.clientHeight=0;v.listeners.resize();
-    assert.equal(v.styles.get('--ios-layout-height'),'844px');
+test('iPad desktop user agent with touch selects the installed iOS shell',()=>{
+    assert.equal(viewport({ua:'Macintosh'}).classes.has('ios-standalone'),true);
 });
 
 test('fullscreen iOS is recognized; browser tabs and Android are unchanged',()=>{

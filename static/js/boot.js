@@ -1,5 +1,5 @@
 document.documentElement.dataset.tab = location.pathname === '/schedule.html' ? 'schedule' : location.pathname === '/settings.html' ? 'settings' : 'dashboard';
-/* Run in <head>: only installed iOS gets the legacy full-height app shell.
+/* Run in <head>: only installed iOS gets the viewport-anchored app shell.
  * Safari tabs, Android and the installation/onboarding UI keep their layout.
  */
 function getMyKepDisplayMode(nav = navigator, view = window) {
@@ -12,27 +12,11 @@ function getMyKepDisplayMode(nav = navigator, view = window) {
 function updateMyKepDisplayMode() {
     const mode = getMyKepDisplayMode();
     document.documentElement.classList.toggle('ios-standalone', mode.ios && mode.standalone);
-    updateMyKepIOSLayoutHeight();
-}
-function updateMyKepIOSLayoutHeight() {
-    const root = document.documentElement;
-    if (!root.classList.contains('ios-standalone')) {
-        root.style.removeProperty('--ios-layout-height');
-        return;
-    }
-    // Keep the legacy lvh shell, but cap it at the actual layout viewport.
-    // visualViewport can shrink for the keyboard without shrinking this shell.
-    if (document.activeElement?.matches('input, textarea, [contenteditable="true"]')) return;
-    const height = root.clientHeight;
-    const value = `${height}px`;
-    if (height > 0 && root.style.getPropertyValue('--ios-layout-height') !== value) root.style.setProperty('--ios-layout-height', value);
 }
 updateMyKepDisplayMode();
 window.matchMedia('(display-mode: standalone)').addEventListener?.('change', updateMyKepDisplayMode);
 window.matchMedia('(display-mode: fullscreen)').addEventListener?.('change', updateMyKepDisplayMode);
 window.addEventListener('pageshow', updateMyKepDisplayMode);
-window.addEventListener('resize', updateMyKepIOSLayoutHeight);
-document.addEventListener('DOMContentLoaded', updateMyKepIOSLayoutHeight);
 
 /* Optional local diagnosis from Safari's console; never sends anything.
  * No group, URL, credentials, localStorage or other user data is included.
@@ -61,7 +45,7 @@ window.mykepViewportReport = function() {
     }
     probe.remove();
     const viewport = window.visualViewport;
-    return { version: '2.9.1', mode: getMyKepDisplayMode(),
+    return { version: '2.9.2', mode: getMyKepDisplayMode(),
         iosFixActive: document.documentElement.classList.contains('ios-standalone'),
         innerHeight: window.innerHeight, clientHeight: document.documentElement.clientHeight,
         visualViewport: viewport ? { height: viewport.height, offsetTop: viewport.offsetTop, scale: viewport.scale } : null,
