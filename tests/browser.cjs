@@ -175,7 +175,7 @@ async function run() {
                         const last=document.querySelector(`[data-view="${Tabs.current}"] main`).getBoundingClientRect();
                         const buttonsBottom=Math.max(...Array.from(document.querySelectorAll('.bottom-nav a'),n=>n.getBoundingClientRect().bottom));
                         const inset=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--test-safe-bottom'));
-                        return {appTop:app.top,appBottom:app.bottom,navBottom:nav.bottom,navTop:nav.top,buttonsBottom,contentBottom:last.bottom,viewport:innerHeight,expectedBottomSpace:Math.max(10,Math.min(inset,34))};
+                        return {appTop:app.top,appBottom:app.bottom,navBottom:nav.bottom,navTop:nav.top,buttonsBottom,contentBottom:last.bottom,viewport:innerHeight,expectedBottomSpace:Math.max(10,Math.min(inset,16))};
                     });
                     assert.ok(Math.abs(bounds.appTop)<=1,JSON.stringify(bounds));
                     assert.ok(Math.abs(bounds.appBottom-bounds.viewport)<=1,JSON.stringify(bounds));

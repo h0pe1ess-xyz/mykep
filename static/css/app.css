@@ -541,7 +541,7 @@ a:focus-visible { outline: 2px solid var(--accent-orange); outline-offset: 3px; 
 html.ios-standalone .app-container {
     /* Use viewport edges instead of height APIs that can exclude iOS safe areas. */
     /* Bound installed-app spacing when iOS reports absent browser-toolbar space. */
-    --ios-nav-bottom-space: clamp(10px, env(safe-area-inset-bottom, 0px), 34px);
+    --ios-nav-bottom-space: clamp(10px, env(safe-area-inset-bottom, 0px), 16px);
     position: fixed;
     inset: 0;
     height: auto;
