@@ -1,4 +1,7 @@
 :root {
+    /* The app already has a dark palette; avoid a second browser recoloring pass. */
+    color-scheme: dark;
+    color-scheme: only dark;
     --bg-main: #110c0a;
     --bg-surface: #1f1714;
     --bg-surface-hover: #2a1f1b;

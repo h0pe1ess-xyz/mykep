@@ -1,5 +1,5 @@
 /* Standalone public page: readable without JavaScript, remote fonts or onboarding. */
-:root { color-scheme: dark; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #110c0a; color: #fff; }
+:root { color-scheme: dark; color-scheme: only dark; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #110c0a; color: #fff; }
 * { box-sizing: border-box; }
 body { margin: 0 auto; max-width: 900px; padding: 24px max(20px, env(safe-area-inset-right)) 32px max(20px, env(safe-area-inset-left)); line-height: 1.7; overflow-wrap: anywhere; }
 a { color: #ffab76; text-underline-offset: 4px; }
