@@ -51,7 +51,9 @@ function buildSupportReport(device) {
     const mode = isPWA() ? 'PWA (запущено як застосунок)' : 'Браузер';
     const viewport = device.system === 'iOS' && typeof window.mykepViewportReport === 'function'
         ? `\nГеометрія екрана: ${JSON.stringify(window.mykepViewportReport())}` : '';
-    return `Повідомлення MyKep\n\nПроблема або ідея: [опишіть тут]\n\nДані застосунку:\nВерсія: ${build}\nСистема: ${device.system}\nМодель: ${device.model}\nБраузер: ${device.browser}\nРежим: ${mode}\nВікно: ${window.innerWidth} × ${window.innerHeight}${viewport}`;
+    const swipe = typeof window.mykepSwipeReport === 'function'
+        ? `\nРух вкладок: ${JSON.stringify(window.mykepSwipeReport())}` : '';
+    return `Повідомлення MyKep\n\nПроблема або ідея: [опишіть тут]\n\nДані застосунку:\nВерсія: ${build}\nСистема: ${device.system}\nМодель: ${device.model}\nБраузер: ${device.browser}\nРежим: ${mode}\nВікно: ${window.innerWidth} × ${window.innerHeight}${viewport}${swipe}`;
 }
 
 function createSupportTelegramURL(report, destination = 'https://t.me/oddxq') {

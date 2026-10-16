@@ -1,6 +1,11 @@
 """Anonymous schedule-view counters. A bounded queue prevents per-request SQLite writers."""
 import asyncio
 import logging
+import math
+import re
+import time
+from collections import OrderedDict
+from typing import Optional
 from datetime import datetime, timedelta
 
 from config import KYIV, DB_PATH
@@ -70,6 +75,49 @@ async def start_writer():
 
 
 DISPLAY_MODES = {'standalone', 'browser'}
+
+
+def valid_uid(uid: str) -> bool:
+    # Keep old user_* IDs, UUIDs and integrations; reject control/whitespace data.
+    return isinstance(uid, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}', uid) is not None
+
+
+class ActivityLimiter:
+    """Write budgets for the deployment's single web worker, not authentication."""
+
+    def __init__(self, max_users: int = 8192) -> None:
+        self.users: OrderedDict[str, tuple[float, float]] = OrderedDict()
+        self.max_users = max_users
+        self.tokens = 600.0
+        self.updated = time.monotonic()
+        self.hour_start = self.day_start = self.updated
+        self.hour_count = self.day_count = 0
+
+    def admit(self, uid: str, now: Optional[float] = None) -> int:
+        now = time.monotonic() if now is None else now
+        if now - self.hour_start >= 3600:
+            self.hour_start, self.hour_count = now, 0
+        if now - self.day_start >= 86400:
+            self.day_start, self.day_count = now, 0
+        if self.day_count >= 50000:
+            return max(1, math.ceil(86400 - (now - self.day_start)))
+        if self.hour_count >= 5000:
+            return max(1, math.ceil(3600 - (now - self.hour_start)))
+        self.tokens = min(600, self.tokens + max(0, now - self.updated) * 2)
+        self.updated = now
+        tokens, updated = self.users.get(uid, (30.0, now))
+        tokens = min(30, tokens + max(0, now - updated) / 5)
+        retry = max((1 - self.tokens) / 2, (1 - tokens) * 5)
+        if retry > 0:
+            return max(1, math.ceil(retry))
+        self.tokens -= 1
+        self.hour_count += 1
+        self.day_count += 1
+        self.users[uid] = (tokens - 1, now)
+        self.users.move_to_end(uid)
+        if len(self.users) > self.max_users:
+            self.users.popitem(last=False)
+        return 0
 
 
 def record_request(uid, group_name, endpoint, user_agent='', display_mode=None, event_kind='legacy_request'):

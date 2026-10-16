@@ -22,6 +22,7 @@ const App = (() => {
     };
     let started = false;
     let settingsReady = false;
+    let visibleVisit = false;
 
     function notice(tab, message, retry = false) {
         const node = document.getElementById(`${tab}-notice`);
@@ -95,6 +96,18 @@ const App = (() => {
         target.cacheEntry = entry;
     }
 
+    function showResponse(tab, context) {
+        const response = targets[tab].response;
+        if (Tabs.current !== tab || response?.key !== context.key) return;
+        if (cachedScheduleForKey(context.cacheKey) !== response.entry) return;
+        const {result} = response;
+        targets[tab].cacheEntry = cachedScheduleForKey(context.cacheKey);
+        updateFreshness(tab,result.meta);
+        if (result.data === null) clearView(tab);
+        else apply(tab,result,context.key);
+        notice(tab,result.notice,result.data === null);
+    }
+
     async function load(tab, event = 'refresh') {
         if (!started || !targets[tab]) return;
         const target = targets[tab];
@@ -106,6 +119,7 @@ const App = (() => {
         const token = ++target.token;
         target.pending = true;
         target.requestKey = key;
+        target.response = null;
         if (tab === 'schedule' && target.key !== key) setScheduleSharingPending();
         target.lastLoad = Date.now();
         showCached(tab,context);
@@ -127,12 +141,13 @@ const App = (() => {
         if (token !== target.token) return;
         target.pending = false;
         busyNode.setAttribute('aria-busy', 'false');
-        if (Tabs.current !== tab || contextFor(tab).key !== key) return;
-        target.cacheEntry = cachedScheduleForKey(context.cacheKey);
-        updateFreshness(tab,result.meta);
-        notice(tab, result.notice, result.data === null);
-        if (result.data === null) clearView(tab);
-        else apply(tab, result, key);
+        // Completion belongs to its context even while another tab is visible.
+        // Rendering can wait; losing a cold-request error strands the loading UI.
+        target.response = {key,result,entry:cachedScheduleForKey(context.cacheKey)};
+        if (contextFor(tab).key === key) showResponse(tab,context);
+        // Successful data is replayed from the cache with the current offline
+        // state. Retain only errors, which otherwise have no cached entry.
+        if (result.data !== null) target.response = null;
     }
 
     function enter(tab, userAction = false) {
@@ -151,8 +166,9 @@ const App = (() => {
         const target = targets[tab];
         const context = contextFor(tab);
         const changed = context.key !== target.key;
-        if (userAction) recordScheduleAction('view',context.group);
+        if (userAction && document.visibilityState === 'visible') recordScheduleAction('view',context.group);
         showCached(tab,context);
+        showResponse(tab,context);
         if ((!target.pending || target.requestKey !== context.key) && (!target.lastLoad || changed || Date.now() - target.lastLoad >= refreshInterval)) load(tab);
     }
 
@@ -162,6 +178,7 @@ const App = (() => {
             targets[tab].pending = false;
             targets[tab].lastLoad = 0;
             targets[tab].key = '';
+            targets[tab].response = null;
             clearView(tab);
             document.querySelector(`[data-view="${tab}"] main`).setAttribute('aria-busy', 'false');
             notice(tab, '');
@@ -177,9 +194,17 @@ const App = (() => {
         else enter(Tabs.current);
     }
 
+    function visibleReturn() {
+        if (!started || document.visibilityState !== 'visible' || document.getElementById('pwa-guide')) return;
+        if (!visibleVisit) {
+            visibleVisit = true;
+            recordScheduleAction('view');
+        }
+    }
+
     async function init() {
         Tabs.init();
-        Tabs.onChange(tab => enter(tab,true));
+        Tabs.onChange((tab,userAction) => enter(tab,userAction));
         if (!isPWA()) await showPWAGuide();
         if (checkOnboarding()) return;
         started = true;
@@ -196,10 +221,17 @@ const App = (() => {
             updateHeaderDisplays();
             load('schedule','interaction');
         });
-        enter(Tabs.current,true);
+        visibleReturn();
+        enter(Tabs.current);
         setInterval(resume, 10000);
-        document.addEventListener('visibilitychange', () => resume(true));
-        window.addEventListener('pageshow', event => { if (event.persisted) resume(true); });
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'visible') visibleVisit = false;
+            else { visibleReturn(); resume(true); }
+        });
+        window.addEventListener('pagehide', () => { visibleVisit = false; });
+        window.addEventListener('pageshow', event => {
+            if (event.persisted) { visibleReturn(); resume(true); }
+        });
         window.addEventListener('online', () => resume(true));
         window.addEventListener('offline', () => resume());
     }

@@ -13,6 +13,20 @@ const Tabs = (() => {
     let frame = 0;
     let clickBlockedUntil = 0;
     const listeners = new Set();
+    const diagnostic = new URLSearchParams(location.search).get('swipe-debug') === '1';
+    const trace = [];
+
+    function sample(type, position, event = null) {
+        if (!diagnostic) return;
+        const point = event?.touches[0] || event?.changedTouches[0];
+        trace.push({type,ms:Math.round(performance.now()*100)/100,position,
+            ...(point ? {x:point.clientX,y:point.clientY,cancelable:event.cancelable} : {})});
+        if (trace.length > 360) trace.shift();
+    }
+    if (diagnostic) window.mykepSwipeReport = () => ({
+        version:document.querySelector('meta[name="mykep-build"]')?.content,
+        width:views?.clientWidth, samples:trace.slice()
+    });
 
     function isBlocked() {
         return document.getElementById('main-app').inert ||
@@ -23,6 +37,9 @@ const Tabs = (() => {
     function show(tab, { historyMode = 'push', focus = false } = {}) {
         if (!names.includes(tab)) return;
         cancelDrag();
+        freeze();
+        // Commit the visible start before restoring the CSS transition.
+        getComputedStyle(track).transform;
         const changed = current !== tab;
         const activeElement = document.activeElement;
         const moveFocus = focus || activeElement?.closest('.view')?.dataset.view !== tab &&
@@ -52,7 +69,7 @@ const Tabs = (() => {
         if (historyMode === 'push' && changed) {
             history.pushState(null, '', paths[tab] + location.search);
         }
-        if (changed) listeners.forEach(listener => listener(tab));
+        if (changed) listeners.forEach(listener => listener(tab, historyMode !== 'none'));
     }
 
     function cancelDrag() {
@@ -62,10 +79,17 @@ const Tabs = (() => {
     }
 
     function reset() {
-        cancelDrag();
-        track?.classList.remove('is-dragging');
-        if (track) track.style.transform = '';
-        resetScroll();
+        if (gesture) sample('cancel', gesture.position);
+        if (track) show(current, { historyMode: 'none' });
+        else cancelDrag();
+    }
+
+    function freeze() {
+        const position = new DOMMatrixReadOnly(getComputedStyle(track).transform).m41;
+        sample('anchor', position);
+        track.classList.add('is-dragging');
+        track.style.transform = `translate3d(${position}px, 0, 0)`;
+        return position;
     }
 
     function resetScroll() {
@@ -73,9 +97,9 @@ const Tabs = (() => {
         if (views?.scrollLeft) views.scrollLeft = 0;
     }
 
-    function restoreHistory() {
+    function restoreHistory(event) {
         const tab = names.find(name => paths[name] === location.pathname) || 'dashboard';
-        show(tab, { historyMode: 'none' });
+        show(tab, { historyMode: event?.type === 'popstate' ? 'pop' : 'none' });
         // The browser already animates Back/Forward; settle the app's transition.
         track.getAnimations().forEach(animation => animation.finish());
         resetScroll();
@@ -86,6 +110,7 @@ const Tabs = (() => {
         if (!gesture || gesture.axis !== 'x') return;
         if (isBlocked()) { reset(); return; }
         track.style.transform = `translate3d(${gesture.position}px, 0, 0)`;
+        sample('frame', gesture.position);
     }
 
     function ownsHorizontalScroll(target) {
@@ -105,9 +130,12 @@ const Tabs = (() => {
         if (point.clientX <= 20 || point.clientX >= width - 20) return;
         const viewWidth = views.clientWidth;
         if (!viewWidth) return;
+        // Contact anchors a running transition even before direction lock.
+        const origin = freeze();
+        sample('start', origin, event);
         gesture = { id: point.identifier, x: point.clientX, y: point.clientY,
             index: names.indexOf(current), width: viewWidth, axis: null,
-            origin: 0, position: 0, samples: [[event.timeStamp, point.clientX]] };
+            origin, position: origin, samples: [[event.timeStamp, point.clientX]] };
     }
 
     function move(event) {
@@ -120,13 +148,11 @@ const Tabs = (() => {
         const dx = point.clientX - gesture.x;
         const dy = point.clientY - gesture.y;
         if (!gesture.axis) {
-            if (Math.max(Math.abs(dx), Math.abs(dy)) < 10) return;
-            if (Math.abs(dx) <= Math.abs(dy) * 1.2) { reset(); return; }
+            const axis = getMyKepGestureAxis(dx, dy);
+            if (!axis) return;
+            if (axis === 'y') { reset(); return; }
             if (isBlocked()) { reset(); return; }
             gesture.axis = 'x';
-            gesture.origin = new DOMMatrixReadOnly(getComputedStyle(track).transform).m41;
-            track.style.transform = `translate3d(${gesture.origin}px, 0, 0)`;
-            track.classList.add('is-dragging');
         }
         if (event.cancelable) event.preventDefault();
         gesture.samples.push([event.timeStamp, point.clientX]);
@@ -135,6 +161,7 @@ const Tabs = (() => {
         const min = -Math.min(names.length - 1, index + 1) * width;
         const max = -Math.max(0, index - 1) * width;
         gesture.position = Math.max(min, Math.min(max, origin + dx));
+        sample('move', gesture.position, event);
         if (!frame) frame = requestAnimationFrame(renderDrag);
     }
 
@@ -145,12 +172,15 @@ const Tabs = (() => {
         const point = [...event.changedTouches].find(touch => touch.identifier === gesture.id);
         if (!point || event.touches.length) { reset(); return; }
         const dx = point.clientX - gesture.x;
+        const distance = Math.max(-(names.length - 1) * width,
+            Math.min(0, gesture.origin + dx)) + index * width;
         const first = samples[0];
         const velocity = (point.clientX - first[1]) / Math.max(event.timeStamp - first[0], 1);
         clickBlockedUntil = performance.now() + 400;
-        const passed = Math.abs(dx) >= width * 0.25 ||
-            Math.abs(dx) >= 30 && Math.abs(velocity) > 0.35 && Math.sign(velocity) === Math.sign(dx);
-        const target = names[index + (dx < 0 ? 1 : -1)];
+        const passed = Math.abs(distance) >= width * 0.25 ||
+            Math.abs(dx) >= 30 && Math.abs(velocity) > 0.35 && Math.sign(velocity) === Math.sign(distance);
+        const target = names[index + (distance < 0 ? 1 : -1)];
+        sample('end', gesture.position, event);
         show(passed && target ? target : current);
     }
 
@@ -175,9 +205,9 @@ const Tabs = (() => {
             event.preventDefault();
             if (!isBlocked()) show(link.dataset.tab);
         });
-        window.addEventListener('popstate', () => {
+        window.addEventListener('popstate', event => {
             document.querySelectorAll('.modal-overlay.active').forEach(modal => modal.classList.remove('active'));
-            restoreHistory();
+            restoreHistory(event);
         });
         window.addEventListener('resize', reset);
         window.addEventListener('pagehide', reset);

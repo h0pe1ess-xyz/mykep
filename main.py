@@ -6,7 +6,7 @@ import json
 from datetime import datetime, date
 from contextlib import asynccontextmanager
 from typing import Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
@@ -15,7 +15,8 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from config import ADMIN_COOKIE_SECURE, ADMIN_DEV_LOGIN, BASE_DIR, BOT_MODE, PUBLIC_CSP, TELEGRAM_BOT_TOKEN, KYIV
 from database import init_database
-from schedule_service import ScheduleService, calendar_metadata
+from schedule_service import (ScheduleService, calendar_metadata, normalize_group,
+                              MIN_CALENDAR_DATE, MAX_CALENDAR_DATE)
 from teacher_hints import TeacherHintsService
 import admin_api
 import admin_auth
@@ -29,6 +30,7 @@ logging.getLogger('httpcore').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 schedule = ScheduleService()
 teachers = TeacherHintsService()
+activity_limiter = analytics.ActivityLimiter()
 admin_api.bind(schedule)
 ADMIN_DIR = BASE_DIR / 'admin_static'
 
@@ -161,7 +163,7 @@ async def get_schedule(request: Request,
                        uid: Optional[str] = Query(None, max_length=128),
                        week: Optional[int] = Query(None, ge=1, le=4),
                        mode: Optional[str] = Query(None, max_length=16),
-                       monday: Optional[date] = Query(None),
+                       monday: Optional[date] = Query(None, ge=MIN_CALENDAR_DATE, le=MAX_CALENDAR_DATE),
                        event: Optional[str] = Query(None, pattern='^(view|interaction|refresh)$')):
     if duration1 not in (60, 80) or duration2 not in (60, 80):
         return JSONResponse(status_code=422, content={'status': 'error', 'message': 'Тривалість має бути 60 або 80 хвилин.'})
@@ -173,13 +175,21 @@ async def get_schedule(request: Request,
     data = schedule.build(group, duration1, duration2, week=week, monday=monday)
     if data is None:
         return JSONResponse(status_code=404, content={'status': 'error', 'message': 'Групу не знайдено. Перевірте назву в налаштуваннях.'})
-    analytics.record_request(uid, group, '/api/schedule', request.headers.get('user-agent', ''), mode, event or 'legacy_request')
+    activity_status = 'invalid_uid'
+    if uid is None or analytics.valid_uid(uid):
+        retry = activity_limiter.admit(uid or '(anonymous)')
+        if retry:
+            activity_status = 'limited'
+        else:
+            accepted = analytics.record_request(uid, group, '/api/schedule', request.headers.get('user-agent', ''), mode, event or 'legacy_request')
+            activity_status = 'recorded' if accepted else 'queue_full'
     cycle = {str(w): schedule.build(group, duration1, duration2, week=w, ignore_start=True) for w in range(1, 5)}
     current = schedule.build(group, duration1, duration2)
     calendar = calendar_metadata(datetime.now(KYIV), current)
     tag = '"' + hashlib.sha256(json.dumps([data, cycle, calendar], sort_keys=True, ensure_ascii=False).encode()).hexdigest() + '"'
     meta = schedule.metadata()
-    headers = {'ETag': tag, 'X-Source-Checked-At': meta['updated_at'] or '', 'X-Source-Stale': str(meta['stale']).lower()}
+    headers = {'ETag': tag, 'X-Source-Checked-At': meta['updated_at'] or '', 'X-Source-Stale': str(meta['stale']).lower(),
+               'X-Activity-Status': activity_status}
     if request.headers.get('if-none-match') == tag:
         return Response(status_code=304, headers=headers)
     return JSONResponse({'status': 'success', 'data': data, 'cycle': cycle, 'calendar': calendar, 'meta': meta}, headers=headers)
@@ -193,20 +203,50 @@ async def teacher_directory():
 
 
 class ActivityEvent(BaseModel):
-    uid: str = Field(max_length=128)
+    model_config = ConfigDict(extra='forbid', strict=True)
+    uid: str = Field(min_length=1, max_length=128, pattern=r'^[A-Za-z0-9][A-Za-z0-9_.:-]*$')
     group: str = Field(min_length=2, max_length=64)
     mode: Literal['standalone', 'browser']
     event: Literal['view', 'interaction']
 
 
 @app.post('/api/activity', status_code=204)
-async def record_activity(request: Request, event: ActivityEvent):
+async def record_activity(request: Request) -> Response:
     # A small action receipt does not build/serialize four schedule cycles.
     # Keep the existing schedule endpoint for historical reporting semantics.
     origin = request.headers.get('origin')
     if origin and origin != str(request.base_url).rstrip('/'):
         return Response(status_code=403)
-    accepted = analytics.record_request(event.uid, event.group, '/api/schedule',
+    if request.headers.get('content-type', '').split(';')[0].strip().lower() != 'application/json':
+        return Response(status_code=415)
+    length = request.headers.get('content-length')
+    if length is not None:
+        if not length.isascii() or not length.isdecimal():
+            return Response(status_code=400)
+        if len(length) > 10 or int(length) > 2048:
+            return Response(status_code=413)
+    body = bytearray()
+    try:
+        async with asyncio.timeout(5):
+            async for chunk in request.stream():
+                if len(body) + len(chunk) > 2048:
+                    return Response(status_code=413)
+                body.extend(chunk)
+    except TimeoutError:
+        return Response(status_code=408)
+    try:
+        event = ActivityEvent.model_validate_json(body)
+    except ValidationError:
+        return JSONResponse(status_code=422, content={'status': 'error', 'message': 'Некоректна подія активності.'})
+    if not schedule.raw:
+        return Response(status_code=503, headers={'Retry-After': '30'})
+    group = next((g for g in schedule.groups if normalize_group(g) == normalize_group(event.group)), None)
+    if group is None:
+        return JSONResponse(status_code=422, content={'status': 'error', 'message': 'Невідома група.'})
+    retry = activity_limiter.admit(event.uid)
+    if retry:
+        return Response(status_code=429, headers={'Retry-After': str(retry)})
+    accepted = analytics.record_request(event.uid, group, '/api/schedule',
                                         request.headers.get('user-agent', ''), event.mode, event.event)
     if not accepted:
         return Response(status_code=503, headers={'Retry-After': '30'})

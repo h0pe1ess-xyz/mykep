@@ -4,6 +4,7 @@ const {startFixtureServer}=require('./fixture-server.cjs');
 const {execFileSync}=require('node:child_process');
 const fs=require('node:fs');
 async function main() {
+    const baseline=process.env.MYKEP_SWIPE_BASELINE||'origin/main';
     const server=await startFixtureServer();
     const browser=await chromium.launch(process.env.PLAYWRIGHT_BROWSER_CHANNEL?{channel:process.env.PLAYWRIGHT_BROWSER_CHANNEL}:{});
     const results=[];
@@ -12,10 +13,11 @@ async function main() {
             for(let run=0;run<3;run++) {
                 const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,serviceWorkers:'block',userAgent:'Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36'});
                 const page=await context.newPage();
-                if(mode==='baseline') for(const name of ['api','app','schedule','tabs','boot']) {
-                    const body=execFileSync('git',['show',`d2cfdc4:static/js/${name}.js`],{encoding:'utf8'});
+                if(mode==='baseline') for(const name of ['api','app','schedule','tabs','boot','support']) {
+                    const body=execFileSync('git',['show',`${baseline}:static/js/${name}.js`],{encoding:'utf8'});
                     await page.route(`**/js/${name}.js*`,route=>route.fulfill({contentType:'text/javascript',body}));
                 }
+                if(mode==='baseline')await page.route('**/css/app.css*',route=>route.fulfill({contentType:'text/css',body:execFileSync('git',['show',`${baseline}:static/css/app.css`],{encoding:'utf8'})}));
                 await page.addInitScript(()=>{localStorage.setItem('mykep_onboarded','true');sessionStorage.setItem('mykep_browser_session','yes');});
                 const cdp=await context.newCDPSession(page);
                 await cdp.send('Emulation.setCPUThrottlingRate',{rate:6});
@@ -65,7 +67,7 @@ async function main() {
             }
         }
         fs.mkdirSync('.mykep-local',{recursive:true});
-        fs.writeFileSync('.mykep-local/swipe-performance.json',JSON.stringify({cpuThrottling:6,gestures:8,baseline:'d2cfdc4',synthetic:true,results},null,2));
+        fs.writeFileSync('.mykep-local/swipe-performance.json',JSON.stringify({cpuThrottling:6,gestures:8,baseline,synthetic:true,results},null,2));
         console.log(JSON.stringify(results));
     } finally {await browser.close();await server.close();}
 }

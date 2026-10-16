@@ -206,8 +206,10 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_activity_receipt_validates_without_building_schedule(self):
         import main
-        event = dict(uid='synthetic-action', group='ПІ-24-02', mode='standalone', event='interaction')
-        with patch.object(main.schedule, 'build', side_effect=AssertionError('activity must not build schedules')):
+        event = dict(uid='synthetic-action', group='НТ-24-01', mode='standalone', event='interaction')
+        service = ScheduleService()
+        service.install(snapshot(), time.time())
+        with patch.object(main, 'schedule', service), patch.object(service, 'build', side_effect=AssertionError('activity must not build schedules')):
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url='https://localhost') as client:
                 self.assertEqual((await client.post('/api/activity', json=event, headers={'Origin':'https://localhost'})).status_code, 204)
                 self.assertEqual((await client.post('/api/activity', json=event, headers={'Origin':'https://foreign.invalid'})).status_code, 403)

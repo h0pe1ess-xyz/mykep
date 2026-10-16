@@ -51,7 +51,7 @@ window.mykepViewportReport = function() {
         const box = node.getBoundingClientRect();
         return {top:box.top,bottom:box.bottom};
     });
-    return { version: '2.9.10', mode: getMyKepDisplayMode(),
+    return { version: '2.9.12', mode: getMyKepDisplayMode(),
         iosFixActive: document.documentElement.classList.contains('ios-standalone'),
         screen: {width:window.screen.width,height:window.screen.height,
             availableHeight:window.screen.availHeight,pixelRatio:window.devicePixelRatio,
@@ -104,6 +104,14 @@ window.mykepViewportReport = function() {
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule);
     });
 })();
+
+function getMyKepGestureAxis(dx, dy) {
+    const x = Math.abs(dx), y = Math.abs(dy);
+    if (Math.max(x, y) < 10) return null;
+    if (x > y * 1.2) return 'x';
+    if (y > x * 1.2) return 'y';
+    return null;
+}
 
 /* App gestures: preserve one-finger scrolling, suppress page zoom and overscroll.
  * Browser/OS-owned gestures are best-effort; no history traps or synthetic clicks.
@@ -175,10 +183,10 @@ window.mykepViewportReport = function() {
         if (Math.max(Math.abs(dx), Math.abs(dy)) < 2) return;
         const totalX = touch.clientX - state.startX;
         const totalY = touch.clientY - state.startY;
-        if (!state.axis && Math.max(Math.abs(totalX), Math.abs(totalY)) >= 10) {
-            state.axis = Math.abs(totalX) > Math.abs(totalY) * 1.2 ? 'x' : 'y';
-        }
-        const axis = state.axis || (Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y');
+        if (!state.axis) state.axis = getMyKepGestureAxis(totalX, totalY);
+        // A diagonal start is still undecided, especially over a vertical list.
+        const axis = state.axis;
+        if (!axis) return;
         if ((state.edge && axis === 'x') || !canScroll(state.containers, axis, axis === 'x' ? dx : dy)) {
             cancel(event);
         }

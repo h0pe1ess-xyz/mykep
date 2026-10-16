@@ -239,6 +239,10 @@ class ScheduleService:
         return self._built[key]
 
 
+MIN_CALENDAR_DATE = date(2000, 1, 1)
+MAX_CALENDAR_DATE = date(2099, 12, 31)
+
+
 def get_academic_week(target_date: date) -> int:
     base_monday = date(2026, 8, 31)
     delta_days = (target_date - base_monday).days
@@ -271,6 +275,8 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
     """Build schedule for a single group from the in-memory raw data. No network calls."""
     if week is not None and (type(week) is not int or week not in (1, 2, 3, 4)):
         raise ValueError("Week must be an integer from 1 to 4")
+    if monday is not None and not MIN_CALENDAR_DATE <= monday <= MAX_CALENDAR_DATE:
+        raise ValueError('Calendar dates must be between 2000 and 2099')
     if not raw_schedule_data:
         return None
 
