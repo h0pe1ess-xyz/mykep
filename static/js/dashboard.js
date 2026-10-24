@@ -36,11 +36,22 @@ function updateTimerDisplay(percentage) {
 }
 
 function tomorrowLessonMessage(nextDay) {
-    if (!nextDay?.lessons?.length) return 'Найближчих занять у циклі не заплановано.';
+    if (!nextDay?.lessons?.length) return 'Поки немає запланованих пар';
     const date = parseLocalDate(nextDay.date).toLocaleDateString('uk-UA',{weekday:'long',day:'numeric',month:'long'});
     const starts = nextDay.lessons.map(l => l.time.split(' - ')[0]).sort();
     const ends = nextDay.lessons.map(l => l.time.split(' - ')[1]).sort();
-    return `${date}: пари ${starts[0]}–${ends.at(-1)}.`;
+    return `${date.charAt(0).toUpperCase() + date.slice(1)}\n${starts[0]}–${ends.at(-1)}`;
+}
+function renderNextDayStatus(node, nextDay) {
+    if (!node) return;
+    const [date, time] = tomorrowLessonMessage(nextDay).split('\n');
+    node.textContent = date;
+    if (time) {
+        const range = document.createElement('span');
+        range.className = 'next-day-time';
+        range.textContent = time;
+        node.appendChild(range);
+    }
 }
 function lessonIntervals(lessons) {
     const slots = new Map();
@@ -61,6 +72,8 @@ function renderDashboard(schedule, tomorrow = null) {
     const gaugeMain = document.getElementById('minutes-left');
     const gaugeSub = document.getElementById('current-room');
     const statusText = document.getElementById('status-text');
+    const statusTitle = document.getElementById('dashboard-status-title');
+    if (statusTitle) statusTitle.textContent = 'Розклад на сьогодні';
     const currentCard = document.getElementById('current-lesson-card');
     const nextCard = document.getElementById('next-lesson-card');
     const progressFill = document.getElementById('day-progress-fill');
@@ -77,7 +90,8 @@ function renderDashboard(schedule, tomorrow = null) {
         updateTimerDisplay(100);
         if (gaugeMain) { gaugeMain.innerHTML = `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`; }
         if (gaugeSub) gaugeSub.innerHTML = `Вихідний`;
-        if (statusText) statusText.innerText = tomorrowLessonMessage(tomorrow);
+        if (statusTitle) statusTitle.textContent = 'Найближчі пари';
+        renderNextDayStatus(statusText, tomorrow);
         if (currentCard) currentCard.style.display = "none";
         if (nextCard) nextCard.style.display = "none";
         if (main) main.dataset.ready = 'true';
@@ -145,7 +159,8 @@ function renderDashboard(schedule, tomorrow = null) {
             updateTimerDisplay(100);
             if (gaugeMain) { gaugeMain.innerHTML = `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`; }
             if (gaugeSub) gaugeSub.innerHTML = `Кінець дня`;
-            if (statusText) statusText.innerText = tomorrowLessonMessage(tomorrow);
+            if (statusTitle) statusTitle.textContent = 'Найближчі пари';
+            renderNextDayStatus(statusText, tomorrow);
         }
     }
 

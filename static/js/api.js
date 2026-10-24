@@ -146,11 +146,13 @@ function defaultMonday(entry, group, now = getKyivNow()) {
     return monday;
 }
 function sourceTimeLabel(meta) {
-    if (!meta?.updated_at) return 'Час перевірки джерела невідомий.';
+    if (!meta?.updated_at) return 'Час перевірки невідомий';
     const checked=new Date(meta.updated_at);
-    if (!Number.isFinite(checked.getTime())) return 'Час перевірки джерела невідомий.';
+    if (!Number.isFinite(checked.getTime())) return 'Час перевірки невідомий';
     const oldYear=+new Intl.DateTimeFormat('en',{timeZone:'Europe/Kyiv',year:'numeric'}).format(checked) !== getKyivNow().getFullYear();
-    return `Джерело перевірено ${checked.toLocaleString('uk-UA',{timeZone:'Europe/Kyiv',day:'2-digit',month:'2-digit',...(oldYear?{year:'numeric'}:{}),hour:'2-digit',minute:'2-digit'})}`;
+    const date = checked.toLocaleDateString('uk-UA',{timeZone:'Europe/Kyiv',day:'numeric',month:'long',...(oldYear?{year:'numeric'}:{})});
+    const time = checked.toLocaleTimeString('uk-UA',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'});
+    return `Перевірено ${date} о ${time}`;
 }
 function staleScheduleNotice(meta) { return meta?.stale ? 'Дані можуть бути застарілими.' : ''; }
 function materializeSchedule(entry, week, group, now = getKyivNow()) {
