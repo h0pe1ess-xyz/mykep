@@ -28,14 +28,17 @@ async function run() {
                 assert.match(focusRing.shadow,/2px/);
                 assert.equal(focusRing.outline,'none');
                 await page.screenshot({path:`.mykep-local/screens/${engine}-week-focus.png`});
-                assert.match(await page.locator('#schedule-week-label').textContent(),/(Поточний|Наступний).*тиждень/);
+                assert.match(await page.locator('#schedule-week-label').textContent(),/12–17 жовтня Тиждень 3/);
                 assert.equal(await page.locator('.schedule-context,#schedule-group,#subgroup-choices').count(),0);
                 assert.equal(await page.locator('#schedule-notice').isVisible(),false);
-                assert.ok((await page.locator('#schedule-data-time').textContent()).includes('Джерело перевірено'));
+                assert.ok((await page.locator('#schedule-data-time').textContent()).includes('Перевірено 14 жовтня о 10:00'));
                 const navStyle=await page.locator('.bottom-nav .active').evaluate(n=>({filter:getComputedStyle(n).filter,shadow:getComputedStyle(n).boxShadow,color:getComputedStyle(n).backgroundColor}));
                 assert.deepEqual(navStyle,{filter:'none',shadow:'none',color:'rgb(255, 85, 0)'});
-                await page.selectOption('#schedule-week','3');
-                await page.waitForFunction(()=>document.getElementById('schedule-week-label').textContent.includes('без календарної дати'));
+                for (const week of ['1','2','3','4']) {
+                    await page.selectOption('#schedule-week',week);
+                    await page.waitForFunction(()=>document.getElementById('schedule-week-label').hidden);
+                    assert.equal(await page.locator('#schedule-week-label').textContent(),'');
+                }
                 async function choosePrimary(group) {
                     await page.evaluate(()=>Tabs.show('settings'));
                     await page.click('#open-group-modal');
@@ -58,7 +61,8 @@ async function run() {
                 assert.equal(await page.evaluate(()=>localStorage.getItem('mykep_uid')),'synthetic-browser-test');
                 await context.setOffline(false);
                 await page.selectOption('#schedule-week','auto');
-                await page.waitForFunction(()=>!document.getElementById('schedule-week-label').textContent.includes('без календарної дати'));
+                await page.waitForFunction(()=>!document.getElementById('schedule-week-label').hidden);
+                assert.match(await page.locator('#schedule-week-label').textContent(),/жовтня Тиждень/);
                 // Hold the fetch at the JS boundary: WebKit worker-owned requests
                 // can bypass page.route(), even when the worker does not cache API.
                 await page.evaluate(()=>{const e=cachedScheduleForKey(scheduleRequestContext().key); saveScheduleEntry({...e,savedAt:Date.now()-180000});});
@@ -368,9 +372,13 @@ async function run() {
                 await calendarPage.clock.runFor(20000);
                 await calendarPage.waitForFunction(()=>currentGlobalSchedule?.length===0);
                 assert.equal(await calendarPage.locator('.progress-section').isVisible(),false);
+                assert.equal(await calendarPage.locator('#dashboard-status-title').textContent(),'Найближчі пари');
+                assert.match(await calendarPage.locator('#status-text').innerText(),/Понеділок, 19 жовтня\n08:00–18:40/);
+                await calendarPage.evaluate(()=>tickDashboard(true));
+                assert.equal(await calendarPage.locator('#status-text .next-day-time').count(),1);
                 await calendarPage.evaluate(()=>Tabs.show('schedule'));
                 await calendarPage.waitForFunction(()=>schedulePageData);
-                assert.match(await calendarPage.locator('#schedule-week-label').textContent(),/Наступний/);
+                assert.equal(await calendarPage.locator('#schedule-week-label').textContent(),'19–24 жовтня Тиждень 4');
                 assert.equal(await calendarPage.locator('#schedule-week option[value=auto]').textContent(),'Наступний');
                 assert.equal(await calendarPage.locator('#schedule-week option[value=current]').textContent(),'Цей тиждень');
                 await calendarPage.selectOption('#schedule-week','current');
@@ -384,6 +392,9 @@ async function run() {
                 assert.equal(await calendarPage.locator('.day-item[aria-current="date"]').getAttribute('data-day'),'понеділок');
                 assert.equal(await calendarPage.locator('#schedule-week option[value=current]').count(),0);
                 assert.equal(await calendarPage.locator('#schedule-week').inputValue(),'auto');
+                await calendarPage.evaluate(()=>Tabs.show('dashboard'));
+                await calendarPage.waitForFunction(()=>document.getElementById('dashboard-status-title').textContent==='Розклад на сьогодні');
+                assert.equal(await calendarPage.locator('#status-text .next-day-time').count(),0);
                 await calendarContext.close();
                 console.log(`${engine}: Kyiv midnight and Sunday-to-Monday week change without restart passed`);
                 if (engine==='chromium') {

@@ -188,11 +188,31 @@ function renderScheduleContext(calendar,group) {
     } else if (selection !== 'next' || automaticIsNext) next?.remove();
     // Preserve an explicit current-week preference while both views coincide.
     select.value=(selection === 'current' && !automaticIsNext || selection === 'next' && automaticIsNext) ? 'auto' : selection;
+    label.hidden = !calendar?.monday;
+    if (label.hidden) {
+        label.replaceChildren();
+        delete label.dataset.description;
+        delete label.dataset.cycle;
+        return;
+    }
     let description;
     if (calendar?.monday) {
         const monday = parseLocalDate(calendar.monday), end = new Date(monday); end.setDate(end.getDate()+5);
-        description = `${calendar.label.replace(' тиждень','')} · ${monday.toLocaleDateString('uk-UA',{day:'numeric',month:'short'})} – ${end.toLocaleDateString('uk-UA',{day:'numeric',month:'short'})} · ${calendar.cycle}-й тиждень`;
-    } else description = `${calendar?.cycle || getScheduleWeekSelection()}-й тиждень · без календарної дати`;
-    if (label.textContent !== description) label.textContent=description;
+        const sameMonth = monday.getMonth() === end.getMonth() && monday.getFullYear() === end.getFullYear();
+        const startLabel = sameMonth ? monday.getDate() : monday.toLocaleDateString('uk-UA',{day:'numeric',month:'long'});
+        const endLabel = end.toLocaleDateString('uk-UA',{day:'numeric',month:'long'});
+        description = `${startLabel}${sameMonth ? '–' : ' – '}${endLabel}`;
+    }
+    const cycleLabel = `Тиждень ${calendar?.cycle || getScheduleWeekSelection()}`;
+    if (label.dataset.description !== description || label.dataset.cycle !== cycleLabel) {
+        const dates = document.createElement('span');
+        dates.textContent = description;
+        const cycle = document.createElement('span');
+        cycle.className = 'schedule-cycle';
+        cycle.textContent = cycleLabel;
+        label.replaceChildren(dates, document.createTextNode(' '), cycle);
+        label.dataset.description = description;
+        label.dataset.cycle = cycleLabel;
+    }
 }
 let currentScheduleCalendar = null;

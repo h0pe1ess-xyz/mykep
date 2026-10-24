@@ -42,6 +42,22 @@ test('offline cycle never activates before start date and manual mode has no inv
     assert.equal(run(`scheduleExportDayLabel('середа','current',new Date(2026,9,12))`),'Середа · 14 жовтня 2026');
     assert.equal(run(`scheduleExportDayLabel('середа','3',new Date(2026,9,12))`),'Середа · 3-й тиждень');
 });
+test('next classes separate the date and time without sentence clutter',()=>{
+    const {run}=fixture();
+    assert.equal(run(`tomorrowLessonMessage({date:'2026-10-26',lessons:[
+        {...sampleLesson,time:'15:20 - 16:20'}, {...sampleLesson,time:'14:10 - 15:10'}
+    ]})`),'Понеділок, 26 жовтня\n14:10–16:20');
+    assert.equal(run(`tomorrowLessonMessage(null)`),'Поки немає запланованих пар');
+});
+
+test('source check labels preserve Kyiv time and distinguish missing or old dates',()=>{
+    const {run}=fixture();
+    assert.equal(run(`sourceTimeLabel({updated_at:'2026-10-24T18:31:00Z'})`),'Перевірено 24 жовтня о 21:31');
+    assert.match(run(`sourceTimeLabel({updated_at:'2025-12-31T12:00:00Z'})`),/31 грудня 2025/);
+    assert.equal(run(`sourceTimeLabel({updated_at:'invalid'})`),'Час перевірки невідомий');
+    assert.equal(run(`sourceTimeLabel({})`),'Час перевірки невідомий');
+});
+
 test('simultaneous lessons form one interval with a strictly later next slot',()=>{
     const {run}=fixture();
     assert.equal(run(`lessonIntervals([{...sampleLesson,subject:'Група 1'},{...sampleLesson,subject:'Група 2'}]).length`),1);
