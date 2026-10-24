@@ -188,6 +188,13 @@ function renderScheduleContext(calendar,group) {
     } else if (selection !== 'next' || automaticIsNext) next?.remove();
     // Preserve an explicit current-week preference while both views coincide.
     select.value=(selection === 'current' && !automaticIsNext || selection === 'next' && automaticIsNext) ? 'auto' : selection;
+    label.hidden = !calendar?.monday;
+    if (label.hidden) {
+        label.replaceChildren();
+        delete label.dataset.description;
+        delete label.dataset.cycle;
+        return;
+    }
     let description;
     if (calendar?.monday) {
         const monday = parseLocalDate(calendar.monday), end = new Date(monday); end.setDate(end.getDate()+5);
@@ -195,7 +202,7 @@ function renderScheduleContext(calendar,group) {
         const startLabel = sameMonth ? monday.getDate() : monday.toLocaleDateString('uk-UA',{day:'numeric',month:'long'});
         const endLabel = end.toLocaleDateString('uk-UA',{day:'numeric',month:'long'});
         description = `${startLabel}${sameMonth ? '–' : ' – '}${endLabel}`;
-    } else description = 'Без прив’язки до дати';
+    }
     const cycleLabel = `Тиждень ${calendar?.cycle || getScheduleWeekSelection()}`;
     if (label.dataset.description !== description || label.dataset.cycle !== cycleLabel) {
         const dates = document.createElement('span');

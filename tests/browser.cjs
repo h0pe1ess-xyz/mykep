@@ -34,8 +34,11 @@ async function run() {
                 assert.ok((await page.locator('#schedule-data-time').textContent()).includes('Перевірено 14 жовтня о 10:00'));
                 const navStyle=await page.locator('.bottom-nav .active').evaluate(n=>({filter:getComputedStyle(n).filter,shadow:getComputedStyle(n).boxShadow,color:getComputedStyle(n).backgroundColor}));
                 assert.deepEqual(navStyle,{filter:'none',shadow:'none',color:'rgb(255, 85, 0)'});
-                await page.selectOption('#schedule-week','3');
-                await page.waitForFunction(()=>document.getElementById('schedule-week-label').textContent.includes('Без прив’язки до дати'));
+                for (const week of ['1','2','3','4']) {
+                    await page.selectOption('#schedule-week',week);
+                    await page.waitForFunction(()=>document.getElementById('schedule-week-label').hidden);
+                    assert.equal(await page.locator('#schedule-week-label').textContent(),'');
+                }
                 async function choosePrimary(group) {
                     await page.evaluate(()=>Tabs.show('settings'));
                     await page.click('#open-group-modal');
@@ -58,7 +61,8 @@ async function run() {
                 assert.equal(await page.evaluate(()=>localStorage.getItem('mykep_uid')),'synthetic-browser-test');
                 await context.setOffline(false);
                 await page.selectOption('#schedule-week','auto');
-                await page.waitForFunction(()=>!document.getElementById('schedule-week-label').textContent.includes('Без прив’язки до дати'));
+                await page.waitForFunction(()=>!document.getElementById('schedule-week-label').hidden);
+                assert.match(await page.locator('#schedule-week-label').textContent(),/жовтня Тиждень/);
                 // Hold the fetch at the JS boundary: WebKit worker-owned requests
                 // can bypass page.route(), even when the worker does not cache API.
                 await page.evaluate(()=>{const e=cachedScheduleForKey(scheduleRequestContext().key); saveScheduleEntry({...e,savedAt:Date.now()-180000});});
