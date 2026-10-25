@@ -50,7 +50,7 @@ function renderTeacherLabel(value) {
     function load() {
         if (!loading) loading = (async () => {
             try { install(JSON.parse(storage.get('mykep_teachers') || 'null')); } catch { /* Bundled fallback follows. */ }
-            await loadURL('/data/teacher-hints.json?v=2.9.13');
+            await loadURL('/data/teacher-hints.json?v=2.9.14');
             await loadURL('/api/teacher-hints');
         })().finally(() => { loading=null; });
         return loading;

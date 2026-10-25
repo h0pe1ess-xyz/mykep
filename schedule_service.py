@@ -7,11 +7,12 @@ import time
 from datetime import datetime, timedelta, date
 from typing import Dict, Any, Optional
 
-from config import DB_PATH, KYIV, REFRESH_SECONDS, RETRY_SECONDS
+from config import BASE_DIR, DB_PATH, KYIV, REFRESH_SECONDS, RETRY_SECONDS
 from database import connect
 
 logger = logging.getLogger(__name__)
 URL = "https://kep.nung.edu.ua/pages/education/schedule"
+BELLS = json.loads((BASE_DIR / 'static/data/bells.json').read_text(encoding='utf-8'))
 
 
 def normalize_group(value):
@@ -288,14 +289,10 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
     base_monday = monday or (now.date() - timedelta(days=now.weekday()))
     days_to_check = {day: base_monday + timedelta(days=i) for i, day in enumerate(DAYS)}
 
-    shift1_80 = {"1": "08:00 - 09:20", "2": "09:30 - 10:50", "3": "11:10 - 12:30", "4": "12:40 - 14:00"}
-    shift1_60 = {"1": "08:00 - 09:00", "2": "09:10 - 10:10", "3": "10:30 - 11:30", "4": "11:40 - 12:40"}
-    shift2_80 = {"5": "14:10 - 15:30", "6": "15:40 - 17:00", "7": "17:10 - 18:30", "8": "18:40 - 20:00"}
-    shift2_60 = {"5": "14:10 - 15:10", "6": "15:20 - 16:20", "7": "16:30 - 17:30", "8": "17:40 - 18:40"}
-
-    time_mapping = {}
-    time_mapping.update(shift1_80 if int(duration1) == 80 else shift1_60)
-    time_mapping.update(shift2_80 if int(duration2) == 80 else shift2_60)
+    time_mapping = {
+        str(i + 1): ' - '.join(BELLS[str(80 if int(duration) == 80 else 60)][i])
+        for i, duration in enumerate([duration1] * 4 + [duration2] * 4)
+    }
 
     full_week_schedule = {}
     for day_name, day_date in days_to_check.items():
