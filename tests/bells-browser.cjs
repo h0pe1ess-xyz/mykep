@@ -23,10 +23,11 @@ async function run() {
                 await page.keyboard.press('ArrowRight');
                 assert.equal(await page.locator('#schedule-bells-tab').evaluate(n=>n===document.activeElement),true);
                 await page.waitForFunction(()=>!document.getElementById('bells-table').hidden);
-                assert.equal(await page.locator('#bells-table tbody tr').count(),8);
+                assert.equal(await page.locator('#bells-table .bell-row').count(),8);
+                assert.deepEqual(await page.locator('.bells-shift-label > span:first-child').allTextContents(),['Перша зміна','Друга зміна']);
                 for (const selector of ['.day-picker','.schedule-header-actions','#dynamic-schedule-list','#schedule-notice','#schedule-share-status']) assert.equal(await page.locator(selector).isVisible(),false);
                 assert.equal(await page.locator('.bottom-nav a').count(),3);
-                assert.equal(await page.locator('#bells-table [aria-current="time"] th').innerText(),'1\nЗараз');
+                assert.equal(await page.locator('#bells-table [aria-current="time"] th').innerText(),'1 Зараз');
                 const bellsHeader=await page.locator('.view-schedule .app-header').evaluate(n=>n.getBoundingClientRect().height);
                 await page.keyboard.press('Home');
                 assert.equal(await page.evaluate(()=>schedulePickerState.activeDay),day);
@@ -35,9 +36,10 @@ async function run() {
                 for (const first of ['60','80']) for (const second of ['60','80']) {
                     await page.evaluate(({first,second})=>{storage.set('mykep_duration1',first);storage.set('mykep_duration2',second);BellSchedule.render();},{first,second});
                     const expected=Array.from({length:8},(_,i)=>bells[i<4?first:second][i]);
-                    await page.waitForFunction(expected=>JSON.stringify([...document.querySelectorAll('#bells-table tbody tr')].map(row=>[...row.querySelectorAll('td')].map(n=>n.textContent)))===JSON.stringify(expected),expected);
-                    const times=await page.locator('#bells-table tbody tr').evaluateAll(rows=>rows.map(row=>[...row.querySelectorAll('td')].map(n=>n.textContent)));
+                    await page.waitForFunction(expected=>JSON.stringify([...document.querySelectorAll('#bells-table .bell-row')].map(row=>[...row.querySelectorAll('.bell-start,.bell-end')].map(n=>n.textContent)))===JSON.stringify(expected),expected);
+                    const times=await page.locator('#bells-table .bell-row').evaluateAll(rows=>rows.map(row=>[...row.querySelectorAll('.bell-start,.bell-end')].map(n=>n.textContent)));
                     assert.deepEqual(times,expected);
+                    assert.deepEqual(await page.locator('.bells-duration').allTextContents(),[`${first} хв`,`${second} хв`]);
                 }
                 await page.clock.setSystemTime(new Date('2026-10-14T06:20:00Z'));
                 await page.evaluate(()=>BellSchedule.render());
@@ -49,7 +51,7 @@ async function run() {
                 await page.locator('input[name="duration1"][value="60"]').locator('..').click();
                 await page.locator('#confirm-ok-btn').click();
                 await page.evaluate(()=>Tabs.show('schedule'));
-                await page.waitForFunction(()=>document.querySelector('#bells-table tbody td:nth-child(3)').textContent==='09:00');
+                await page.waitForFunction(()=>document.querySelector('#bells-table .bell-end').textContent==='09:00');
                 await page.locator('#schedule-bells-tab').focus();
                 await page.keyboard.press('Home');
                 assert.equal(await page.locator('#dynamic-schedule-list').isVisible(),true);
@@ -64,8 +66,8 @@ async function run() {
                     await page.locator('#schedule-bells-tab').click();
                     await page.screenshot({path:`.mykep-local/screens/${engine}-bells-${width}.png`});
                     assert.equal(await page.locator('.bells-panel').evaluate(n=>n.scrollWidth>n.clientWidth),false);
-                    await page.locator('#bells-table tbody tr:last-child').scrollIntoViewIfNeeded();
-                    const visible=await page.locator('#bells-table tbody tr:last-child').boundingBox();
+                    await page.locator('#bells-table .bell-row').last().scrollIntoViewIfNeeded();
+                    const visible=await page.locator('#bells-table .bell-row').last().boundingBox();
                     assert.ok(visible.y+visible.height<=height);
                     await page.locator('#schedule-lessons-tab').click();
                     await page.screenshot({path:`.mykep-local/screens/${engine}-lessons-${width}.png`});
@@ -99,7 +101,7 @@ async function run() {
                 release();
                 await late.locator('#schedule-bells-tab').click();
                 await late.locator('#bells-table').waitFor({state:'visible'});
-                assert.equal(await late.locator('#bells-table tbody tr').count(),8);
+                assert.equal(await late.locator('#bells-table .bell-row').count(),8);
                 await delayed.close();
                 if (engine==='chromium') {
                     const offline=await browser.newContext();
@@ -111,7 +113,7 @@ async function run() {
                     await cached.reload();
                     await cached.locator('#schedule-bells-tab').click();
                     await cached.locator('#bells-table').waitFor({state:'visible'});
-                    assert.equal(await cached.locator('#bells-table tbody tr').count(),8);
+                    assert.equal(await cached.locator('#bells-table .bell-row').count(),8);
                     await offline.close();
                 }
                 console.log(`${engine}: 8 bells, all durations, keyboard, time boundaries, settings, preserved week/day, responsive scrolling, retry and delayed replies${engine==='chromium'?', offline cache':''} passed`);

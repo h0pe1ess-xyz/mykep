@@ -48,12 +48,18 @@ const BellSchedule = (() => {
         try {
             const data = await load();
             if (token !== renderToken || mode !== 'bells') return;
-            const rows = Array.from({length:8}, (_, i) => {
-                const [start, end] = data[i < 4 ? first : second][i];
-                const current = minute >= timeToMins(start) && minute < timeToMins(end);
-                return `<tr${current ? ' aria-current="time"' : ''}><th scope="row">${i + 1}${current ? '<span class="bell-current">Зараз</span>' : ''}</th><td>${start}</td><td>${end}</td></tr>`;
+            const groups = [first, second].map((duration, shift) => {
+                const title = shift === 0 ? 'Перша зміна' : 'Друга зміна';
+                const rows = Array.from({length:4}, (_, slot) => {
+                    const i = shift * 4 + slot;
+                    const [start, end] = data[duration][i];
+                    const current = minute >= timeToMins(start) && minute < timeToMins(end);
+                    return `<tr class="bell-row"${current ? ' aria-current="time"' : ''}><th scope="row"><span class="bell-number">${i + 1}</span>${current ? ' <span class="bell-current">Зараз</span>' : ''}</th><td><span class="bell-start">${start}</span><span class="bell-separator">–</span><span class="bell-end">${end}</span></td></tr>`;
+                });
+                return `<tbody><tr class="bells-shift"><th colspan="2" scope="rowgroup"><span class="bells-shift-label"><span>${title}</span><span class="bells-duration">${duration} хв</span></span></th></tr>${rows.join('')}</tbody>`;
             });
-            table.querySelector('tbody').innerHTML = rows.join('');
+            table.querySelectorAll('tbody').forEach(group => group.remove());
+            table.insertAdjacentHTML('beforeend', groups.join(''));
             status.hidden = true;
             table.hidden = false;
             renderedKey = key;

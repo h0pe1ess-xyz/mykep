@@ -1,35 +1,35 @@
-const CACHE_NAME = 'mykep-cache-v2.9.14';
-const RELEASE_VERSION = '2.9.14';
+const CACHE_NAME = 'mykep-cache-v2.9.15';
+const RELEASE_VERSION = '2.9.15';
 const APP_SHELL = [
-    "/js/bells.js?v=2.9.14",
-    "/data/bells.json?v=2.9.14",
-    "/js/dialogs.js?v=2.9.14",
+    "/js/bells.js?v=2.9.15",
+    "/data/bells.json?v=2.9.15",
+    "/js/dialogs.js?v=2.9.15",
     "/",
     "/about.html",
-    "/css/about.css?v=2.9.14",
-    "/css/app.css?v=2.9.14",
+    "/css/about.css?v=2.9.15",
+    "/css/app.css?v=2.9.15",
     "/manifest.json",
     "/favicon.ico",
-    "/data/teacher-hints.json?v=2.9.14",
-    "/js/api.js?v=2.9.14",
-    "/js/app.js?v=2.9.14",
-    "/js/boot.js?v=2.9.14",
-    "/js/dashboard.js?v=2.9.14",
-    "/js/onboarding.js?v=2.9.14",
-    "/js/pwa.js?v=2.9.14",
-    "/js/schedule-share.js?v=2.9.14",
-    "/js/schedule.js?v=2.9.14",
-    "/js/settings.js?v=2.9.14",
-    "/js/support.js?v=2.9.14",
-    "/js/tabs.js?v=2.9.14",
-    "/js/teacher-hints.js?v=2.9.14",
-    "/js/utils.js?v=2.9.14",
+    "/data/teacher-hints.json?v=2.9.15",
+    "/js/api.js?v=2.9.15",
+    "/js/app.js?v=2.9.15",
+    "/js/boot.js?v=2.9.15",
+    "/js/dashboard.js?v=2.9.15",
+    "/js/onboarding.js?v=2.9.15",
+    "/js/pwa.js?v=2.9.15",
+    "/js/schedule-share.js?v=2.9.15",
+    "/js/schedule.js?v=2.9.15",
+    "/js/settings.js?v=2.9.15",
+    "/js/support.js?v=2.9.15",
+    "/js/tabs.js?v=2.9.15",
+    "/js/teacher-hints.js?v=2.9.15",
+    "/js/utils.js?v=2.9.15",
     "/icons/install-144.webp",
     "/icons/icon-192.png",
     "/icons/icon-512.png",
     "/icons/maskable-orange-512.png"
 ];
-const SHELL_HASHES = {"/": "87158451a51c769944a787e7bc32ffd73e2942cb2bef1080d63a6aacef42a67c", "/about.html": "50d861ce4bffb59eb216bc3101ee615b9ae06cefe78a1e6eeebbf3019f9a112a", "/css/about.css?v=2.9.14": "63f9cb041b1dbb44e5d1bbcd99a0ea7b067221aaf0fcc5f2620d3081d1b2548b", "/css/app.css?v=2.9.14": "fb4a7eb58e73032176f081fa5f695e56a4ad0297fe0961f7f39bce168b1c36c4", "/data/bells.json?v=2.9.14": "3ba4a9a96491c50262ee333427ea57a1863070f347cba2356c5670fd1d5a4161", "/data/teacher-hints.json?v=2.9.14": "62925f89ce7b723ca830be198a8016d44f7c3c477ba9500ef3d201abe9555452", "/favicon.ico": "3fec7714d2adfa4acaadea48e6f7514939ad689ed026dd221aa58cd2d369d67b", "/icons/icon-192.png": "e470d3f6cf6976a2d12c35dfe249f0561ae0ad457f046bd3612a40568dc134bd", "/icons/icon-512.png": "e2d86fe6dd7d2571e5bd941129fc3aa88469cead4c53d381abcd33ffd514d40d", "/icons/install-144.webp": "e55475df6ab9a48853cc92e9a3059734d84f002c895fc0e704df8e906b595679", "/icons/maskable-orange-512.png": "4fc555360c7c3d0b0ff993540d30e599756a15a26418280dc583ebac28db8d86", "/js/api.js?v=2.9.14": "3eaba3bb0489c3488c714f01c3a0d6e5aba54c28267c55f8b7ebbb39df88287f", "/js/app.js?v=2.9.14": "c5569c3c2399a6a7327e8223540b3f70f0ca463e550e024c87541f10032895cb", "/js/bells.js?v=2.9.14": "65f533525598bf06da0c14fb469b95480a27600b89ba9e00039f378c89f2efd5", "/js/boot.js?v=2.9.14": "c8c305f4f025cf0d0efe7c81ae0c835f2660f35ca1f0f0a8bdf6afe326deb2e0", "/js/dashboard.js?v=2.9.14": "09fe949e878b8cdb33b104ae4a36b12a53ffa4a9508c59afecca648d533e721f", "/js/dialogs.js?v=2.9.14": "16ccdb6f1bbb037b22089ee96f315006a3f6c9303af39b0c2dfb701212ae7e3a", "/js/onboarding.js?v=2.9.14": "a1eda936fff8962ba3f781fd977a9287bda666f98b22b6f4ceb9873f4172ee00", "/js/pwa.js?v=2.9.14": "eedf3a7f92c0533ee92a605ce4cc93fa2b7b05f5969f61972476a6066f86795a", "/js/schedule-share.js?v=2.9.14": "da698b39bb40d59928b22cf186826837e3bd881875a0fe021924782e702f9568", "/js/schedule.js?v=2.9.14": "f7e07af87dfc583f6a14f20fc68b3edee42319a6d4e6c9c85b9508be7d8289ef", "/js/settings.js?v=2.9.14": "7d56f972ae97b03646282a9926348538795f2ef5c79ae79379d1bb8f80dac338", "/js/support.js?v=2.9.14": "e31210b2a751b1cf9b13b9ef3f28034283f030a8793d48db60aa606c1e58394f", "/js/tabs.js?v=2.9.14": "7210f6a5b22006b1808457e4700f618cd170dc6375210e0a7e36fc9494432a1d", "/js/teacher-hints.js?v=2.9.14": "eb085925131ae758e86a1f9df89c0ca4ee6a29a493004d9944faf4d894e2e0d5", "/js/utils.js?v=2.9.14": "60ec12bb010288cfb0f73b5ca2351353c01a27ec0ea685007acdcc0324bd0fb0", "/manifest.json": "1ca328a0070b66bdfb49fd6aa0b6ffca26d5239bddb8752dc328f5428f954ae4"};
+const SHELL_HASHES = {"/": "718ea272a1ac38ca1448a4b8505ed027f308c1f335d7b162f6f35449bdb7ab82", "/about.html": "b7cc671d207bf469ffa97efb9c0b70bc0d83d6f78757948b1dd29eb29c5d4770", "/css/about.css?v=2.9.15": "63f9cb041b1dbb44e5d1bbcd99a0ea7b067221aaf0fcc5f2620d3081d1b2548b", "/css/app.css?v=2.9.15": "7d10274e73be5e8e99adafd70bdd2c71815e774647594d4b1f0450991c6b0f18", "/data/bells.json?v=2.9.15": "3ba4a9a96491c50262ee333427ea57a1863070f347cba2356c5670fd1d5a4161", "/data/teacher-hints.json?v=2.9.15": "62925f89ce7b723ca830be198a8016d44f7c3c477ba9500ef3d201abe9555452", "/favicon.ico": "3fec7714d2adfa4acaadea48e6f7514939ad689ed026dd221aa58cd2d369d67b", "/icons/icon-192.png": "e470d3f6cf6976a2d12c35dfe249f0561ae0ad457f046bd3612a40568dc134bd", "/icons/icon-512.png": "e2d86fe6dd7d2571e5bd941129fc3aa88469cead4c53d381abcd33ffd514d40d", "/icons/install-144.webp": "e55475df6ab9a48853cc92e9a3059734d84f002c895fc0e704df8e906b595679", "/icons/maskable-orange-512.png": "4fc555360c7c3d0b0ff993540d30e599756a15a26418280dc583ebac28db8d86", "/js/api.js?v=2.9.15": "3eaba3bb0489c3488c714f01c3a0d6e5aba54c28267c55f8b7ebbb39df88287f", "/js/app.js?v=2.9.15": "c5569c3c2399a6a7327e8223540b3f70f0ca463e550e024c87541f10032895cb", "/js/bells.js?v=2.9.15": "5b069bef02a44c1af29af7f9dccf98e86275e6172fe0d74b910f7a9c35e056fc", "/js/boot.js?v=2.9.15": "06e337cb57314e9b3b1dba647a3a12d628677fbb1ce99cdc96def20336bdad3c", "/js/dashboard.js?v=2.9.15": "09fe949e878b8cdb33b104ae4a36b12a53ffa4a9508c59afecca648d533e721f", "/js/dialogs.js?v=2.9.15": "16ccdb6f1bbb037b22089ee96f315006a3f6c9303af39b0c2dfb701212ae7e3a", "/js/onboarding.js?v=2.9.15": "a1eda936fff8962ba3f781fd977a9287bda666f98b22b6f4ceb9873f4172ee00", "/js/pwa.js?v=2.9.15": "eedf3a7f92c0533ee92a605ce4cc93fa2b7b05f5969f61972476a6066f86795a", "/js/schedule-share.js?v=2.9.15": "da698b39bb40d59928b22cf186826837e3bd881875a0fe021924782e702f9568", "/js/schedule.js?v=2.9.15": "f7e07af87dfc583f6a14f20fc68b3edee42319a6d4e6c9c85b9508be7d8289ef", "/js/settings.js?v=2.9.15": "7d56f972ae97b03646282a9926348538795f2ef5c79ae79379d1bb8f80dac338", "/js/support.js?v=2.9.15": "e31210b2a751b1cf9b13b9ef3f28034283f030a8793d48db60aa606c1e58394f", "/js/tabs.js?v=2.9.15": "7210f6a5b22006b1808457e4700f618cd170dc6375210e0a7e36fc9494432a1d", "/js/teacher-hints.js?v=2.9.15": "03a44ed5b5618eb39cbe03cf5d1ba060760bc9d94bc8679f715371e1203800b2", "/js/utils.js?v=2.9.15": "60ec12bb010288cfb0f73b5ca2351353c01a27ec0ea685007acdcc0324bd0fb0", "/manifest.json": "1ca328a0070b66bdfb49fd6aa0b6ffca26d5239bddb8752dc328f5428f954ae4"};
 const OPTIONAL_ASSETS = ["/pfp/1-192.webp", "/pfp/2.webp"];
 const TAB_PATHS = new Set(['/', '/index.html', '/schedule.html', '/settings.html']);
 
