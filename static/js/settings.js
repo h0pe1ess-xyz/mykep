@@ -2,7 +2,7 @@ function initSettings() {
     const clearBtn = document.getElementById('clear-cache-btn');
     const resetDurationBtn = document.getElementById('reset-duration-btn');
     const durations = [
-        { name: 'duration1', key: 'mykep_duration1', fallback: '80', label: 'Перша зміна' },
+        { name: 'duration1', key: 'mykep_duration1', fallback: '60', label: 'Перша зміна' },
         { name: 'duration2', key: 'mykep_duration2', fallback: '60', label: 'Друга зміна' }
     ];
     function currentDuration(setting) {

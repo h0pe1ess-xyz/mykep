@@ -36,8 +36,8 @@ const BellSchedule = (() => {
     async function render() {
         if (mode !== 'bells' || Tabs.current !== 'schedule') return;
         const token = ++renderToken;
-        const first = storage.get('mykep_duration1') === '60' ? '60' : '80';
-        const second = storage.get('mykep_duration2') === '80' ? '80' : '60';
+        const first = getLessonDuration(1);
+        const second = getLessonDuration(2);
         const now = getKyivNow();
         const minute = now.getHours() * 60 + now.getMinutes();
         const key = `${first}|${second}|${minute}`;

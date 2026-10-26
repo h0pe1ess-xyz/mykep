@@ -23,6 +23,9 @@ async function run() {
                 await page.keyboard.press('ArrowRight');
                 assert.equal(await page.locator('#schedule-bells-tab').evaluate(n=>n===document.activeElement),true);
                 await page.waitForFunction(()=>!document.getElementById('bells-table').hidden);
+                assert.deepEqual(await page.locator('.bells-duration').allTextContents(),['60 хв','60 хв']);
+                assert.equal(await page.locator('#bells-table .bell-start').nth(4).textContent(),'12:50');
+                assert.equal(await page.locator('#bells-table .bell-end').last().textContent(),'17:20');
                 assert.equal(await page.locator('#bells-table .bell-row').count(),8);
                 assert.deepEqual(await page.locator('.bells-shift-label > span:first-child').allTextContents(),['Перша зміна','Друга зміна']);
                 for (const selector of ['.day-picker','.schedule-header-actions','#dynamic-schedule-list','#schedule-notice','#schedule-share-status']) assert.equal(await page.locator(selector).isVisible(),false);
@@ -49,7 +52,12 @@ async function run() {
                 await page.waitForFunction(()=>document.querySelector('#bells-table [aria-current] th').textContent.startsWith('2'));
                 await page.evaluate(()=>{Tabs.show('settings');});
                 await page.locator('input[name="duration1"][value="60"]').locator('..').click();
+                assert.equal(await page.locator('#confirm-modal').isVisible(),false);
+                await page.locator('#reset-duration-btn').click();
+                await page.locator('input[name="duration1"][value="80"]').locator('..').click();
                 await page.locator('#confirm-ok-btn').click();
+                assert.equal(await page.evaluate(()=>getLessonDuration(1)),'80');
+                await page.locator('#reset-duration-btn').click();
                 await page.evaluate(()=>Tabs.show('schedule'));
                 await page.waitForFunction(()=>document.querySelector('#bells-table .bell-end').textContent==='09:00');
                 await page.locator('#schedule-bells-tab').focus();

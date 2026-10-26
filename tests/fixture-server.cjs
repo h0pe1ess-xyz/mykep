@@ -1,15 +1,20 @@
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const days=['понеділок','вівторок','середа','четвер',"п'ятниця",'субота'];
-function cycleFixture() {
-    return Object.fromEntries([1,2,3,4].map(week=>[week,Object.fromEntries(days.map(day=>[day,[
+function cycleFixture(first='60',second='60') {
+    const cycle=Object.fromEntries([1,2,3,4].map(week=>[week,Object.fromEntries(days.map(day=>[day,[
         {lesson:1,time:'08:00 - 09:20',subject:`Захист України (1 група) · цикл ${week}`,teacher:'Тест Т.Т.',room:'101',condition:'1-4',starts_on:null,subgroup:{context:'Захист України|група',value:'1',label:'1 група'}},
         {lesson:1,time:'08:00 - 09:20',subject:`Захист України (2 група) · цикл ${week}`,teacher:'Приклад П.П.',room:'102',condition:'1-4',starts_on:null,subgroup:{context:'Захист України|група',value:'2',label:'2 група'}},
         {lesson:2,time:'09:30 - 10:50',subject:`Математика · цикл ${week}`,teacher:'Тест Т.Т.',room:'201',condition:'1-4',starts_on:null,subgroup:null},
         {lesson:8,time:'17:40 - 18:40',subject:'Датоване заняття',teacher:'Тест Т.Т.',room:'202',condition:'1-4 (з 01.10.2026)',starts_on:'2026-10-01',subgroup:null}
     ]]))]));
+    const bells=JSON.parse(fs.readFileSync(path.resolve('static/data/bells.json'),'utf8'));
+    for(const week of Object.values(cycle)) for(const lessons of Object.values(week)) for(const lesson of lessons) {
+        lesson.time=bells[lesson.lesson<=4?first:second][lesson.lesson-1].join(' - ');
+    }
+    return cycle;
 }
 async function startFixtureServer({root=path.resolve('static'),port=0}={}) {
-    const cycle=cycleFixture(),events=[],requests=[];
+    const events=[],requests=[];
     const groups=['ПІ-24-02','ЕК(11)-24-03',...Array.from({length:60},(_,i)=>`ТЕСТ-24-${String(i).padStart(2,'0')}`)];
     let buildSuffix='',breakAsset=false,edgeHTML=false;
     const server=http.createServer((req,res)=>{
@@ -29,7 +34,8 @@ async function startFixtureServer({root=path.resolve('static'),port=0}={}) {
                 const etag='"fixture"';res.setHeader('ETag',etag);
                 res.setHeader('X-Source-Checked-At','2026-10-14T10:00:00+03:00');res.setHeader('X-Source-Stale','false');
                 if (req.headers['if-none-match']===etag) {res.statusCode=304;return res.end();}
-                return res.end(JSON.stringify({status:'success',cycle,data:cycle[3],meta:{updated_at:'2026-10-14T10:00:00+03:00',stale:false}}));
+                const requested=cycleFixture(url.searchParams.get('duration1')||'60',url.searchParams.get('duration2')||'60');
+                return res.end(JSON.stringify({status:'success',cycle:requested,data:requested[3],meta:{updated_at:'2026-10-14T10:00:00+03:00',stale:false}}));
             }
             res.statusCode=404;return res.end('{}');
         }

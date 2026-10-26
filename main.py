@@ -156,7 +156,7 @@ async def health():
 @app.get('/api/schedule')
 async def get_schedule(request: Request,
                        group: str = Query('ПІ-24-02', min_length=2, max_length=64),
-                       duration1: int = Query(80),
+                       duration1: int = Query(60),
                        duration2: int = Query(60),
                        uid: Optional[str] = Query(None, max_length=128),
                        week: Optional[int] = Query(None, ge=1, le=4),
