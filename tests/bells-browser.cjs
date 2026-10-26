@@ -38,10 +38,16 @@ async function run() {
                 await page.locator('#schedule-bells-tab').click();
                 for (const first of ['60','80']) for (const second of ['60','80']) {
                     await page.evaluate(({first,second})=>{storage.set('mykep_duration1',first);storage.set('mykep_duration2',second);BellSchedule.render();},{first,second});
-                    const expected=Array.from({length:8},(_,i)=>bells[i<4?first:second][i]);
+                    const expected=Array.from({length:8},(_,i)=>bells[i<4?first:second][i].map(value=>{
+                        const [h,m]=value.split(':').map(Number);
+                        const minute=h*60+m+(i>=4?(+first- +second)*4:0);
+                        return `${String(Math.floor(minute/60)).padStart(2,'0')}:${String(minute%60).padStart(2,'0')}`;
+                    }));
                     await page.waitForFunction(expected=>JSON.stringify([...document.querySelectorAll('#bells-table .bell-row')].map(row=>[...row.querySelectorAll('.bell-start,.bell-end')].map(n=>n.textContent)))===JSON.stringify(expected),expected);
                     const times=await page.locator('#bells-table .bell-row').evaluateAll(rows=>rows.map(row=>[...row.querySelectorAll('.bell-start,.bell-end')].map(n=>n.textContent)));
                     assert.deepEqual(times,expected);
+                    assert.equal(times[4][0],first==='80'?'14:10':'12:50');
+                    assert.equal(await page.locator('#bells-custom').isVisible(),first!=='60'||second!=='60');
                     assert.deepEqual(await page.locator('.bells-duration').allTextContents(),[`${first} хв`,`${second} хв`]);
                 }
                 await page.clock.setSystemTime(new Date('2026-10-14T06:20:00Z'));

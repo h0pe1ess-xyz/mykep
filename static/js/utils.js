@@ -8,6 +8,13 @@ function getLessonDuration(shift) {
     const value = storage.get(`mykep_duration${shift}`);
     return value === '80' ? '80' : '60';
 }
+function buildBellTimes(data, first, second) {
+    const offset = timeToMins(data[first][4][0]) - timeToMins(data[second][4][0]);
+    return [...data[first].slice(0, 4), ...data[second].slice(4).map(slot => slot.map(time => {
+        const minute = timeToMins(time) + offset;
+        return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+    }))];
+}
 function migrateDurationDefaults() {
     const revision = '2026-10-27';
     if (storage.get('mykep_duration_defaults') === revision) return;

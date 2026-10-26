@@ -6,7 +6,7 @@ import sqlite3
 import tempfile
 import time
 import unittest
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -44,8 +44,12 @@ class ScheduleTests(unittest.TestCase):
                     for i, row in enumerate(rows):
                         duration = first if i < 4 else second
                         start, end = bells[str(duration)][i]
+                        if i >= 4:
+                            offset = (first - second) * 4
+                            start, end = [(datetime.strptime(value, '%H:%M') + timedelta(minutes=offset)).strftime('%H:%M') for value in (start, end)]
                         self.assertEqual(row['time'], f'{start} - {end}')
                         self.assertEqual((datetime.strptime(end, '%H:%M') - datetime.strptime(start, '%H:%M')).seconds // 60, duration)
+                    self.assertEqual(rows[4]['time'].split(' - ')[0], '14:10' if first == 80 else '12:50')
         self.assertEqual(bells['80'][0], ['08:00', '09:20'])
         self.assertEqual(bells['60'], [
             ['08:00', '09:00'], ['09:10', '10:10'], ['10:30', '11:30'], ['11:40', '12:40'],

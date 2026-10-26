@@ -39,6 +39,8 @@ async function run() {
                             return {overflow:Math.max(0,main.scrollHeight-main.clientHeight),clipped,scroll:main.scrollTop};
                         });
                         assert.ok(layout.overflow <= 1 && !layout.clipped.length && layout.scroll === 0, `${name} ${width}x${height} ${state}: ${JSON.stringify(layout)}`);
+                        const nav = await page.locator('.bottom-nav').evaluate(n=>({bottom:n.getBoundingClientRect().bottom,heights:[...n.querySelectorAll('.nav-btn')].map(b=>b.getBoundingClientRect().height)}));
+                        assert.ok(nav.bottom<=height+1 && nav.heights.every(h=>h>=(width>=560&&height<=400?48:56)));
                     }
                 }
                 await page.evaluate(() => Tabs.show('schedule',{historyMode:'none'}));

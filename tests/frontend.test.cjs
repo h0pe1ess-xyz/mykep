@@ -2,6 +2,20 @@ const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
+test('second shift follows first shift while keeping its own lesson duration',()=>{
+    const {run}=fixture();
+    const data=JSON.stringify(JSON.parse(fs.readFileSync('static/data/bells.json','utf8')));
+    for(const [first,second,fifth,last] of [
+        ['60','60','12:50 - 13:50','16:20 - 17:20'],
+        ['80','60','14:10 - 15:10','17:40 - 18:40'],
+        ['60','80','12:50 - 14:10','17:20 - 18:40'],
+        ['80','80','14:10 - 15:30','18:40 - 20:00']
+    ]) {
+        const times=JSON.parse(run(`JSON.stringify(buildBellTimes(${data},'${first}','${second}'))`));
+        assert.equal(times[4].join(' - '),fifth);
+        assert.equal(times[7].join(' - '),last);
+    }
+});
 function fixture() {
     const data = new Map();
     const context = vm.createContext({console,Date,Intl,URLSearchParams,AbortController,setTimeout,clearTimeout,setInterval:()=>0,

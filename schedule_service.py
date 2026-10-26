@@ -15,6 +15,18 @@ URL = "https://kep.nung.edu.ua/pages/education/schedule"
 BELLS = json.loads((BASE_DIR / 'static/data/bells.json').read_text(encoding='utf-8'))
 
 
+def build_bell_times(duration1, duration2):
+    first, second = (str(80 if int(value) == 80 else 60) for value in (duration1, duration2))
+    def minutes(value):
+        hour, minute = map(int, value.split(':'))
+        return hour * 60 + minute
+    offset = minutes(BELLS[first][4][0]) - minutes(BELLS[second][4][0])
+    def shifted(value):
+        total = minutes(value) + offset
+        return f'{total // 60:02d}:{total % 60:02d}'
+    return BELLS[first][:4] + [[shifted(value) for value in slot] for slot in BELLS[second][4:]]
+
+
 def normalize_group(value):
     return re.sub(r"[\s\-\N{EN DASH}-]", "", str(value)).casefold()
 
@@ -290,8 +302,8 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
     days_to_check = {day: base_monday + timedelta(days=i) for i, day in enumerate(DAYS)}
 
     time_mapping = {
-        str(i + 1): ' - '.join(BELLS[str(80 if int(duration) == 80 else 60)][i])
-        for i, duration in enumerate([duration1] * 4 + [duration2] * 4)
+        str(i + 1): ' - '.join(slot)
+        for i, slot in enumerate(build_bell_times(duration1, duration2))
     }
 
     full_week_schedule = {}

@@ -9,7 +9,11 @@ function cycleFixture(first='60',second='60') {
     ]]))]));
     const bells=JSON.parse(fs.readFileSync(path.resolve('static/data/bells.json'),'utf8'));
     for(const week of Object.values(cycle)) for(const lessons of Object.values(week)) for(const lesson of lessons) {
-        lesson.time=bells[lesson.lesson<=4?first:second][lesson.lesson-1].join(' - ');
+        lesson.time=bells[lesson.lesson<=4?first:second][lesson.lesson-1].map(value=>{
+            const [h,m]=value.split(':').map(Number);
+            const minute=h*60+m+(lesson.lesson>4?(+first- +second)*4:0);
+            return `${String(Math.floor(minute/60)).padStart(2,'0')}:${String(minute%60).padStart(2,'0')}`;
+        }).join(' - ');
     }
     return cycle;
 }

@@ -48,11 +48,13 @@ const BellSchedule = (() => {
         try {
             const data = await load();
             if (token !== renderToken || mode !== 'bells') return;
+            const times = buildBellTimes(data, first, second);
+            document.getElementById('bells-custom').hidden = first === '60' && second === '60';
             const groups = [first, second].map((duration, shift) => {
                 const title = shift === 0 ? 'Перша зміна' : 'Друга зміна';
                 const rows = Array.from({length:4}, (_, slot) => {
                     const i = shift * 4 + slot;
-                    const [start, end] = data[duration][i];
+                    const [start, end] = times[i];
                     const current = minute >= timeToMins(start) && minute < timeToMins(end);
                     return `<tr class="bell-row"${current ? ' aria-current="time"' : ''}><th scope="row"><span class="bell-number">${i + 1}</span>${current ? ' <span class="bell-current">Зараз</span>' : ''}</th><td><span class="bell-start">${start}</span><span class="bell-separator">–</span><span class="bell-end">${end}</span></td></tr>`;
                 });
