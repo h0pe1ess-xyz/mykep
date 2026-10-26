@@ -4,6 +4,22 @@ const storage = {
     set(key, value) { try { localStorage.setItem(key, value); return true; } catch { return false; } },
     remove(key) { try { localStorage.removeItem(key); } catch {} }
 };
+function getLessonDuration(shift) {
+    const value = storage.get(`mykep_duration${shift}`);
+    return value === '80' ? '80' : '60';
+}
+function migrateDurationDefaults() {
+    const revision = '2026-10-27';
+    if (storage.get('mykep_duration_defaults') === revision) return;
+    const first = storage.get('mykep_duration1');
+    const second = storage.get('mykep_duration2');
+    // Onboarding saved the old 80/60 default as explicit preferences.
+    if (first === '80' && (!second || second === '60')) {
+        if (!storage.set('mykep_duration1', '60')) return;
+    }
+    storage.set('mykep_duration_defaults', revision);
+}
+migrateDurationDefaults();
 function escapeHTML(value) {
     return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
 }

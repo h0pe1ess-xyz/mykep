@@ -33,6 +33,26 @@ def snapshot():
 
 
 class ScheduleTests(unittest.TestCase):
+    def test_bells_match_all_eight_lessons_and_both_shift_durations(self):
+        bells = json.loads((Path(__file__).resolve().parents[1] / 'static/data/bells.json').read_text(encoding='utf-8'))
+        raw = {'ТЕСТ': {day: [lesson(str(i)) for i in range(1, 9)] for day in DAYS}}
+        for first in (60, 80):
+            for second in (60, 80):
+                with self.subTest(first=first, second=second):
+                    rows = build_group_schedule(raw, 'ТЕСТ', first, second, week=1, ignore_start=True)['понеділок']
+                    self.assertEqual(len(rows), 8)
+                    for i, row in enumerate(rows):
+                        duration = first if i < 4 else second
+                        start, end = bells[str(duration)][i]
+                        self.assertEqual(row['time'], f'{start} - {end}')
+                        self.assertEqual((datetime.strptime(end, '%H:%M') - datetime.strptime(start, '%H:%M')).seconds // 60, duration)
+        self.assertEqual(bells['80'][0], ['08:00', '09:20'])
+        self.assertEqual(bells['60'], [
+            ['08:00', '09:00'], ['09:10', '10:10'], ['10:30', '11:30'], ['11:40', '12:40'],
+            ['12:50', '13:50'], ['14:00', '15:00'], ['15:10', '16:10'], ['16:20', '17:20']
+        ])
+        self.assertEqual(bells['80'][7], ['18:40', '20:00'])
+
     def test_stats_admission_year_excludes_school_entry_marker(self):
         self.assertEqual(admin_stats.parse_group('ЕК(11)-24-03'), ('ЕК', 2024))
         self.assertEqual(admin_stats.parse_group('ПІ-24-02'), ('ПІ', 2024))
@@ -238,6 +258,7 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
                 first = await client.get('/api/schedule', params={'group': 'НТ-24-01', 'event': 'view'})
                 self.assertEqual(first.status_code, 200)
                 self.assertEqual(set(first.json()['cycle']), {'1', '2', '3', '4'})
+                self.assertEqual(first.json()['cycle']['1']['понеділок'][0]['time'], '08:00 - 09:00')
                 checked = service.updated_at + 1
                 service.updated_at = checked
                 second = await client.get('/api/schedule', params={'group': 'НТ-24-01', 'event': 'refresh'}, headers={'If-None-Match': first.headers['etag']})

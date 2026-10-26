@@ -134,6 +134,7 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
     }
     function finishScroll() {
         clearTimeout(state.scrollTimeout);
+        if (picker.hidden) return;
         state.programmatic = false;
         cancelAnimationFrame(state.frame);
         updateArc();

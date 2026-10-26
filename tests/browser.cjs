@@ -129,7 +129,7 @@ async function run() {
                 // A same-time class is not the next class.
                 await page.evaluate(()=>{ getKyivNow=()=>new Date(2026,9,14,8,20); const e=cachedScheduleForKey(scheduleRequestContext().key); startDashboard(scheduleOnDate(e,getKyivNow(),'ПІ-24-02')); });
                 assert.match(await page.locator('#current-subject').textContent(),/1 група.*2 група/);
-                assert.equal(await page.locator('#next-time').textContent(),'09:30 - 10:50');
+                assert.equal(await page.locator('#next-time').textContent(),'09:10 - 10:10');
                 await page.evaluate(()=>renderDashboard([]));
                 assert.equal(await page.locator('.progress-section').isVisible(),false);
                 assert.equal(await page.locator('#day-progress-text').textContent(),'0%');
@@ -373,7 +373,7 @@ async function run() {
                 await calendarPage.waitForFunction(()=>currentGlobalSchedule?.length===0);
                 assert.equal(await calendarPage.locator('.progress-section').isVisible(),false);
                 assert.equal(await calendarPage.locator('#dashboard-status-title').textContent(),'Найближчі пари');
-                assert.match(await calendarPage.locator('#status-text').innerText(),/Понеділок, 19 жовтня\n08:00–18:40/);
+                assert.match(await calendarPage.locator('#status-text').innerText(),/Понеділок, 19 жовтня\n08:00–17:20/);
                 await calendarPage.evaluate(()=>tickDashboard(true));
                 assert.equal(await calendarPage.locator('#status-text .next-day-time').count(),1);
                 await calendarPage.evaluate(()=>Tabs.show('schedule'));

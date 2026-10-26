@@ -121,7 +121,7 @@ const App = (() => {
             } else notice(tab, 'Завантаження розкладу…');
         }
         target.key = key;
-        const busyNode = document.querySelector(`[data-view="${tab}"] main`);
+        const busyNode = tab === 'schedule' ? document.getElementById('dynamic-schedule-list') : document.querySelector(`[data-view="${tab}"] main`);
         busyNode.setAttribute('aria-busy', 'true');
         const result = await fetchSchedule(week,group);
         if (token !== target.token) return;
@@ -163,7 +163,7 @@ const App = (() => {
             targets[tab].lastLoad = 0;
             targets[tab].key = '';
             clearView(tab);
-            document.querySelector(`[data-view="${tab}"] main`).setAttribute('aria-busy', 'false');
+            (tab === 'schedule' ? document.getElementById('dynamic-schedule-list') : document.querySelector(`[data-view="${tab}"] main`)).setAttribute('aria-busy', 'false');
             notice(tab, '');
         }
         updateHeaderDisplays();

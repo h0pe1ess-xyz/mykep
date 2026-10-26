@@ -69,7 +69,7 @@ function validSchedule(data) {
 function validCycle(cycle) { return cycle && [1,2,3,4].every(w => validSchedule(cycle[w])); }
 function scheduleRequestContext(week = 'auto', group = null) {
     group = group || storage.get('mykep_group') || 'ПІ-24-02';
-    const duration1 = storage.get('mykep_duration1') || '80', duration2 = storage.get('mykep_duration2') || '60';
+    const duration1 = getLessonDuration(1), duration2 = getLessonDuration(2);
     return { group, duration1, duration2, week: normalizeWeekSelection(week), key: scheduleCacheKey(group,duration1,duration2) };
 }
 function readScheduleEntries() {

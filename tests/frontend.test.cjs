@@ -10,7 +10,7 @@ function fixture() {
         navigator:{}, isPWA:()=>false, Tabs:{current:'dashboard'}, fetch:async()=>{throw new Error('offline');}});
     for (const file of ['utils','api','dashboard','schedule-share']) vm.runInContext(fs.readFileSync(`static/js/${file}.js`,'utf8'),context);
     const run = code => vm.runInContext(code,context);
-    run(`getKyivNow=()=>new Date(2026,9,17,15,0);`);
+    run(`getKyivNow=()=>new Date(2026,9,17,15,0); storage.set('mykep_duration1','80'); storage.set('mykep_duration2','60');`);
     run(`const sampleLesson={lesson:8,time:'17:40 - 18:40',subject:'Тест',teacher:'Тест Т.Т.',room:'101',condition:'1-4',starts_on:null,subgroup:null};
         const cycle=Object.fromEntries([1,2,3,4].map(w=>[w,Object.fromEntries(SCHEDULE_DAYS.map(d=>[d,[]]))]));
         cycle[3]['субота']=[sampleLesson]; cycle[4]['понеділок']=[{...sampleLesson,lesson:1,time:'08:00 - 09:20'}];

@@ -132,7 +132,7 @@ window.obFinish = function() {
         status.textContent = 'Браузер заборонив збереження даних. Дозвольте сховище для цього сайту або відкрийте його в іншому браузері.';
         return;
     }
-    storage.set('mykep_duration1', '80');
+    storage.set('mykep_duration1', '60');
     storage.set('mykep_duration2', '60');
     storage.set('mykep_onboarded', 'true');
     storage.remove('mykep_schedule');
