@@ -26,7 +26,11 @@ function escapeHTML(value) {
 function renderRoomCue(value) {
     const rooms = String(value ?? '').trim().split(' / ').filter(Boolean);
     const label = rooms.length > 1 ? 'Аудиторії' : 'Аудиторія';
-    const numbers = rooms.length ? rooms.map(room => `<span class="room-cue-number">${escapeHTML(room)}</span>`).join('') : '<span class="room-cue-missing">Не вказано</span>';
+    const numbers = rooms.length ? rooms.map(room => {
+        const text = /^(?:спортивний\s+зал|спортзал|спорт\.?\s*зал)$/iu.test(room) ? 'спорт. зал' : room;
+        const size = text.length > 14 ? ' is-long' : text.length > 5 ? ' is-text' : '';
+        return `<span class="room-cue-number${size}" title="${escapeHTML(room)}">${escapeHTML(text)}</span>`;
+    }).join('') : '<span class="room-cue-missing">Не вказано</span>';
     return `<span class="room-cue-label">${label}</span><strong class="room-cue-values">${numbers}</strong>`;
 }
 

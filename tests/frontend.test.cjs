@@ -151,3 +151,14 @@ test('room cues retain all parallel rooms and escape room text',()=>{
     assert.match(run("renderRoomCue('<b>101</b>')"),/&lt;b&gt;101&lt;\/b&gt;/);
     assert.match(run("renderRoomCue('')"),/Не вказано/);
 });
+
+test('room cues shorten gym names and reduce long labels without changing numeric rooms',()=>{
+    const {run}=fixture();
+    for (const room of ['спортивний зал','Спортзал','спорт. зал']) {
+        const html=run(`renderRoomCue(${JSON.stringify(room)})`);
+        assert.match(html,/class="room-cue-number is-text"/);
+        assert.match(html,/>спорт\. зал</);
+    }
+    assert.match(run("renderRoomCue('навчально-виробнича майстерня')"),/class="room-cue-number is-long"/);
+    assert.match(run("renderRoomCue('313')"),/class="room-cue-number"/);
+});

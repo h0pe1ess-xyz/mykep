@@ -23,10 +23,12 @@ async function run() {
                 assert.equal(await page.locator('#schedule-week').inputValue(),'auto');
                 assert.equal(await page.evaluate(()=>getScheduleWeekSelection()),'current');
                 await page.locator('#schedule-week').focus();
-                const focusRing=await page.locator('.week-control').evaluate(n=>({radius:getComputedStyle(n).borderRadius,shadow:getComputedStyle(n).boxShadow,outline:getComputedStyle(n).outlineStyle}));
+                await page.locator('#schedule-week').evaluate(n=>Promise.all(n.getAnimations().map(a=>a.finished)));
+                const focusRing=await page.locator('#schedule-week').evaluate(n=>({radius:getComputedStyle(n).borderRadius,shadow:getComputedStyle(n).boxShadow,outline:getComputedStyle(n).outlineStyle}));
                 assert.equal(focusRing.radius,'10px');
-                assert.match(focusRing.shadow,/2px/);
-                assert.equal(focusRing.outline,'none');
+                assert.equal(focusRing.outline,'solid');
+                assert.equal(await page.locator('#schedule-week').evaluate(n=>getComputedStyle(n).outlineWidth),'2px');
+                assert.equal(await page.locator('.week-control').evaluate(n=>getComputedStyle(n).boxShadow),'none');
                 await page.screenshot({path:`.mykep-local/screens/${engine}-week-focus.png`});
                 assert.match(await page.locator('#schedule-week-label').textContent(),/12–17 жовтня Тиждень 3/);
                 assert.equal(await page.locator('.schedule-context,#schedule-group,#subgroup-choices').count(),0);
