@@ -9,7 +9,7 @@
 <meta content="MyKep - розклад пар для студентів ФКЕП ІФНТУНГ: заняття на сьогодні й тиждень, аудиторії, викладачі та таймер. Студентський PWA-застосунок з офлайн-доступом." name="description"/>
 <meta content="index, follow, max-image-preview:large" name="robots"/>
 <meta content="MyKep" name="application-name"/>
-<meta content="2.9.16" name="mykep-build"/>
+<meta content="2.9.17" name="mykep-build"/>
 <link href="https://mykep.pp.ua/" rel="canonical"/>
 <meta content="website" property="og:type"/>
 <meta content="MyKep" property="og:site_name"/>
@@ -37,7 +37,7 @@
 <meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"/>
 
 
-<script defer="" src="/js/bells.js?v=2.9.16"></script>
+<script defer="" src="/js/bells.js?v=2.9.17"></script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -93,8 +93,8 @@
   ]
 }
     </script>
-<script src="/js/boot.js?v=2.9.16"></script><link href="/css/app.css?v=2.9.16" rel="stylesheet"/><script defer="" src="/js/utils.js?v=2.9.16"></script><script defer="" src="/js/pwa.js?v=2.9.16"></script><script defer="" src="/js/api.js?v=2.9.16"></script><script defer="" src="/js/teacher-hints.js?v=2.9.16"></script><script defer="" src="/js/dashboard.js?v=2.9.16"></script><script defer="" src="/js/schedule-share.js?v=2.9.16"></script><script defer="" src="/js/schedule.js?v=2.9.16"></script><script defer="" src="/js/dialogs.js?v=2.9.16"></script>
-<script defer="" src="/js/settings.js?v=2.9.16"></script><script defer="" src="/js/support.js?v=2.9.16"></script><script defer="" src="/js/onboarding.js?v=2.9.16"></script><script defer="" src="/js/tabs.js?v=2.9.16"></script><script defer="" src="/js/app.js?v=2.9.16"></script></head>
+<script src="/js/boot.js?v=2.9.17"></script><link href="/css/app.css?v=2.9.17" rel="stylesheet"/><script defer="" src="/js/utils.js?v=2.9.17"></script><script defer="" src="/js/pwa.js?v=2.9.17"></script><script defer="" src="/js/api.js?v=2.9.17"></script><script defer="" src="/js/teacher-hints.js?v=2.9.17"></script><script defer="" src="/js/dashboard.js?v=2.9.17"></script><script defer="" src="/js/schedule-share.js?v=2.9.17"></script><script defer="" src="/js/schedule.js?v=2.9.17"></script><script defer="" src="/js/dialogs.js?v=2.9.17"></script>
+<script defer="" src="/js/settings.js?v=2.9.17"></script><script defer="" src="/js/support.js?v=2.9.17"></script><script defer="" src="/js/onboarding.js?v=2.9.17"></script><script defer="" src="/js/tabs.js?v=2.9.17"></script><script defer="" src="/js/app.js?v=2.9.17"></script></head>
 <body>
 <h1 class="sr-only page-heading">MyKep - розклад пар ФКЕП ІФНТУНГ</h1>
 <noscript>
@@ -193,8 +193,16 @@
 <div class="app-container" id="main-app" style="opacity: 1;"><div class="views" id="views"><div class="views-track"><section aria-label="Розклад" class="view view-schedule page-schedule" data-view="schedule" tabindex="-1"><header class="app-header">
 <h2 class="app-title">MyKep</h2>
 <div class="schedule-header-actions">
-<label class="location-badge week-control" for="schedule-week">
-<span class="sr-only">Тиждень для перегляду розкладу</span>
+
+<button aria-label="Поділитися розкладом дня" class="schedule-share-button" disabled="" id="schedule-share" title="Поділитися розкладом дня" type="button">
+<svg aria-hidden="true" fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24" width="22"><path d="M12 16V3m-4 4 4-4 4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+</button>
+</div>
+</header><div class="schedule-toolbar"><div aria-label="Вигляд розкладу" class="schedule-mode-switch" data-no-swipe="" role="tablist">
+<button aria-controls="dynamic-schedule-list" aria-selected="true" id="schedule-lessons-tab" role="tab" type="button">Пари</button>
+<button aria-controls="schedule-bells-panel" aria-selected="false" id="schedule-bells-tab" role="tab" tabindex="-1" type="button">Дзвінки</button>
+</div><label class="week-control" for="schedule-week">
+<span class="week-control-label">Тиждень</span>
 <select class="week-select" id="schedule-week">
 <option value="auto">Цей тиждень</option>
 <option value="1">1-й тиждень</option>
@@ -202,15 +210,7 @@
 <option value="3">3-й тиждень</option>
 <option value="4">4-й тиждень</option>
 </select>
-</label>
-<button aria-label="Поділитися розкладом дня" class="schedule-share-button" disabled="" id="schedule-share" title="Поділитися розкладом дня" type="button">
-<svg aria-hidden="true" fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24" width="22"><path d="M12 16V3m-4 4 4-4 4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
-</button>
-</div>
-</header><div aria-label="Вигляд розкладу" class="schedule-mode-switch" data-no-swipe="" role="tablist">
-<button aria-controls="dynamic-schedule-list" aria-selected="true" id="schedule-lessons-tab" role="tab" type="button">Пари</button>
-<button aria-controls="schedule-bells-panel" aria-selected="false" id="schedule-bells-tab" role="tab" tabindex="-1" type="button">Дзвінки</button>
-</div><p class="schedule-notice" hidden="" id="schedule-notice" role="status"></p><div class="day-picker">
+</label></div><p class="schedule-notice" hidden="" id="schedule-notice" role="status"></p><div class="day-picker">
 <button type="button" class="day-item" data-day="понеділок" aria-label="Понеділок" aria-pressed="false" disabled=""><span class="day-num">Пн</span><span class="day-name">Понеділок</span></button>
 <button type="button" class="day-item" data-day="вівторок" aria-label="Вівторок" aria-pressed="false" disabled=""><span class="day-num">Вт</span><span class="day-name">Вівторок</span></button>
 <button type="button" class="day-item" data-day="середа" aria-label="Середа" aria-pressed="false" disabled=""><span class="day-num">Ср</span><span class="day-name">Середа</span></button>
@@ -269,10 +269,10 @@
 <div class="lesson-card-detailed" id="current-lesson-card">
 <div class="card-header">
 <div class="card-title">
-<svg fill="none" height="16" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="16"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                        Поточна пара
+Поточна пара
                     </div>
 </div>
+<div class="current-lesson-room room-cue" hidden="" id="current-lesson-room"></div>
 <div class="card-body">
 <div class="lesson-subject" id="current-subject">---</div>
 </div>
@@ -289,8 +289,7 @@
 <div class="lesson-subject" id="next-subject">---</div>
 </div>
 <div class="info-block align-right">
-<div class="info-label">Аудиторія</div>
-<div class="lesson-room" id="next-room">---</div>
+<div class="lesson-room room-cue" id="next-room">---</div>
 </div>
 </div>
 <div class="card-footer">
@@ -313,7 +312,7 @@
 <h2 class="app-title">Налаштування</h2>
 <div class="location-badge">
 <svg fill="none" height="12" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="12"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>
-                MyKep v2.9.16
+                MyKep v2.9.17
             </div>
 </header><main class="main-content" style="justify-content: flex-start; gap: 16px; padding-top: 10px;">
 <div class="settings-card">
@@ -426,12 +425,12 @@
 </div>
 </div>
 <div style="text-align: center; margin-top: 30px; margin-bottom: 20px; font-size: 12px; color: var(--text-muted); opacity: 0.5;">
-                MyKep v2.9.16
+                MyKep v2.9.17
             </div>
 <details class="data-notice"><summary><svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M3 1.5 10 6 3 10.5Z"/></svg>Про дані</summary><p>MyKep зберігає в цьому браузері групу, налаштування, проходження вступу, випадковий UID і офлайн-розклад. Сервер записує час запиту, UID, групу, тип події, режим PWA/браузера та User-Agent для статистики. Автооновлення позначаються окремо від відкриттів і дій. Старі записи означають успішні запити API й можуть включати автооновлення. Деталі історії автоматично не видаляються. IP використовується захистом адмінки; цей опис не охоплює окремі журнали хостингу. Окрема статистика хостингу не входить до цього опису. З питаннями щодо даних: <a href="https://t.me/oddxq" rel="noopener">@oddxq</a></p></details></main></section></div></div><nav aria-label="Основна навігація" class="bottom-nav">
-<a aria-label="Розклад" class="nav-btn" data-tab="schedule" href="/schedule.html"><svg fill="none" height="22" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="22"><rect height="18" rx="2" ry="2" width="18" x="3" y="4"></rect><line x1="16" x2="16" y1="2" y2="6"></line><line x1="8" x2="8" y1="2" y2="6"></line><line x1="3" x2="21" y1="10" y2="10"></line></svg></a>
-<a aria-label="Головна" class="nav-btn active center-action" data-tab="dashboard" href="/"><svg fill="currentColor" height="24" viewbox="0 0 24 24" width="24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg></a>
-<a aria-label="Налаштування" class="nav-btn" data-tab="settings" href="/settings.html"><svg fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="22"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></a>
+<a aria-label="Розклад" class="nav-btn" data-tab="schedule" href="/schedule.html"><svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24" width="20"><rect height="16" rx="3" width="18" x="3" y="5"/><path d="M7 3v5m10-5v5M3 11h18"/></svg><span class="nav-label">Розклад</span></a>
+<a aria-current="page" aria-label="Головна" class="nav-btn active" data-tab="dashboard" href="/"><svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24" width="20"><path d="m3 10 9-7 9 7v10H3Z"/><path d="M9 20v-7h6v7"/></svg><span class="nav-label">Головна</span></a>
+<a aria-label="Налаштування" class="nav-btn" data-tab="settings" href="/settings.html"><svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24" width="20"><path d="M4 7h16M4 17h16"/><circle cx="8" cy="7" r="3" fill="var(--bg-main)"/><circle cx="16" cy="17" r="3" fill="var(--bg-main)"/></svg><span class="nav-label">Налаштування</span></a>
 </nav></div>
 
 

@@ -141,3 +141,13 @@ test('failed coalesced requests use each exact legacy week and never invent miss
     assert.equal(fourth.data['понеділок'].length,1);
     assert.equal(first.data,null);
 });
+
+test('room cues retain all parallel rooms and escape room text',()=>{
+    const {run}=fixture();
+    const rooms=run("renderRoomCue('101 / 102')");
+    assert.match(rooms,/Аудиторії/);
+    assert.match(rooms,/>101<.*>102</);
+    assert.match(run("renderRoomCue('101/3')"),/>101\/3</);
+    assert.match(run("renderRoomCue('<b>101</b>')"),/&lt;b&gt;101&lt;\/b&gt;/);
+    assert.match(run("renderRoomCue('')"),/Не вказано/);
+});

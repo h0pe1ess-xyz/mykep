@@ -23,6 +23,13 @@ migrateDurationDefaults();
 function escapeHTML(value) {
     return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
 }
+function renderRoomCue(value) {
+    const rooms = String(value ?? '').trim().split(' / ').filter(Boolean);
+    const label = rooms.length > 1 ? 'Аудиторії' : 'Аудиторія';
+    const numbers = rooms.length ? rooms.map(room => `<span class="room-cue-number">${escapeHTML(room)}</span>`).join('') : '<span class="room-cue-missing">Не вказано</span>';
+    return `<span class="room-cue-label">${label}</span><strong class="room-cue-values">${numbers}</strong>`;
+}
+
 
 function normalizeGroupSearch(value) {
     // Separators are optional in search; preserve the original group for display/API.

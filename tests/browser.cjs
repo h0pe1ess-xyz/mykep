@@ -33,7 +33,13 @@ async function run() {
                 assert.equal(await page.locator('#schedule-notice').isVisible(),false);
                 assert.ok((await page.locator('#schedule-data-time').textContent()).includes('Перевірено 14 жовтня о 10:00'));
                 const navStyle=await page.locator('.bottom-nav .active').evaluate(n=>({filter:getComputedStyle(n).filter,shadow:getComputedStyle(n).boxShadow,color:getComputedStyle(n).backgroundColor}));
-                assert.deepEqual(navStyle,{filter:'none',shadow:'none',color:'rgb(255, 85, 0)'});
+                assert.deepEqual(navStyle,{filter:'none',shadow:'none',color:'rgb(31, 23, 20)'});
+                assert.deepEqual(await page.locator('.bottom-nav .nav-label').allTextContents(),['Розклад','Головна','Налаштування']);
+                assert.equal(await page.locator('.bottom-nav [aria-current=page]').count(),1);
+                assert.equal(await page.locator('.bottom-nav .active svg').evaluate(n=>getComputedStyle(n).color),'rgb(255, 85, 0)');
+                assert.equal(await page.locator('.schedule-toolbar .week-control-label').innerText(),'Тиждень');
+                const controls=await page.locator('.schedule-toolbar').evaluate(row=>{const tabs=row.querySelector('.schedule-mode-switch').getBoundingClientRect();const week=row.querySelector('.week-select').getBoundingClientRect();return {separate:tabs.right<=week.left,bottom:Math.abs(tabs.bottom-week.bottom),touch:week.height>=44};});
+                assert.deepEqual(controls,{separate:true,bottom:0,touch:true});
                 for (const week of ['1','2','3','4']) {
                     await page.selectOption('#schedule-week',week);
                     await page.waitForFunction(()=>document.getElementById('schedule-week-label').hidden);
@@ -99,7 +105,10 @@ async function run() {
                     Object.defineProperty(navigator,'share',{configurable:true,value:async options=>{const f=options.files?.[0];window.testShares.push({keys:Object.keys(options),type:f?.type,size:f?.size,active:navigator.userActivation.isActive});}});
                 });
                 await page.click('#schedule-share');
-                await page.waitForFunction(()=>window.testShares.length===1 || (scheduleExportFile && !scheduleShareInFlight));
+                await page.waitForFunction(()=>window.testShares.length===1 || (scheduleExportFile && !scheduleShareInFlight)).catch(async error=>{
+                    const state=await page.evaluate(()=>({status:document.getElementById('schedule-share-status').textContent,preparing:scheduleSharePreparing,inFlight:scheduleShareInFlight,tab:Tabs.current})).catch(()=>null);
+                    throw new Error(`${error.message}\nShare state: ${JSON.stringify(state)}`);
+                });
                 if(!await page.evaluate(()=>window.testShares.length)) await page.click('#schedule-share');
                 await page.waitForFunction(()=>window.testShares.length===1);
                 const share=await page.evaluate(()=>testShares[0]);
@@ -130,7 +139,25 @@ async function run() {
                 await page.evaluate(()=>{ getKyivNow=()=>new Date(2026,9,14,8,20); const e=cachedScheduleForKey(scheduleRequestContext().key); startDashboard(scheduleOnDate(e,getKyivNow(),'ПІ-24-02')); });
                 assert.match(await page.locator('#current-subject').textContent(),/1 група.*2 група/);
                 assert.equal(await page.locator('#next-time').textContent(),'09:10 - 10:10');
+                assert.equal(await page.locator('#current-room').textContent(),'до кінця пари');
+                assert.equal(await page.locator('.view-dashboard .status-section').isVisible(),false);
+                assert.deepEqual(await page.locator('#current-lesson-room .room-cue-number').allTextContents(),['101','102']);
+                assert.equal(await page.locator('#current-lesson-room .room-cue-number').first().evaluate(n=>parseFloat(getComputedStyle(n).fontSize)),22);
+                assert.ok(await page.locator('.room-badge .room-cue-number').count()>0);
+                await page.setViewportSize({width:320,height:568});
+                await page.waitForFunction(()=>document.getElementById('dashboard-main').scrollHeight<=document.getElementById('dashboard-main').clientHeight+1);
+                assert.equal(await page.locator('#current-lesson-room').isVisible(),true);
+                await page.setViewportSize({width:390,height:844});
+                await page.evaluate(()=>renderDashboard([{lesson:1,time:'08:00 - 09:00',subject:'Тест',teacher:'Викладач',room:''}]));
+                assert.equal(await page.locator('#current-lesson-room .room-cue-missing').textContent(),'Не вказано');
+                assert.equal(await page.locator('#current-room.is-room').count(),0);
+                await page.evaluate(()=>renderDashboard([{lesson:1,time:'08:00 - 09:00',subject:'Тест',teacher:'Викладач',room:'<b>101</b>'}]));
+                assert.equal(await page.locator('#current-lesson-room .room-cue-number').textContent(),'<b>101</b>');
+                assert.equal(await page.locator('#current-lesson-room b').count(),0);
                 await page.evaluate(()=>renderDashboard([]));
+                assert.equal(await page.locator('#current-room.is-room').count(),0);
+                assert.equal(await page.locator('#current-lesson-room').isVisible(),false);
+                assert.equal(await page.locator('.view-dashboard .status-section').isVisible(),true);
                 assert.equal(await page.locator('.progress-section').isVisible(),false);
                 assert.equal(await page.locator('#day-progress-text').textContent(),'0%');
                 // Full application carousel, including uncancelable browser-owned moves.

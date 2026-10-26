@@ -28,7 +28,7 @@ async function run() {
                 assert.equal(await page.locator('#bells-table .bell-end').last().textContent(),'17:20');
                 assert.equal(await page.locator('#bells-table .bell-row').count(),8);
                 assert.deepEqual(await page.locator('.bells-shift-label > span:first-child').allTextContents(),['Перша зміна','Друга зміна']);
-                for (const selector of ['.day-picker','.schedule-header-actions','#dynamic-schedule-list','#schedule-notice','#schedule-share-status']) assert.equal(await page.locator(selector).isVisible(),false);
+                for (const selector of ['.day-picker','.schedule-header-actions','.schedule-toolbar .week-control','#dynamic-schedule-list','#schedule-notice','#schedule-share-status']) assert.equal(await page.locator(selector).isVisible(),false);
                 assert.equal(await page.locator('.bottom-nav a').count(),3);
                 assert.equal(await page.locator('#bells-table [aria-current="time"] th').innerText(),'1 Зараз');
                 const bellsHeader=await page.locator('.view-schedule .app-header').evaluate(n=>n.getBoundingClientRect().height);
@@ -63,6 +63,7 @@ async function run() {
                 await page.locator('#schedule-bells-tab').focus();
                 await page.keyboard.press('Home');
                 assert.equal(await page.locator('#dynamic-schedule-list').isVisible(),true);
+                assert.equal(await page.locator('.schedule-toolbar .week-control').isVisible(),true);
                 assert.equal(await page.locator('#schedule-week').inputValue(),'2');
                 // A normal subview switch preserves the day; changing durations may rebuild it.
                 const selected=await page.evaluate(()=>schedulePickerState.activeDay);

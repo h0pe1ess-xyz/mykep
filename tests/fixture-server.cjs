@@ -13,7 +13,7 @@ function cycleFixture(first='60',second='60') {
     }
     return cycle;
 }
-async function startFixtureServer({root=path.resolve('static'),port=0}={}) {
+async function startFixtureServer({root=path.resolve('static'),port=0,transformCycle=cycle=>cycle,fixtureTag='"fixture"'}={}) {
     const events=[],requests=[];
     const groups=['ПІ-24-02','ЕК(11)-24-03',...Array.from({length:60},(_,i)=>`ТЕСТ-24-${String(i).padStart(2,'0')}`)];
     let buildSuffix='',breakAsset=false,edgeHTML=false;
@@ -31,10 +31,10 @@ async function startFixtureServer({root=path.resolve('static'),port=0}={}) {
             if (url.pathname==='/api/teacher-hints') return res.end(fs.readFileSync(path.join(root,'data/teacher-hints.json')));
             if (url.pathname==='/api/schedule') {
                 events.push(url.searchParams.get('event'));
-                const etag='"fixture"';res.setHeader('ETag',etag);
+                const etag=fixtureTag;res.setHeader('ETag',etag);
                 res.setHeader('X-Source-Checked-At','2026-10-14T10:00:00+03:00');res.setHeader('X-Source-Stale','false');
                 if (req.headers['if-none-match']===etag) {res.statusCode=304;return res.end();}
-                const requested=cycleFixture(url.searchParams.get('duration1')||'60',url.searchParams.get('duration2')||'60');
+                const requested=transformCycle(cycleFixture(url.searchParams.get('duration1')||'60',url.searchParams.get('duration2')||'60'));
                 return res.end(JSON.stringify({status:'success',cycle:requested,data:requested[3],meta:{updated_at:'2026-10-14T10:00:00+03:00',stale:false}}));
             }
             res.statusCode=404;return res.end('{}');

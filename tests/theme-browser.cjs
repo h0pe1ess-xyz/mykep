@@ -36,6 +36,7 @@ async function run() {
                         await page.evaluate(tab=>Tabs.show(tab),tab);
                         await page.waitForFunction(()=>scheduleRequests.size===0);
                         await page.locator('.bottom-nav .active').waitFor({state:'visible'});
+                        await page.locator('.bottom-nav .active').evaluate(node=>Promise.all(node.getAnimations({subtree:true}).map(animation=>animation.finished)));
                         const info=await page.evaluate(()=>{
                             const button=document.querySelector('.bottom-nav .active');
                             const rect=button.getBoundingClientRect();
@@ -45,6 +46,7 @@ async function run() {
                                 meta:document.querySelector('meta[name="color-scheme"]')?.content,
                                 cardBackground:getComputedStyle(card).backgroundColor,
                                 accent:getComputedStyle(button).backgroundColor,
+                                iconColor:getComputedStyle(button.querySelector('svg')).color,
                                 glow:getComputedStyle(button).boxShadow,
                                 sample:{x:Math.round(rect.left+6),y:Math.round(rect.top+rect.height/2)}};
                         });
@@ -62,10 +64,11 @@ async function run() {
                         if(!baselineOnly) {
                             assert.equal(info.scheme,'dark only');
                             assert.equal(info.meta,'dark');
-                            assert.equal(info.accent,'rgb(255, 85, 0)');
+                            assert.equal(info.accent,'rgb(31, 23, 20)');
+                            assert.equal(info.iconColor,'rgb(255, 85, 0)');
                             assert.equal(info.glow,'none');
                             assert.equal(info.cardBackground,'rgba(36, 28, 24, 0.65)');
-                            assert.deepEqual(pixel,[255,85,0,255]);
+                            assert.deepEqual(pixel,[31,23,20,255]);
                         }
                     }
                     if(!baselineOnly) {
@@ -76,7 +79,7 @@ async function run() {
                     assert.deepEqual(errors,[]);
                     await context.close();
                 }
-                console.log(`${name}: light/dark preferences, three tabs and painted orange pixels ${baselineOnly?'captured':'passed'}`);
+                console.log(`${name}: light/dark preferences, three tabs and painted selected-navigation pixels ${baselineOnly?'captured':'passed'}`);
             } finally {await browser.close();}
         }
         fs.writeFileSync(`.mykep-local/theme${baselineOnly?'-baseline':''}.json`,JSON.stringify(results,null,2));

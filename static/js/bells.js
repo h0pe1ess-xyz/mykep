@@ -83,6 +83,7 @@ const BellSchedule = (() => {
         panel.hidden = !bells;
         document.getElementById('dynamic-schedule-list').hidden = bells;
         document.querySelector('.schedule-header-actions').hidden = bells;
+        document.querySelector('.schedule-toolbar .week-control').hidden = bells;
         document.querySelector('.day-picker').hidden = bells;
         buttons.forEach((button, i) => {
             const selected = i === (bells ? 1 : 0);

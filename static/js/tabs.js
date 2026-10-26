@@ -45,7 +45,6 @@ const Tabs = (() => {
         for (const link of nav.querySelectorAll('[data-tab]')) {
             const active = link.dataset.tab === tab;
             link.classList.toggle('active', active);
-            link.classList.toggle('center-action', active);
             if (active) link.setAttribute('aria-current', 'page');
             else link.removeAttribute('aria-current');
         }

@@ -28,13 +28,14 @@ function renderScheduleList(schedule) {
                 </div>
                 <div class="lesson-title">${escapeHTML(lesson.subject)}</div>
                 ${lesson.starts_on ? `<p class="lesson-condition">З ${escapeHTML(lesson.starts_on.split('-').reverse().join('.'))} · ${escapeHTML(lesson.condition || '')}</p>` : ''}
+                <div class="room-badge room-cue">${renderRoomCue(lesson.room)}</div>
                 <div class="lesson-divider"></div>
                 <div class="lesson-bottom">
                     <div class="teacher-name">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                         <span>${renderTeacherLabel(lesson.teacher)}</span>
                     </div>
-                    ${lesson.room && String(lesson.room).trim() !== '' ? `<div class="room-badge">${escapeHTML(lesson.room)}</div>` : ''}
+
                 </div>
             </div>
         `;

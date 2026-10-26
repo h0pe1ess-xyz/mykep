@@ -71,6 +71,10 @@ function renderDashboard(schedule, tomorrow = null) {
     const main = document.getElementById('dashboard-main');
     const gaugeMain = document.getElementById('minutes-left');
     const gaugeSub = document.getElementById('current-room');
+    if (gaugeSub) gaugeSub.classList.remove('is-countdown');
+    if (main) main.dataset.lessonActive = 'false';
+    const currentRoom = document.getElementById('current-lesson-room');
+    if (currentRoom) { currentRoom.textContent = ''; currentRoom.hidden = true; }
     const statusText = document.getElementById('status-text');
     const statusTitle = document.getElementById('dashboard-status-title');
     if (statusTitle) statusTitle.textContent = 'Розклад на сьогодні';
@@ -132,8 +136,16 @@ function renderDashboard(schedule, tomorrow = null) {
 
         updateTimerDisplay(progressPercent);
         if (gaugeMain) gaugeMain.innerHTML = `${minutesLeft}<span class="timer-unit">хв</span>`;
-        if (gaugeSub) gaugeSub.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg> Ауд. ${escapeHTML(currentLesson.room)}`;
-        if (statusText) statusText.innerText = `Зараз йде ${currentLesson.lesson}-${getLessonSuffix(currentLesson.lesson)} пара, залишайтесь сфокусованими.`;
+        if (gaugeSub) {
+            gaugeSub.classList.add('is-countdown');
+            gaugeSub.textContent = 'до кінця пари';
+        }
+        if (main) main.dataset.lessonActive = 'true';
+        if (currentRoom) {
+            const room = String(currentLesson.room || '').trim();
+            currentRoom.innerHTML = renderRoomCue(room);
+            currentRoom.hidden = false;
+        }
 
         document.getElementById('current-subject').innerText = currentLesson.subject;
         document.getElementById('current-teacher').innerHTML = renderTeacherLabel(currentLesson.teacher);
@@ -166,12 +178,16 @@ function renderDashboard(schedule, tomorrow = null) {
 
     if (nextLesson) {
         document.getElementById('next-subject').innerText = nextLesson.subject;
-        document.getElementById('next-room').innerText = nextLesson.room;
+        document.getElementById('next-room').innerHTML = renderRoomCue(nextLesson.room);
+        document.getElementById('next-room').hidden = false;
+        if (nextCard) nextCard.dataset.hasNextLesson = 'true';
         document.getElementById('next-teacher').innerHTML = renderTeacherLabel(nextLesson.teacher);
         document.getElementById('next-time').innerText = nextLesson.time;
     } else {
         document.getElementById('next-subject').innerText = "Пари завершились";
-        document.getElementById('next-room').innerText = "---";
+        document.getElementById('next-room').textContent = '';
+        document.getElementById('next-room').hidden = true;
+        if (nextCard) nextCard.dataset.hasNextLesson = 'false';
         document.getElementById('next-teacher').innerText = "Гарного відпочинку!";
         document.getElementById('next-time').innerText = "";
     }
