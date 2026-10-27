@@ -172,24 +172,7 @@ function renderScheduleContext(calendar,group) {
     const label = scheduleCaption.querySelector('#schedule-week-label');
     const select=document.getElementById('schedule-week');
     const selection=getScheduleWeekSelection();
-    const automaticIsNext=calendar?.default_monday
-        ? calendar.default_monday !== dateKey(calendarMonday()) : calendar?.label === 'Наступний тиждень';
-    const automaticLabel=automaticIsNext ? 'Наступний' : 'Цей тиждень';
-    if (select.options[0].textContent !== automaticLabel) select.options[0].textContent=automaticLabel;
-    let current=select.querySelector('option[value=current]');
-    if (automaticIsNext && !current) {
-        current=document.createElement('option');
-        current.value='current'; current.textContent='Цей тиждень';
-        select.insertBefore(current,select.options[1]);
-    } else if (!automaticIsNext) current?.remove();
-    let next = select.querySelector('option[value=next]');
-    if (selection === 'next' && !automaticIsNext && !next) {
-        next = document.createElement('option');
-        next.value = 'next'; next.textContent = 'Наступний';
-        select.insertBefore(next,select.options[1]);
-    } else if (selection !== 'next' || automaticIsNext) next?.remove();
-    // Preserve an explicit current-week preference while both views coincide.
-    select.value=(selection === 'current' && !automaticIsNext || selection === 'next' && automaticIsNext) ? 'auto' : selection;
+    select.value = selection;
     label.hidden = !calendar?.monday;
     if (label.hidden) {
         label.replaceChildren();

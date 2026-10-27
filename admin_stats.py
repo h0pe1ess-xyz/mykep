@@ -10,6 +10,7 @@ from config import COLLEGE_SIZE, KYIV
 from database import connect
 
 from analytics import VIEWS, refresh_daily
+from schedule_service import build_bell_times, CALENDAR_CONFIG
 RANGES = {'1': 1, '7': 7, '14': 14, '30': 30, '90': 90, 'all': None}
 WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
 _cache = {}
@@ -32,10 +33,9 @@ BROWSER_SQL = """CASE
   WHEN LOWER(user_agent) LIKE '%safari%' THEN 'Safari'
   ELSE 'Інше' END"""
 
-# Default bell schedule (1st shift 80 min, 2nd shift 60 min) used to classify
-# when people look at the schedule: during a lesson or during a break.
-LESSON_SLOTS = [(1, '08:00', '09:20'), (2, '09:30', '10:50'), (3, '11:10', '12:30'), (4, '12:40', '14:00'),
-                (5, '14:10', '15:10'), (6, '15:20', '16:20'), (7, '16:30', '17:30'), (8, '17:40', '18:40')]
+BELLS_CHANGED_ON = date.fromisoformat(CALENDAR_CONFIG['default_bells_from'])
+LESSON_SLOTS = [(i + 1, *slot) for i, slot in enumerate(build_bell_times(60, 60))]
+HISTORICAL_SLOTS = [(i + 1, *slot) for i, slot in enumerate(build_bell_times(80, 60))]
 
 
 def _minutes(hm):
@@ -211,23 +211,24 @@ async def _stats(range_key):
                        'new_users': new, 'returning_users': max(0, users - new), 'total_users': cumulative})
 
     # Time of day: hourly average, 15-minute profile, weekday x hour heatmap.
-    minute_rows = await _rows(f"""SELECT CAST(strftime('%w', timestamp) AS INTEGER), SUBSTR(timestamp,12,5), COUNT(*)
-        FROM analytics WHERE {where} GROUP BY 1, 2""", p)
+    minute_rows = await _rows(f"""SELECT CAST(strftime('%w', timestamp) AS INTEGER), SUBSTR(timestamp,12,5), COUNT(*), SUBSTR(timestamp,1,10) < ?
+        FROM analytics WHERE {where} GROUP BY 1, 2, 4""", (BELLS_CHANGED_ON.isoformat(), *p))
     hours = [0] * 24
     quarter = [0] * 96
     heat = [[0] * 24 for _ in range(7)]
     slot_counter = Counter()
     weekday_totals = [0] * 7
-    for wd_sqlite, hm, cnt in minute_rows:
+    for wd_sqlite, hm, cnt, previous_bells in minute_rows:
         wd = (wd_sqlite + 6) % 7            # SQLite: 0=Sunday -> Monday-first
         minute = _minutes(hm)
         hours[minute // 60] += cnt
         quarter[minute // 15] += cnt
         heat[wd][minute // 60] += cnt
         weekday_totals[wd] += cnt
-        slot_counter[_slot_for(minute)] += cnt
+        slot_day = BELLS_CHANGED_ON - timedelta(days=1) if previous_bells else BELLS_CHANGED_ON
+        slot_counter[_slot_for(minute, slot_day)] += cnt
     weekday_days = Counter(d.weekday() for d in _days(start, today))
-    slots = _slot_breakdown(slot_counter)
+    slots = _slot_breakdown(slot_counter, start, today)
 
     peak_hour = max(range(24), key=lambda h: hours[h]) if any(hours) else None
     peak_quarter = max(range(96), key=lambda q: quarter[q]) if any(quarter) else None
@@ -304,18 +305,24 @@ async def _stats(range_key):
     }
 
 
-def _slot_for(minute):
-    if minute < _minutes(LESSON_SLOTS[0][1]):
+def _slot_for(minute, day=None):
+    slots = HISTORICAL_SLOTS if (day or _today()) < BELLS_CHANGED_ON else LESSON_SLOTS
+    if minute < _minutes(slots[0][1]):
         return 'before'
-    for number, begin, end in LESSON_SLOTS:
+    for number, begin, end in slots:
         if _minutes(begin) <= minute < _minutes(end):
             return f'lesson{number}'
-    if minute >= _minutes(LESSON_SLOTS[-1][2]):
+    if minute >= _minutes(slots[-1][2]):
         return 'after'
     return 'break'
 
 
-def _slot_breakdown(counter):
+def _slot_breakdown(counter, start=None, end=None):
+    end = end or _today()
+    start = start or end
+    slots = HISTORICAL_SLOTS if end < BELLS_CHANGED_ON else LESSON_SLOTS
+    durations = '/'.join(str(_minutes(slots[i][2]) - _minutes(slots[i][1])) for i in (0, 4))
+    mixed = start < BELLS_CHANGED_ON <= end
     total = sum(counter.values()) or 1
     items = [('before', 'До 1-ї пари')] + [(f'lesson{n}', f'{n} пара') for n, _, _ in LESSON_SLOTS] + [
         ('break', 'Перерви'), ('after', 'Після пар')]
@@ -325,7 +332,9 @@ def _slot_breakdown(counter):
                   for k, label in items],
         'summary': {'lessons': lessons, 'breaks': counter.get('break', 0),
                     'outside': counter.get('before', 0) + counter.get('after', 0)},
-        'bells': [{'lesson': n, 'start': b, 'end': e} for n, b, e in LESSON_SLOTS],
+        'bells': [{'lesson': n, 'start': b, 'end': e} for n, b, e in slots],
+        'standard_note': 'За стандартними дзвінками на дату кожної події' if mixed else f'За стандартними дзвінками {durations} хв',
+        'profile_note': f'Підсвітка: стандартні дзвінки {durations} хв' + ('; за період стандарт змінювався' if mixed else ''),
     }
 
 

@@ -15,7 +15,8 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from config import ADMIN_COOKIE_SECURE, ADMIN_DEV_LOGIN, BASE_DIR, BOT_MODE, PUBLIC_CSP, TELEGRAM_BOT_TOKEN, KYIV
 from database import init_database
-from schedule_service import ScheduleService, calendar_metadata
+from schedule_service import ScheduleService, calendar_metadata, MIN_SCHEDULE_DATE, MAX_SCHEDULE_DATE, normalize_group
+from activity_limits import ActivityLimits
 from teacher_hints import TeacherHintsService
 import admin_api
 import admin_auth
@@ -29,6 +30,7 @@ logging.getLogger('httpcore').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 schedule = ScheduleService()
 teachers = TeacherHintsService()
+activity_limits = ActivityLimits()
 admin_api.bind(schedule)
 ADMIN_DIR = BASE_DIR / 'admin_static'
 
@@ -165,6 +167,8 @@ async def get_schedule(request: Request,
                        event: Optional[str] = Query(None, pattern='^(view|interaction|refresh)$')):
     if duration1 not in (60, 80) or duration2 not in (60, 80):
         return JSONResponse(status_code=422, content={'status': 'error', 'message': 'Тривалість має бути 60 або 80 хвилин.'})
+    if monday is not None and not MIN_SCHEDULE_DATE <= monday <= MAX_SCHEDULE_DATE:
+        return JSONResponse(status_code=422, content={'status': 'error', 'message': 'Дата має бути в межах 2000–2100 років.'})
     if not schedule.raw:
         return JSONResponse(status_code=503, headers={'Retry-After': '30'}, content={
             'status': 'error', 'message': 'Розклад тимчасово недоступний. Спробуйте за хвилину.'})
@@ -173,7 +177,11 @@ async def get_schedule(request: Request,
     data = schedule.build(group, duration1, duration2, week=week, monday=monday)
     if data is None:
         return JSONResponse(status_code=404, content={'status': 'error', 'message': 'Групу не знайдено. Перевірте назву в налаштуваннях.'})
-    analytics.record_request(uid, group, '/api/schedule', request.headers.get('user-agent', ''), mode, event or 'legacy_request')
+    kind = event or 'legacy_request'
+    canonical = next((g for g in schedule.groups if normalize_group(g) == normalize_group(group)), group)
+    if activity_limits.check(uid or '', canonical, kind) == 'accepted':
+        if not analytics.record_request(uid, canonical, '/api/schedule', request.headers.get('user-agent', ''), mode, kind):
+            activity_limits.forget(uid or '', canonical, kind)
     cycle = {str(w): schedule.build(group, duration1, duration2, week=w, ignore_start=True) for w in range(1, 5)}
     current = schedule.build(group, duration1, duration2)
     calendar = calendar_metadata(datetime.now(KYIV), current)
@@ -193,7 +201,7 @@ async def teacher_directory():
 
 
 class ActivityEvent(BaseModel):
-    uid: str = Field(max_length=128)
+    uid: str = Field(min_length=8, max_length=128, pattern=r'^[A-Za-z0-9_-]+$')
     group: str = Field(min_length=2, max_length=64)
     mode: Literal['standalone', 'browser']
     event: Literal['view', 'interaction']
@@ -206,9 +214,20 @@ async def record_activity(request: Request, event: ActivityEvent):
     origin = request.headers.get('origin')
     if origin and origin != str(request.base_url).rstrip('/'):
         return Response(status_code=403)
-    accepted = analytics.record_request(event.uid, event.group, '/api/schedule',
+    if not schedule.groups:
+        return Response(status_code=503, headers={'Retry-After': '30'})
+    group = next((g for g in schedule.groups if normalize_group(g) == normalize_group(event.group)), None)
+    if group is None:
+        return Response(status_code=422)
+    admission = activity_limits.check(event.uid, group, event.event)
+    if admission == 'duplicate':
+        return Response(status_code=204)
+    if admission == 'limited':
+        return Response(status_code=429, headers={'Retry-After': '60'})
+    accepted = analytics.record_request(event.uid, group, '/api/schedule',
                                         request.headers.get('user-agent', ''), event.mode, event.event)
     if not accepted:
+        activity_limits.forget(event.uid, group, event.event)
         return Response(status_code=503, headers={'Retry-After': '30'})
     return Response(status_code=204)
 

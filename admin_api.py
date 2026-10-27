@@ -255,6 +255,11 @@ def _health_summary():
         add('analytics', 'Запис статистики', 'warning', f"Втрачено подій: {writer['dropped']}")
     else:
         add('analytics', 'Запис статистики', 'ok', f"У черзі: {writer['pending']}")
+    last_rollup = writer.get('last_rollup_success') or 'ще не було'
+    if writer.get('rollup_error') or writer.get('rollup_stale') or not writer.get('rollup_running'):
+        add('rollup', 'Підсумки статистики', 'warning', f'Підрахунок не працює. Останній успішний: {last_rollup}')
+    else:
+        add('rollup', 'Підсумки статистики', 'ok', f'Останній успішний: {last_rollup}')
     disk = system.get('disk')
     if disk and disk['total']:
         free_pct = disk['free'] / disk['total'] * 100
@@ -305,6 +310,19 @@ async def refresh_schedule(request: Request):
     await auth.audit('refresh_schedule', s['user_id'], client_ip(request), 'ok' if ok else 'failed')
     return {'status': 'success', 'data': {'refreshed': ok, 'message': 'Розклад оновлено.' if ok else
             'Не вдалося оновити. Працює останній збережений розклад.', 'schedule': _schedule.diagnostics()}}
+
+
+@router.post('/actions/rollback-schedule')
+async def rollback_schedule(request: Request) -> dict:
+    session = await require_session(request, mutating=True)
+    if not auth.action_limiter.check(session['sid']):
+        raise AdminError(429, 'Зачекайте хвилину.')
+    try:
+        await _schedule.rollback()
+    except ValueError:
+        raise AdminError(409, 'Немає іншого перевіреного знімка для відновлення.')
+    await auth.audit('rollback_schedule', session['user_id'], client_ip(request))
+    return {'status': 'success', 'data': {'message': 'Попередній розклад відновлено.', 'schedule': _schedule.diagnostics()}}
 
 
 @router.get('/sessions')

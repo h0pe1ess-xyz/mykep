@@ -16,13 +16,13 @@ test('second shift follows first shift while keeping its own lesson duration',()
         assert.equal(times[7].join(' - '),last);
     }
 });
-function fixture() {
-    const data = new Map();
+function fixture(initialData={}) {
+    const data = new Map(Object.entries(initialData));
     const context = vm.createContext({console,Date,Intl,URLSearchParams,AbortController,setTimeout,clearTimeout,setInterval:()=>0,
         localStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)},
         document:{getElementById:()=>({}),addEventListener(){},visibilityState:'visible'},window:{addEventListener(){},matchMedia:()=>({matches:true})},
         navigator:{}, isPWA:()=>false, Tabs:{current:'dashboard'}, fetch:async()=>{throw new Error('offline');}});
-    for (const file of ['utils','api','dashboard','schedule-share']) vm.runInContext(fs.readFileSync(`static/js/${file}.js`,'utf8'),context);
+    for (const file of ['calendar-config','utils','api','dashboard','schedule-share']) vm.runInContext(fs.readFileSync(`static/js/${file}.js`,'utf8'),context);
     const run = code => vm.runInContext(code,context);
     run(`getKyivNow=()=>new Date(2026,9,17,15,0); storage.set('mykep_duration1','80'); storage.set('mykep_duration2','60');`);
     run(`const sampleLesson={lesson:8,time:'17:40 - 18:40',subject:'Тест',teacher:'Тест Т.Т.',room:'101',condition:'1-4',starts_on:null,subgroup:null};
@@ -31,6 +31,60 @@ function fixture() {
         const entry={key:'ПІ-24-02|80|60',cycle,savedAt:1,meta:{updated_at:'2026-10-14T10:00:00+03:00',stale:false}};`);
     return {data,run,context};
 }
+
+test('server calendar configuration is validated, cached and used offline',()=>{
+    const {run,data}=fixture();
+    assert.equal(run(`cycleWeek(new Date(2026,9,26))`),1);
+    run(`acceptCalendarConfig({cycle_start:'2026-09-07',cycle_weeks:4})`);
+    assert.equal(run(`cycleWeek(new Date(2026,9,26))`),4);
+    assert.equal(JSON.parse(data.get('mykep_calendar')).cycle_start,'2026-09-07');
+    for(const value of [{cycle_start:'2026-09-08',cycle_weeks:4},{cycle_start:'2026-02-30',cycle_weeks:4},{cycle_start:'9999-12-27',cycle_weeks:4},{cycle_start:'2026-09-07',cycle_weeks:5}]) {
+        run(`acceptCalendarConfig(${JSON.stringify(value)})`);
+        assert.equal(run(`cycleWeek(new Date(2026,9,26))`),4);
+    }
+    const second=fixture({mykep_calendar:data.get('mykep_calendar')});
+    assert.equal(second.run(`cycleWeek(new Date(2026,9,26))`),4);
+});
+
+test('corrupt cycles cannot hide behind valid data or erase other cached groups',async()=>{
+    const {run,data}=fixture();
+    data.set('mykep_uid','keep-uid');
+    data.set('mykep_group','ПІ-24-02');
+    run(`storage.set('mykep_schedule',JSON.stringify({version:3,entries:[
+        {...entry,cycle:{1:null},data:Object.fromEntries(SCHEDULE_DAYS.map(day=>[day,[]]))},
+        {...entry,key:'ІНША|80|60'},
+        {...entry,key:'ЗІПСОВАНА|80|60',cycle:{...cycle,1:{...cycle[1],'понеділок':[null]}}}
+    ]}))`);
+    assert.equal(run(`getCachedSchedule('auto','ПІ-24-02')`),null);
+    assert.equal(run(`cachedScheduleForKey('ІНША|80|60').key`),'ІНША|80|60');
+    assert.equal(JSON.parse(data.get('mykep_schedule')).entries.length,1);
+    assert.equal(data.get('mykep_uid'),'keep-uid');
+    assert.equal(data.get('mykep_group'),'ПІ-24-02');
+    assert.equal(data.get('mykep_duration1'),'80');
+    run(`fetch=async()=>({ok:true,status:200,headers:{get:()=>null},json:async()=>({status:'success',cycle,meta:{}})})`);
+    const result=await run(`fetchSchedule('current','ПІ-24-02')`);
+    assert.ok(result.data);
+    assert.equal(run(`cachedScheduleForKey('ІНША|80|60').key`),'ІНША|80|60');
+});
+
+test('schedule response supplies calendar configuration for subsequent offline views',async()=>{
+    const {run,data}=fixture();
+    run(`fetch=async()=>({ok:true,status:200,headers:{get:()=>null},json:async()=>({status:'success',cycle,meta:{},calendar:{config:{cycle_start:'2026-09-07',cycle_weeks:4}}})})`);
+    const online=await run(`fetchSchedule('next','ПІ-24-02')`);
+    assert.equal(online.calendar.cycle,3);
+    assert.equal(JSON.parse(data.get('mykep_calendar')).cycle_start,'2026-09-07');
+    run(`fetch=async()=>{throw new Error('offline')}`);
+    const offline=await run(`fetchSchedule('next','ПІ-24-02')`);
+    assert.equal(offline.calendar.cycle,3);
+});
+
+test('next calendar week has dates and filters future-start lessons',()=>{
+    const {run}=fixture();
+    run(`cycle[4]['понеділок']=[{...sampleLesson,starts_on:'2026-10-26'}]`);
+    assert.equal(run(`materializeSchedule(entry,'next','ПІ-24-02',new Date(2026,9,14)).calendar.monday`),'2026-10-19');
+    assert.equal(run(`materializeSchedule(entry,'next','ПІ-24-02',new Date(2026,9,14)).data['понеділок'].length`),0);
+    assert.equal(run(`materializeSchedule(entry,'4','ПІ-24-02',new Date(2026,9,14)).data['понеділок'].length`),1);
+});
 test('calendar week waits for actual Saturday end, Sunday advances, Monday resets',()=>{
     const {run}=fixture();
     assert.equal(run(`dateKey(defaultMonday(entry,'ПІ-24-02'))`),'2026-10-12');

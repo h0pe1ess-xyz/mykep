@@ -19,8 +19,9 @@ async function run() {
                 await page.waitForFunction(()=>typeof schedulePageData!=='undefined' && schedulePageData);
                 const weekOptions=await page.locator('#schedule-week option').allTextContents();
                 assert.equal(new Set(weekOptions).size,weekOptions.length);
-                assert.equal(await page.locator('#schedule-week option[value=current]').count(),0);
-                assert.equal(await page.locator('#schedule-week').inputValue(),'auto');
+                assert.equal(await page.locator('#schedule-week option[value=current]').count(),1);
+                assert.equal(await page.locator('#schedule-week option[value=next]').count(),1);
+                assert.equal(await page.locator('#schedule-week').inputValue(),'current');
                 assert.equal(await page.evaluate(()=>getScheduleWeekSelection()),'current');
                 await page.locator('#schedule-week').focus();
                 await page.locator('#schedule-week').evaluate(n=>Promise.all(n.getAnimations().map(a=>a.finished)));
@@ -34,6 +35,7 @@ async function run() {
                 assert.equal(await page.locator('.schedule-context,#schedule-group,#subgroup-choices').count(),0);
                 assert.equal(await page.locator('#schedule-notice').isVisible(),false);
                 assert.ok((await page.locator('#schedule-data-time').textContent()).includes('Перевірено 14 жовтня о 10:00'));
+                await page.locator('.bottom-nav .active').evaluate(n=>Promise.all(n.getAnimations().map(a=>a.finished)));
                 const navStyle=await page.locator('.bottom-nav .active').evaluate(n=>({filter:getComputedStyle(n).filter,shadow:getComputedStyle(n).boxShadow,color:getComputedStyle(n).backgroundColor}));
                 assert.deepEqual(navStyle,{filter:'none',shadow:'none',color:'rgb(31, 23, 20)'});
                 assert.deepEqual(await page.locator('.bottom-nav .nav-label').allTextContents(),['Розклад','Головна','Налаштування']);
@@ -42,6 +44,10 @@ async function run() {
                 assert.equal(await page.locator('.schedule-toolbar .week-control-label').innerText(),'Тиждень');
                 const controls=await page.locator('.schedule-toolbar').evaluate(row=>{const tabs=row.querySelector('.schedule-mode-switch').getBoundingClientRect();const week=row.querySelector('.week-select').getBoundingClientRect();return {separate:tabs.right<=week.left,bottom:Math.abs(tabs.bottom-week.bottom),touch:week.height>=44};});
                 assert.deepEqual(controls,{separate:true,bottom:0,touch:true});
+                await page.selectOption('#schedule-week','next');
+                await page.waitForFunction(()=>currentScheduleCalendar?.monday==='2026-10-19');
+                assert.equal(await page.locator('#schedule-week').inputValue(),'next');
+                assert.equal(await page.locator('#schedule-week-label').isVisible(),true);
                 for (const week of ['1','2','3','4']) {
                     await page.selectOption('#schedule-week',week);
                     await page.waitForFunction(()=>document.getElementById('schedule-week-label').hidden);
@@ -408,19 +414,19 @@ async function run() {
                 await calendarPage.evaluate(()=>Tabs.show('schedule'));
                 await calendarPage.waitForFunction(()=>schedulePageData);
                 assert.equal(await calendarPage.locator('#schedule-week-label').textContent(),'19–24 жовтня Тиждень 4');
-                assert.equal(await calendarPage.locator('#schedule-week option[value=auto]').textContent(),'Наступний');
+                assert.equal(await calendarPage.locator('#schedule-week option[value=auto]').textContent(),'Автоматично');
                 assert.equal(await calendarPage.locator('#schedule-week option[value=current]').textContent(),'Цей тиждень');
                 await calendarPage.selectOption('#schedule-week','current');
                 await calendarPage.waitForFunction(()=>currentScheduleCalendar?.label==='Поточний тиждень');
-                assert.equal(await calendarPage.locator('#schedule-week option[value=auto]').textContent(),'Наступний');
+                assert.equal(await calendarPage.locator('#schedule-week option[value=auto]').textContent(),'Автоматично');
                 const sundayOptions=await calendarPage.locator('#schedule-week option').allTextContents();
                 assert.equal(new Set(sundayOptions).size,sundayOptions.length);
                 await calendarPage.clock.setSystemTime(new Date('2026-10-18T20:59:50Z'));
                 await calendarPage.clock.runFor(20000);
                 await calendarPage.waitForFunction(()=>currentScheduleCalendar?.monday==='2026-10-19');
                 assert.equal(await calendarPage.locator('.day-item[aria-current="date"]').getAttribute('data-day'),'понеділок');
-                assert.equal(await calendarPage.locator('#schedule-week option[value=current]').count(),0);
-                assert.equal(await calendarPage.locator('#schedule-week').inputValue(),'auto');
+                assert.equal(await calendarPage.locator('#schedule-week option[value=current]').count(),1);
+                assert.equal(await calendarPage.locator('#schedule-week').inputValue(),'current');
                 await calendarPage.evaluate(()=>Tabs.show('dashboard'));
                 await calendarPage.waitForFunction(()=>document.getElementById('dashboard-status-title').textContent==='Розклад на сьогодні');
                 assert.equal(await calendarPage.locator('#status-text .next-day-time').count(),0);

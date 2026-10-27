@@ -185,12 +185,7 @@ const App = (() => {
         started = true;
         const weekSelect = document.getElementById('schedule-week');
         const initialWeek=getScheduleWeekSelection();
-        if (initialWeek === 'next') {
-            const next = document.createElement('option');
-            next.value = 'next'; next.textContent = 'Наступний';
-            weekSelect.insertBefore(next,weekSelect.options[1]);
-        }
-        weekSelect.value = initialWeek === 'current' ? 'auto' : initialWeek;
+        weekSelect.value = initialWeek;
         weekSelect.addEventListener('change', () => {
             storage.set('mykep_schedule_week', normalizeWeekSelection(weekSelect.value));
             updateHeaderDisplays();

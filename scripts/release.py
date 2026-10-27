@@ -12,7 +12,8 @@ def generate(check: bool = False) -> None:
     version = (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
     if not re.fullmatch(r'\d+\.\d+\.\d+(?:-[a-z0-9.]+)?', version):
         raise ValueError('Invalid VERSION')
-    generated = {}
+    calendar = json.loads((ROOT / 'static/data/calendar.json').read_text(encoding='utf-8'))
+    generated = {'static/js/calendar-config.js': 'window.MYKEP_CALENDAR_CONFIG = ' + json.dumps(calendar, ensure_ascii=False, sort_keys=True) + ';\n'}
     for name in ('static/index.html', 'static/about.html', 'static/js/teacher-hints.js', 'static/js/boot.js', 'admin_static/sw.js'):
         path = ROOT / name
         text = path.read_text(encoding='utf-8')
@@ -32,6 +33,8 @@ def generate(check: bool = False) -> None:
     worker = re.sub(r'^const RELEASE_VERSION = .*;\n', '', worker, flags=re.M)
     worker = worker.replace('const APP_SHELL', "const RELEASE_VERSION = '" + version + "';\nconst APP_SHELL")
     worker = re.sub(r'\?v=[\w.-]+', '?v=' + version, worker)
+    if '/js/calendar-config.js?' not in worker:
+        worker = worker.replace('const APP_SHELL = [', 'const APP_SHELL = [\n    "/js/calendar-config.js?v=' + version + '",')
     if '/js/dialogs.js?' not in worker:
         worker = worker.replace('const APP_SHELL = [', 'const APP_SHELL = [\n    "/js/dialogs.js?v=' + version + '",')
     shell = json.loads(re.search(r'const APP_SHELL = (\[.*?\]);', worker, re.S)[1])
@@ -52,7 +55,7 @@ def generate(check: bool = False) -> None:
     drift = []
     for name, content in generated.items():
         path = ROOT / name
-        if path.read_text(encoding='utf-8') != content:
+        if not path.exists() or path.read_text(encoding='utf-8') != content:
             drift.append(name)
             if not check:
                 path.write_bytes(content.encode())

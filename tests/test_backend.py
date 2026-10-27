@@ -96,6 +96,8 @@ class ScheduleTests(unittest.TestCase):
 
     def test_snapshot_validation_and_empty_days(self):
         self.assertTrue(valid_snapshot(snapshot()))
+        self.assertTrue(valid_snapshot({'Група': {day: [] for day in DAYS[:5]}}))
+        self.assertFalse(valid_snapshot({'Група': {'понеділок': []}}))
         self.assertTrue(valid_snapshot({'Група': {day: [] for day in DAYS}}))
         for value in ({'ТЕСТ': {'понеділок': [{}]}}, {'Група': {'невідомий': []}}, {}, {'Група': {'понеділок': [lesson('0')]}}, {'Група': {'понеділок': [lesson(week='невідомо')]}}):
             self.assertFalse(valid_snapshot(value))
@@ -226,19 +228,46 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(analytics, 'ROLLUP_INTERVAL', 0), patch.object(analytics, 'refresh_daily', side_effect=observed_refresh):
             await analytics.start_writer()
             await asyncio.wait_for(completed.wait(), 5)
+            self.assertIsNotNone(analytics.writer_status()['last_rollup_success'])
             await analytics.stop_writer()
+
+    async def test_rollup_error_is_reported_then_recovers_after_success(self):
+        await analytics.stop_writer()
+        completed = asyncio.Event()
+        original = analytics.refresh_daily
+        calls = 0
+
+        async def failing_then_recovered():
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise RuntimeError('synthetic rollup failure')
+            self.assertTrue(analytics.writer_status()['rollup_error'])
+            await original()
+            self.assertFalse(analytics.writer_status()['rollup_error'])
+            self.assertIsNotNone(analytics.writer_status()['last_rollup_success'])
+            analytics._rollup_stop.set()
+            completed.set()
+
+        with patch.object(analytics, 'ROLLUP_INTERVAL', 0), patch.object(analytics, 'refresh_daily', side_effect=failing_then_recovered):
+            await analytics.start_writer()
+            await asyncio.wait_for(completed.wait(), 5)
+        await analytics.stop_writer()
 
     async def test_activity_receipt_validates_without_building_schedule(self):
         import main
+        from activity_limits import ActivityLimits
         event = dict(uid='synthetic-action', group='ПІ-24-02', mode='standalone', event='interaction')
-        with patch.object(main.schedule, 'build', side_effect=AssertionError('activity must not build schedules')):
+        with patch.object(main.schedule, 'groups', ['ПІ-24-02']), patch.object(main, 'activity_limits', ActivityLimits()), patch.object(main.schedule, 'build', side_effect=AssertionError('activity must not build schedules')):
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url='https://localhost') as client:
                 self.assertEqual((await client.post('/api/activity', json=event, headers={'Origin':'https://localhost'})).status_code, 204)
+                self.assertEqual((await client.post('/api/activity', json=event)).status_code, 204)
                 self.assertEqual((await client.post('/api/activity', json=event, headers={'Origin':'https://foreign.invalid'})).status_code, 403)
-                for invalid in ({**event,'event':'refresh'}, {**event,'group':'x'}, {**event,'mode':'unknown'}, {**event,'uid':'x'*129}):
+                for invalid in ({**event,'event':'refresh'}, {**event,'group':'x'}, {**event,'group':'НЕІСНУЮЧА-ГРУПА'}, {**event,'mode':'unknown'}, {**event,'uid':'x'*129}, {**event,'uid':''}):
                     self.assertEqual((await client.post('/api/activity', json=invalid)).status_code, 422)
                 with patch.object(analytics, 'record_request', return_value=False):
-                    self.assertEqual((await client.post('/api/activity', json=event)).status_code, 503)
+                    self.assertEqual((await client.post('/api/activity', json={**event,'uid':'queue-retry'})).status_code, 503)
+                self.assertEqual((await client.post('/api/activity', json={**event,'uid':'queue-retry','group':'НЕІСНУЮЧА-ГРУПА'})).status_code, 422)
         await analytics._queue.join()
         with closing(sqlite3.connect(self.path)) as db:
             self.assertEqual(db.execute("SELECT endpoint,event_kind,display_mode FROM analytics WHERE uid='synthetic-action'").fetchall(), [('/api/schedule','interaction','standalone')])
@@ -253,6 +282,64 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(service.metadata()['stale'])
         self.assertEqual(service.diagnostics()['last_error_type'], 'ValueError')
 
+    async def test_suspicious_shrink_needs_confirmation_and_supports_rollback(self):
+        from schedule_service import RETRY_SECONDS
+        service = ScheduleService()
+        await service.load()
+        full = snapshot()
+        full['ІНША-ГРУПА'] = copy.deepcopy(next(iter(full.values())))
+        reduced = snapshot()
+        with patch('schedule_service.fetch_schedule_sync', return_value=full):
+            self.assertTrue(await service.refresh())
+        service.last_attempt = 0
+        with patch('schedule_service.fetch_schedule_sync', return_value=reduced):
+            self.assertFalse(await service.refresh())
+            self.assertEqual(service.raw, full)
+            self.assertTrue(service.metadata()['stale'])
+            self.assertTrue(service.diagnostics()['pending_confirmation'])
+            with closing(sqlite3.connect(self.path)) as db:
+                self.assertEqual(json.loads(db.execute('SELECT data FROM schedule_snapshot').fetchone()[0]), full)
+            service.last_attempt = 0
+            service.pending_since -= RETRY_SECONDS + 1
+            self.assertTrue(await service.refresh())
+        self.assertEqual(service.raw, reduced)
+        self.assertTrue(service.rollback_available)
+        self.assertFalse(service.metadata()['stale'])
+        await service.rollback()
+        self.assertEqual(service.raw, full)
+        self.assertTrue(service.metadata()['stale'])
+        recovered = ScheduleService()
+        await recovered.load()
+        self.assertEqual(recovered.raw, full)
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(json.loads(db.execute('SELECT data FROM schedule_snapshot_previous').fetchone()[0]), reduced)
+            self.assertEqual(db.execute('SELECT id,timestamp,uid,group_name,endpoint,user_agent FROM analytics ORDER BY id').fetchall()[:3], self.before)
+
+    async def test_missing_known_saturday_is_not_silently_an_empty_day(self):
+        service = ScheduleService()
+        await service.load()
+        original = snapshot()
+        service.install(original, time.time())
+        missing = copy.deepcopy(original)
+        del missing[next(iter(missing))]['субота']
+        with patch('schedule_service.fetch_schedule_sync', return_value=missing):
+            self.assertFalse(await service.refresh())
+        self.assertEqual(service.raw, original)
+        self.assertTrue(service.metadata()['stale'])
+        self.assertIsNone(service.pending_fingerprint)
+
+    async def test_corrupt_current_snapshot_recovers_previous_at_startup(self):
+        service = ScheduleService()
+        await service.load()
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('INSERT INTO schedule_snapshot VALUES (1, ?, ?)', ('{}', time.time()))
+            db.execute('INSERT INTO schedule_snapshot_previous VALUES (1, ?, ?)', (json.dumps(snapshot()), time.time()))
+        recovered = ScheduleService()
+        await recovered.load()
+        self.assertEqual(recovered.raw, snapshot())
+        self.assertTrue(recovered.metadata()['stale'])
+        self.assertEqual(recovered.last_error_type, 'SnapshotRecovery')
+
     async def test_api_conditional_response_and_admin_protection(self):
         import main
         service = ScheduleService()
@@ -262,6 +349,7 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
                 first = await client.get('/api/schedule', params={'group': 'НТ-24-01', 'event': 'view'})
                 self.assertEqual(first.status_code, 200)
                 self.assertEqual(set(first.json()['cycle']), {'1', '2', '3', '4'})
+                self.assertEqual(first.json()['calendar']['config']['cycle_start'], '2026-08-31')
                 self.assertEqual(first.json()['cycle']['1']['понеділок'][0]['time'], '08:00 - 09:00')
                 checked = service.updated_at + 1
                 service.updated_at = checked
@@ -306,6 +394,34 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
                     result = await client.get(path)
                     self.assertEqual(result.status_code, 200)
                     self.assertNotIn('uid', json.dumps(result.json()))
+
+    async def test_admin_rollback_requires_session_csrf_and_same_origin(self):
+        import main
+        import admin_api
+        import admin_auth
+        await admin_auth.init_admin_db()
+        service = ScheduleService()
+        await service.load()
+        original = snapshot()
+        newer = copy.deepcopy(original)
+        newer[next(iter(newer))]['понеділок'][0]['subject'] = 'Оновлена математика'
+        service.install(newer, time.time())
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('INSERT INTO schedule_snapshot VALUES (1, ?, ?)', (json.dumps(newer), time.time()))
+            db.execute('INSERT INTO schedule_snapshot_previous VALUES (1, ?, ?)', (json.dumps(original), time.time()-60))
+        token = await admin_auth.create_session(next(iter(admin_auth.ADMIN_IDS)), 'Test', '', 'test', '127.0.0.1', 'synthetic')
+        with patch.object(admin_api, '_schedule', service):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url='https://localhost') as client:
+                path = '/api/admin/actions/rollback-schedule'
+                self.assertEqual((await client.post(path, json={}, headers={'Origin':'https://localhost'})).status_code, 401)
+                client.cookies.set(admin_auth.COOKIE_NAME, token)
+                csrf = (await client.get('/api/admin/me')).json()['data']['csrf']
+                self.assertEqual((await client.post(path, json={}, headers={'Origin':'https://localhost'})).status_code, 403)
+                self.assertEqual((await client.post(path, json={}, headers={'Origin':'https://foreign.invalid','X-CSRF-Token':csrf})).status_code, 403)
+                result = await client.post(path, json={}, headers={'Origin':'https://localhost','X-CSRF-Token':csrf})
+                self.assertEqual(result.status_code, 200)
+                self.assertEqual(service.raw, original)
+                self.assertTrue(service.metadata()['stale'])
 
 
 if __name__ == '__main__':
