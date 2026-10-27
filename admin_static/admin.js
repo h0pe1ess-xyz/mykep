@@ -505,8 +505,8 @@
                 card(single ? 'Перегляди по годинах' : 'Перегляди та користувачі по днях', main, { span: 3,
                     actions: single ? null : [metricToggle()] }),
                 card('Коли найбільше дивляться', hours, { span: 2, sub: single ? 'Перегляди по годинах' : `Середня кількість переглядів за годину · пік ${peakHourText}` }),
-                card('Пари чи перерви?', [slotsDonut], { sub: 'За стандартним розкладом дзвінків' }),
-                card('Профіль дня (кожні 15 хв)', profile, { span: 3, sub: 'Підсвічено час пар (1-ша зміна: 80 хв, 2-га: 60 хв)' }),
+                card('Пари чи перерви?', [slotsDonut], { sub: d.slots.standard_note }),
+                card('Профіль дня (кожні 15 хв)', profile, { span: 3, sub: d.slots.profile_note }),
                 card('Тиждень × година', heat, { span: 2, sub: 'Теплова карта переглядів' }),
                 card('По днях тижня', weekdays, { sub: 'Середня кількість переглядів за день' }),
                 card('Перегляди по парах', slotBars, { sub: `Під час пар ${fmt(slotSum.lessons)} · перерви ${fmt(slotSum.breaks)} · поза парами ${fmt(slotSum.outside)}` }),
@@ -661,6 +661,7 @@
         const load = s.load_avg ? s.load_avg.map(x => nf1.format(x)).join(' · ') : '-';
         const loadPct = s.load_avg && s.cpu_count ? s.load_avg[0] / s.cpu_count * 100 : 0;
         const refreshBtn = h('button', { type: 'button', class: 'btn', text: 'Оновити розклад зараз', on: { click: ev => refreshSchedule(ev.currentTarget) } });
+        const rollbackBtn = h('button', { type: 'button', class: 'btn btn-ghost', text: 'Відновити попередній розклад', disabled:!sc?.rollback_available, on: { click: ev => rollbackSchedule(ev.currentTarget) } });
         C.dispose($('page-server'));
         $('page-server').replaceChildren(
             statusBanner(d.health),
@@ -696,12 +697,14 @@
                     ['Успішних / невдалих', sc ? `${fmt(sc.refresh_ok)} / ${fmt(sc.refresh_failed)}` : '-'],
                     ['Наступне оновлення', sc && sc.next_refresh_in !== null ? `через ${fmtDuration(sc.next_refresh_in)}` : '-'],
                     ['Інтервал', sc ? `${fmtDuration(sc.refresh_interval)} (повтор ${fmtDuration(sc.retry_interval)})` : '-']
-                ]), refreshBtn], { span: 2 }),
+                ]), h('div', {class:'card-actions'}, [refreshBtn, rollbackBtn])], { span: 2 }),
                 card('Запис статистики', kv([
                     ['Writer', w.running ? 'працює' : 'зупинений', w.running ? 'ok' : 'critical'],
                     ['У черзі', fmt(w.pending)],
                     ['Втрачено подій', fmt(w.dropped), w.dropped ? 'warning' : null],
-                    ['Помилка запису', w.write_error ? 'так' : 'ні', w.write_error ? 'warning' : null]
+                    ['Помилка запису', w.write_error ? 'так' : 'ні', w.write_error ? 'warning' : null],
+                    ['Підрахунок підсумків', w.rollup_error || !w.rollup_running ? 'помилка або зупинено' : 'працює', w.rollup_error || !w.rollup_running ? 'warning' : null],
+                    ['Останній успішний підрахунок', w.last_rollup_success ? fmtDateTime(w.last_rollup_success) : 'ще не було']
                 ])),
                 card('Telegram-бот', [kv([['Режим', d.bot.mode === 'disabled' ? 'вимкнено' : d.bot.mode], ['Стан', String(d.bot.state)]]),
                     h('p', { class: 'muted small', text: 'Статистика тепер в адмінці. Бота можна увімкнути назад через BOT_MODE=embedded у .env.' })]),
@@ -730,11 +733,22 @@
         finally { btn.disabled = false; }
     }
 
+    async function rollbackSchedule(btn) {
+        if (!confirm('Відновити попередню збережену версію розкладу?')) return;
+        btn.disabled = true;
+        try {
+            const result = await api('/actions/rollback-schedule', {method:'POST', body:{}});
+            toast(result.message, 'ok');
+            load(false);
+        } catch (error) { toast(error.message, 'error'); }
+        finally { btn.disabled = false; }
+    }
+
     /* ----------------------------------------------------------- security */
     const EVENTS = { login: ['Вхід', 'ok'], logout: ['Вихід', null], login_denied: ['Спроба входу: не адмін', 'critical'],
         login_bad_signature: ['Невалідний підпис Telegram', 'warning'], login_replay: ['Повторне використання входу', 'critical'],
         login_bad_code: ['Невірний код входу', 'warning'], login_code_created: ['Створено код входу', null],
-        refresh_schedule: ['Ручне оновлення розкладу', null], revoke_sessions: ['Завершення сесій', null], export: ['Експорт CSV', null] };
+        refresh_schedule: ['Ручне оновлення розкладу', null], rollback_schedule: ['Відновлення попереднього розкладу', 'warning'], revoke_sessions: ['Завершення сесій', null], export: ['Експорт CSV', null] };
     const METHODS = { telegram: 'Telegram', code: 'Код', dev: 'Dev (локально)' };
     function renderSecurity([sessions, audit, server]) {
         const me = state.me, sec = server.security;

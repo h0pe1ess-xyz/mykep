@@ -1,6 +1,7 @@
 """Schedule parsing, persistent last-good snapshot and single-flight refresh."""
 import asyncio
 import json
+import hashlib
 import logging
 import re
 import time
@@ -13,6 +14,23 @@ from database import connect
 logger = logging.getLogger(__name__)
 URL = "https://kep.nung.edu.ua/pages/education/schedule"
 BELLS = json.loads((BASE_DIR / 'static/data/bells.json').read_text(encoding='utf-8'))
+CALENDAR_CONFIG = json.loads((BASE_DIR / 'static/data/calendar.json').read_text(encoding='utf-8'))
+CYCLE_START = date.fromisoformat(CALENDAR_CONFIG['cycle_start'])
+if CYCLE_START.weekday() != 0 or CALENDAR_CONFIG['cycle_weeks'] != 4:
+    raise ValueError('Calendar requires a Monday anchor and a four-week cycle')
+MIN_SCHEDULE_DATE, MAX_SCHEDULE_DATE = date(2000, 1, 1), date(2100, 12, 25)
+
+
+def build_bell_times(duration1, duration2):
+    first, second = (str(80 if int(value) == 80 else 60) for value in (duration1, duration2))
+    def minutes(value):
+        hour, minute = map(int, value.split(':'))
+        return hour * 60 + minute
+    offset = minutes(BELLS[first][4][0]) - minutes(BELLS[second][4][0])
+    def shifted(value):
+        total = minutes(value) + offset
+        return f'{total // 60:02d}:{total % 60:02d}'
+    return BELLS[first][:4] + [[shifted(value) for value in slot] for slot in BELLS[second][4:]]
 
 
 def normalize_group(value):
@@ -107,6 +125,8 @@ def validate_snapshot(data: dict) -> None:
                 parse_condition(lesson.get('week', lesson.get('weeks', '')))
                 if 'week' in lesson and 'weeks' in lesson and lesson['week'] != lesson['weeks']:
                     raise ValueError('Conflicting week conditions')
+        if not set(DAYS[:5]).issubset(normalized_days):
+            raise ValueError('Missing weekday; an empty day must be explicit')
 
 
 def valid_snapshot(data):
@@ -115,6 +135,10 @@ def valid_snapshot(data):
         return True
     except (ValueError, TypeError):
         return False
+
+
+class PendingSnapshot(ValueError):
+    """A structurally complete reduction still needs an independent fetch."""
 
 
 class ScheduleService:
@@ -136,6 +160,32 @@ class ScheduleService:
         self.refresh_failed = 0
         self.counts = {}
         self.previous_counts = {}
+        self.pending_fingerprint = None
+        self.pending_since = None
+        self.rollback_available = False
+
+    def check_replacement(self, data: dict) -> None:
+        if not self.raw:
+            return
+        previous_days = {normalize_group(group): {day_key(day) for day in days}
+                         for key, days in self.raw.items() for group in split_groups(key)}
+        for key, days in data.items():
+            for group in split_groups(key):
+                if previous_days.get(normalize_group(group), set()) - {day_key(day) for day in days}:
+                    raise ValueError('Previously present day is missing; use an explicit empty list')
+        counts = snapshot_counts(data)
+        shrinking = any(counts[key] < self.counts[key] * ratio
+                        for key, ratio in (('groups', .8), ('lessons', .65)))
+        if not shrinking:
+            self.pending_fingerprint = self.pending_since = None
+            return
+        fingerprint = hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        now = time.monotonic()
+        if fingerprint != self.pending_fingerprint:
+            self.pending_fingerprint, self.pending_since = fingerprint, now
+            raise PendingSnapshot('Suspicious schedule decrease; awaiting another independent fetch')
+        if now - self.pending_since < RETRY_SECONDS:
+            raise PendingSnapshot('Suspicious schedule decrease; confirmation is too early')
 
     def install(self, data, updated_at):
         validate_snapshot(data)
@@ -151,15 +201,28 @@ class ScheduleService:
     async def load(self):
         async with connect() as db:
             await db.execute("CREATE TABLE IF NOT EXISTS schedule_snapshot (id INTEGER PRIMARY KEY CHECK (id=1), data TEXT NOT NULL, updated_at REAL NOT NULL)")
+            await db.execute("CREATE TABLE IF NOT EXISTS schedule_snapshot_previous (id INTEGER PRIMARY KEY CHECK (id=1), data TEXT NOT NULL, updated_at REAL NOT NULL)")
             await db.commit()
-            rows = await db.execute_fetchall("SELECT data, updated_at FROM schedule_snapshot WHERE id=1")
-        if rows:
+            rows = await db.execute_fetchall("SELECT data, updated_at, 0 FROM schedule_snapshot WHERE id=1 UNION ALL SELECT data, updated_at, 1 FROM schedule_snapshot_previous WHERE id=1")
+        for row in rows:
             try:
-                data = json.loads(rows[0][0])
+                data = json.loads(row[0])
                 if valid_snapshot(data):
-                    self.install(data, rows[0][1])
+                    self.install(data, row[1])
+                    if row[2]:
+                        self.last_error = True
+                        self.last_error_type = 'SnapshotRecovery'
+                        self.last_error_reason = 'Recovered previous valid snapshot'
+                    break
             except (ValueError, TypeError):
                 logger.warning("Invalid saved snapshot, will refresh")
+        for row in rows:
+            if row[2]:
+                try:
+                    previous = json.loads(row[0])
+                    self.rollback_available = valid_snapshot(previous) and previous != self.raw
+                except (ValueError, TypeError):
+                    logger.warning('Invalid previous snapshot; manual rollback unavailable')
 
     async def refresh(self):
         async with self.lock:
@@ -172,19 +235,28 @@ class ScheduleService:
             try:
                 data = await asyncio.to_thread(fetch_schedule_sync)
                 validate_snapshot(data)
+                self.check_replacement(data)
                 updated_at = time.time()
+                changed = bool(self.raw and self.raw != data)
                 async with connect() as db:
+                    await db.execute('BEGIN IMMEDIATE')
+                    if changed:
+                        await db.execute("INSERT OR REPLACE INTO schedule_snapshot_previous VALUES (1, ?, ?)", (json.dumps(self.raw, ensure_ascii=False), self.updated_at))
                     await db.execute("INSERT OR REPLACE INTO schedule_snapshot VALUES (1, ?, ?)", (json.dumps(data, ensure_ascii=False), updated_at))
                     await db.commit()
                 self.install(data, updated_at)
+                self.rollback_available = self.rollback_available or changed
                 self.last_error = False
                 self.last_error_type = None
                 self.last_error_reason = None
+                self.pending_fingerprint = self.pending_since = None
                 self.refresh_ok += 1
                 self.last_duration_ms = round((time.monotonic() - started) * 1000)
                 logger.info("Refreshed schedule: %s groups", len(self.groups))
                 return True
             except Exception as exc:
+                if not isinstance(exc, PendingSnapshot):
+                    self.pending_fingerprint = self.pending_since = None
                 self.last_error = True
                 self.last_error_type = type(exc).__name__
                 self.last_error_reason = str(exc)[:160] if isinstance(exc, ValueError) else None
@@ -192,6 +264,29 @@ class ScheduleService:
                 self.last_duration_ms = round((time.monotonic() - started) * 1000)
                 logger.warning("Schedule refresh failed (%s); retaining cached data", type(exc).__name__)
                 return False
+
+    async def rollback(self) -> None:
+        async with self.lock:
+            async with connect() as db:
+                await db.execute('BEGIN IMMEDIATE')
+                rows = await db.execute_fetchall('SELECT data, updated_at FROM schedule_snapshot_previous WHERE id=1')
+                if not rows:
+                    raise ValueError('No previous schedule snapshot')
+                data = json.loads(rows[0][0])
+                validate_snapshot(data)
+                if data == self.raw:
+                    raise ValueError('Previous snapshot matches the current schedule')
+                if self.raw:
+                    await db.execute('INSERT OR REPLACE INTO schedule_snapshot_previous VALUES (1, ?, ?)', (json.dumps(self.raw, ensure_ascii=False), self.updated_at))
+                await db.execute('INSERT OR REPLACE INTO schedule_snapshot VALUES (1, ?, ?)', rows[0])
+                await db.commit()
+            self.install(data, rows[0][1])
+            self.rollback_available = True
+            self.last_error = True
+            self.last_error_type = 'ManualRollback'
+            self.last_error_reason = 'Previous snapshot restored; awaiting source revalidation'
+            self.last_attempt = time.monotonic()
+            self.pending_fingerprint = self.pending_since = None
 
     async def run(self):
         while True:
@@ -213,6 +308,8 @@ class ScheduleService:
             "ready": bool(self.raw),
             "counts": self.counts,
             "previous_counts": self.previous_counts,
+            "pending_confirmation": self.pending_fingerprint is not None,
+            "rollback_available": self.rollback_available,
             "groups": len(self.groups),
             "age_seconds": round(now - self.updated_at) if self.updated_at else None,
             "last_attempt": datetime.fromtimestamp(self.last_attempt_wall, KYIV).isoformat() if self.last_attempt_wall else None,
@@ -241,10 +338,10 @@ class ScheduleService:
 
 
 def get_academic_week(target_date: date) -> int:
-    base_monday = date(2026, 8, 31)
+    base_monday = CYCLE_START
     delta_days = (target_date - base_monday).days
     if delta_days < 0: return 1
-    return (delta_days // 7 % 4) + 1
+    return (delta_days // 7 % CALENDAR_CONFIG['cycle_weeks']) + 1
 
 def is_lesson_active(weeks_str: str, current_week: int, lesson_date: Optional[date] = None) -> bool:
     weeks, start = parse_condition(weeks_str)
@@ -272,6 +369,8 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
     """Build schedule for a single group from the in-memory raw data. No network calls."""
     if week is not None and (type(week) is not int or week not in (1, 2, 3, 4)):
         raise ValueError("Week must be an integer from 1 to 4")
+    if monday is not None and not MIN_SCHEDULE_DATE <= monday <= MAX_SCHEDULE_DATE:
+        raise ValueError('Schedule date is out of range')
     if not raw_schedule_data:
         return None
 
@@ -290,8 +389,8 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
     days_to_check = {day: base_monday + timedelta(days=i) for i, day in enumerate(DAYS)}
 
     time_mapping = {
-        str(i + 1): ' - '.join(BELLS[str(80 if int(duration) == 80 else 60)][i])
-        for i, duration in enumerate([duration1] * 4 + [duration2] * 4)
+        str(i + 1): ' - '.join(slot)
+        for i, slot in enumerate(build_bell_times(duration1, duration2))
     }
 
     full_week_schedule = {}
@@ -335,6 +434,6 @@ def calendar_metadata(now: datetime, data: dict) -> dict:
     saturday = data.get('субота', [])
     end = max((l['time'].split(' - ')[1] for l in saturday), default='00:00')
     upcoming = now.weekday() == 6 or (now.weekday() == 5 and now.strftime('%H:%M') >= end)
-    return {'today': now.date().isoformat(), 'current_monday': monday.isoformat(),
+    return {'config': CALENDAR_CONFIG, 'today': now.date().isoformat(), 'current_monday': monday.isoformat(),
             'default_monday': (monday + timedelta(days=7 if upcoming else 0)).isoformat(),
             'current_cycle': get_academic_week(monday)}

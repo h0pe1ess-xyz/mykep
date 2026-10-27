@@ -15,11 +15,13 @@ _rollup = None
 _rollup_stop = None
 ROLLUP_INTERVAL = 60
 _last_rollup_error = False
+_last_rollup_success = None
 _dropped = 0
 _last_write_error = False
 
 
 async def init_analytics_db():
+    global _last_rollup_success
     # Back up the target, including WAL, before any schema change. Never touch a
     # different deployment database or replace historical rows.
     async with connect() as db:
@@ -54,6 +56,7 @@ async def init_analytics_db():
             day TEXT PRIMARY KEY, bytes INTEGER NOT NULL, details INTEGER NOT NULL)''')
         await update_daily(db)
         await db.commit()
+        _last_rollup_success = datetime.now(KYIV).isoformat()
 
 
 async def start_writer():
@@ -160,16 +163,22 @@ def writer_status():
     return {'running': bool(_writer and not _writer.done()),
             'pending': _queue.qsize() if _queue else 0,
             'dropped': _dropped, 'write_error': _last_write_error,
-            'rollup_error': _last_rollup_error}
+            'rollup_error': _last_rollup_error,
+            'rollup_running': bool(_rollup and not _rollup.done()),
+            'rollup_stale': _last_rollup_success is None or (datetime.now(KYIV) - datetime.fromisoformat(_last_rollup_success)).total_seconds() > ROLLUP_INTERVAL * 3,
+            'last_rollup_success': _last_rollup_success}
 
 
 async def refresh_daily():
+    global _last_rollup_error, _last_rollup_success
     # Checkpoint and aggregates commit together. BEGIN IMMEDIATE serializes
     # catch-up across web/bot processes without blocking event-loop readers.
     async with connect() as db:
         await db.execute('BEGIN IMMEDIATE')
         await update_daily(db)
         await db.commit()
+    _last_rollup_success = datetime.now(KYIV).isoformat()
+    _last_rollup_error = False
 
 
 async def _rollup_loop():

@@ -8,6 +8,13 @@ function getLessonDuration(shift) {
     const value = storage.get(`mykep_duration${shift}`);
     return value === '80' ? '80' : '60';
 }
+function buildBellTimes(data, first, second) {
+    const offset = timeToMins(data[first][4][0]) - timeToMins(data[second][4][0]);
+    return [...data[first].slice(0, 4), ...data[second].slice(4).map(slot => slot.map(time => {
+        const minute = timeToMins(time) + offset;
+        return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+    }))];
+}
 function migrateDurationDefaults() {
     const revision = '2026-10-27';
     if (storage.get('mykep_duration_defaults') === revision) return;
@@ -23,6 +30,17 @@ migrateDurationDefaults();
 function escapeHTML(value) {
     return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
 }
+function renderRoomCue(value) {
+    const rooms = String(value ?? '').trim().split(' / ').filter(Boolean);
+    const label = rooms.length > 1 ? 'Аудиторії' : 'Аудиторія';
+    const numbers = rooms.length ? rooms.map(room => {
+        const text = /^(?:спортивний\s+зал|спортзал|спорт\.?\s*зал)$/iu.test(room) ? 'спорт. зал' : room;
+        const size = text.length > 14 ? ' is-long' : text.length > 5 ? ' is-text' : '';
+        return `<span class="room-cue-number${size}" title="${escapeHTML(room)}">${escapeHTML(text)}</span>`;
+    }).join('') : '<span class="room-cue-missing">Не вказано</span>';
+    return `<span class="room-cue-label">${label}</span><strong class="room-cue-values">${numbers}</strong>`;
+}
+
 
 function normalizeGroupSearch(value) {
     // Separators are optional in search; preserve the original group for display/API.

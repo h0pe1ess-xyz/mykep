@@ -51,7 +51,7 @@ window.mykepViewportReport = function() {
         const box = node.getBoundingClientRect();
         return {top:box.top,bottom:box.bottom};
     });
-    return { version: '2.9.16', mode: getMyKepDisplayMode(),
+    return { version: '2.9.21', mode: getMyKepDisplayMode(),
         iosFixActive: document.documentElement.classList.contains('ios-standalone'),
         screen: {width:window.screen.width,height:window.screen.height,
             availableHeight:window.screen.availHeight,pixelRatio:window.devicePixelRatio,
@@ -218,7 +218,9 @@ window.mykepViewportReport = function() {
             const style = getComputedStyle(main);
             const children = [...main.children].map(node => ({node,css:getComputedStyle(node)}))
                 .filter(({css}) => css.display !== 'none');
-            const needed = children.reduce((height, {node,css}) => {
+            const needed = style.display === 'grid'
+                ? Math.max(0, ...children.map(({node,css}) => node.getBoundingClientRect().bottom + parseFloat(css.marginBottom || 0))) - main.getBoundingClientRect().top + parseFloat(style.paddingBottom)
+                : children.reduce((height, {node,css}) => {
                 return height + node.getBoundingClientRect().height + parseFloat(css.marginTop || 0) + parseFloat(css.marginBottom || 0);
             }, 0) + Math.max(0, children.length - 1) * (parseFloat(style.rowGap) || 0)
                 + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);

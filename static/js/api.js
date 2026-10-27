@@ -6,6 +6,21 @@ const SCHEDULE_DAYS = ['понеділок', 'вівторок', 'середа',
 let scheduleCacheSource;
 let scheduleEntries = [];
 const scheduleViews = new WeakMap();
+function validCalendarConfig(config) {
+    if (config?.cycle_weeks !== 4 || !/^\d{4}-\d{2}-\d{2}$/.test(config.cycle_start || '')) return false;
+    const date = parseLocalDate(config.cycle_start);
+    return dateKey(date) === config.cycle_start && date.getDay() === 1 && date.getFullYear() >= 2000 && date.getFullYear() <= 2100;
+}
+let calendarConfig = window.MYKEP_CALENDAR_CONFIG;
+try {
+    const cached = JSON.parse(storage.get('mykep_calendar') || 'null');
+    if (validCalendarConfig(cached)) calendarConfig = cached;
+} catch { /* Use the release's offline calendar when saved data is corrupt. */ }
+function acceptCalendarConfig(config) {
+    if (!validCalendarConfig(config)) return;
+    calendarConfig = {cycle_start:config.cycle_start,cycle_weeks:config.cycle_weeks};
+    storage.set('mykep_calendar', JSON.stringify(calendarConfig));
+}
 function currentDisplayMode() {
     return isPWA() ? 'standalone' : 'browser';
 }
@@ -44,7 +59,10 @@ async function fetchGroups(force = false) {
 function normalizeWeekSelection(value) {
     return ['auto', 'current', 'next', '1', '2', '3', '4'].includes(String(value)) ? String(value) : 'auto';
 }
-function getScheduleWeekSelection() { return normalizeWeekSelection(storage.get('mykep_schedule_week')); }
+let scheduleWeekSelection = 'auto';
+storage.remove('mykep_schedule_week');
+function getScheduleWeekSelection() { return scheduleWeekSelection; }
+function setScheduleWeekSelection(value) { scheduleWeekSelection = normalizeWeekSelection(value); }
 function dateKey(date) {
     return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
@@ -56,17 +74,18 @@ function calendarMonday(now = getKyivNow()) {
     return date;
 }
 function cycleWeek(date) {
-    const days = (Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())-Date.UTC(2026,7,31))/86400000;
-    return days < 0 ? 1 : (Math.floor(days/7)%4)+1;
+    const start = parseLocalDate(calendarConfig.cycle_start);
+    const days = (Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())-Date.UTC(start.getFullYear(),start.getMonth(),start.getDate()))/86400000;
+    return days < 0 ? 1 : (Math.floor(days/7)%calendarConfig.cycle_weeks)+1;
 }
 function scheduleCacheKey(group, duration1, duration2) { return `${group}|${duration1}|${duration2}`; }
 function validSchedule(data) {
     return data && typeof data === 'object' && !Array.isArray(data) && SCHEDULE_DAYS.every(day => Array.isArray(data[day]) && data[day].every(l =>
-        Number.isInteger(l.lesson) && l.lesson >= 1 && l.lesson <= 8 && typeof l.subject === 'string' && l.subject.trim() &&
+        l && typeof l === 'object' && Number.isInteger(l.lesson) && l.lesson >= 1 && l.lesson <= 8 && typeof l.subject === 'string' && l.subject.trim() &&
         typeof l.teacher === 'string' && typeof l.room === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d - (?:[01]\d|2[0-3]):[0-5]\d$/.test(l.time) &&
         (!l.starts_on || /^\d{4}-\d{2}-\d{2}$/.test(l.starts_on))));
 }
-function validCycle(cycle) { return cycle && [1,2,3,4].every(w => validSchedule(cycle[w])); }
+function validCycle(cycle) { return cycle && typeof cycle === 'object' && !Array.isArray(cycle) && [1,2,3,4].every(w => validSchedule(cycle[w])); }
 function scheduleRequestContext(week = 'auto', group = null) {
     group = group || storage.get('mykep_group') || 'ПІ-24-02';
     const duration1 = getLessonDuration(1), duration2 = getLessonDuration(2);
@@ -80,7 +99,9 @@ function readScheduleEntries() {
     try {
         const cache = JSON.parse(source || 'null');
         if (cache?.version === 3 && Array.isArray(cache.entries)) {
-            scheduleEntries = cache.entries.filter(e => e && typeof e.key === 'string' && (validCycle(e.cycle) || validSchedule(e.data)));
+            scheduleEntries = cache.entries.filter(e => e && typeof e.key === 'string' &&
+                (e.cycle !== undefined && e.cycle !== null ? validCycle(e.cycle) : validSchedule(e.data)));
+            if (scheduleEntries.length !== cache.entries.length) persistScheduleEntries();
         }
         if (cache?.version === 2 && Array.isArray(cache.entries)) {
             // Preserve exact legacy views until their group obtains a cycle. Never
@@ -159,7 +180,7 @@ function materializeSchedule(entry, week, group, now = getKyivNow()) {
     const offline = entry.offline || navigator.onLine === false;
     const manual = ['1','2','3','4'].includes(week);
     const automaticMonday = defaultMonday(entry,group,now);
-    const viewKey = `${week}|${dateKey(now)}|${dateKey(automaticMonday)}`;
+    const viewKey = `${calendarConfig.cycle_start}|${week}|${dateKey(now)}|${dateKey(automaticMonday)}`;
     let views = scheduleViews.get(entry.cycle);
     if (!views) { views = new Map(); scheduleViews.set(entry.cycle,views); }
     const cached = views.get(viewKey);
@@ -214,6 +235,7 @@ async function loadScheduleResponse(context) {
             const result = await response.json();
             if (!response.ok || result.status !== 'success') { const error = new Error(result.message); error.status=response.status; throw error; }
             if (!validCycle(result.cycle)) throw new Error('Некоректний цикл розкладу.');
+            acceptCalendarConfig(result.calendar?.config);
             const cycle = cached?.cycle && JSON.stringify(cached.cycle) === JSON.stringify(result.cycle) ? cached.cycle : result.cycle;
             entry = {key,cycle,meta:result.meta,etag:response.headers.get('ETag'),savedAt:Date.now()};
         }

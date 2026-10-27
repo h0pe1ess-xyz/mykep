@@ -2,13 +2,27 @@ const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
-function fixture() {
-    const data = new Map();
+test('second shift follows first shift while keeping its own lesson duration',()=>{
+    const {run}=fixture();
+    const data=JSON.stringify(JSON.parse(fs.readFileSync('static/data/bells.json','utf8')));
+    for(const [first,second,fifth,last] of [
+        ['60','60','12:50 - 13:50','16:20 - 17:20'],
+        ['80','60','14:10 - 15:10','17:40 - 18:40'],
+        ['60','80','12:50 - 14:10','17:20 - 18:40'],
+        ['80','80','14:10 - 15:30','18:40 - 20:00']
+    ]) {
+        const times=JSON.parse(run(`JSON.stringify(buildBellTimes(${data},'${first}','${second}'))`));
+        assert.equal(times[4].join(' - '),fifth);
+        assert.equal(times[7].join(' - '),last);
+    }
+});
+function fixture(initialData={}) {
+    const data = new Map(Object.entries(initialData));
     const context = vm.createContext({console,Date,Intl,URLSearchParams,AbortController,setTimeout,clearTimeout,setInterval:()=>0,
         localStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)},
         document:{getElementById:()=>({}),addEventListener(){},visibilityState:'visible'},window:{addEventListener(){},matchMedia:()=>({matches:true})},
         navigator:{}, isPWA:()=>false, Tabs:{current:'dashboard'}, fetch:async()=>{throw new Error('offline');}});
-    for (const file of ['utils','api','dashboard','schedule-share']) vm.runInContext(fs.readFileSync(`static/js/${file}.js`,'utf8'),context);
+    for (const file of ['calendar-config','utils','api','dashboard','schedule-share']) vm.runInContext(fs.readFileSync(`static/js/${file}.js`,'utf8'),context);
     const run = code => vm.runInContext(code,context);
     run(`getKyivNow=()=>new Date(2026,9,17,15,0); storage.set('mykep_duration1','80'); storage.set('mykep_duration2','60');`);
     run(`const sampleLesson={lesson:8,time:'17:40 - 18:40',subject:'Тест',teacher:'Тест Т.Т.',room:'101',condition:'1-4',starts_on:null,subgroup:null};
@@ -17,6 +31,73 @@ function fixture() {
         const entry={key:'ПІ-24-02|80|60',cycle,savedAt:1,meta:{updated_at:'2026-10-14T10:00:00+03:00',stale:false}};`);
     return {data,run,context};
 }
+
+test('server calendar configuration is validated, cached and used offline',()=>{
+    const {run,data}=fixture();
+    assert.equal(run(`cycleWeek(new Date(2026,9,26))`),1);
+    run(`acceptCalendarConfig({cycle_start:'2026-09-07',cycle_weeks:4})`);
+    assert.equal(run(`cycleWeek(new Date(2026,9,26))`),4);
+    assert.equal(JSON.parse(data.get('mykep_calendar')).cycle_start,'2026-09-07');
+    for(const value of [{cycle_start:'2026-09-08',cycle_weeks:4},{cycle_start:'2026-02-30',cycle_weeks:4},{cycle_start:'9999-12-27',cycle_weeks:4},{cycle_start:'2026-09-07',cycle_weeks:5}]) {
+        run(`acceptCalendarConfig(${JSON.stringify(value)})`);
+        assert.equal(run(`cycleWeek(new Date(2026,9,26))`),4);
+    }
+    const second=fixture({mykep_calendar:data.get('mykep_calendar')});
+    assert.equal(second.run(`cycleWeek(new Date(2026,9,26))`),4);
+});
+
+test('week choice is temporary and ignores the previous saved launch',()=>{
+    const {run,data}=fixture({mykep_schedule_week:'4',mykep_uid:'preserved-uid'});
+    assert.equal(run('getScheduleWeekSelection()'),'auto');
+    assert.equal(data.has('mykep_schedule_week'),false);
+    assert.equal(data.get('mykep_uid'),'preserved-uid');
+    run("setScheduleWeekSelection('next')");
+    assert.equal(run('getScheduleWeekSelection()'),'next');
+    assert.equal(data.has('mykep_schedule_week'),false);
+    run("setScheduleWeekSelection('invalid')");
+    assert.equal(run('getScheduleWeekSelection()'),'auto');
+    assert.equal(fixture({mykep_schedule_week:'next'}).run('getScheduleWeekSelection()'),'auto');
+});
+
+test('corrupt cycles cannot hide behind valid data or erase other cached groups',async()=>{
+    const {run,data}=fixture();
+    data.set('mykep_uid','keep-uid');
+    data.set('mykep_group','ПІ-24-02');
+    run(`storage.set('mykep_schedule',JSON.stringify({version:3,entries:[
+        {...entry,cycle:{1:null},data:Object.fromEntries(SCHEDULE_DAYS.map(day=>[day,[]]))},
+        {...entry,key:'ІНША|80|60'},
+        {...entry,key:'ЗІПСОВАНА|80|60',cycle:{...cycle,1:{...cycle[1],'понеділок':[null]}}}
+    ]}))`);
+    assert.equal(run(`getCachedSchedule('auto','ПІ-24-02')`),null);
+    assert.equal(run(`cachedScheduleForKey('ІНША|80|60').key`),'ІНША|80|60');
+    assert.equal(JSON.parse(data.get('mykep_schedule')).entries.length,1);
+    assert.equal(data.get('mykep_uid'),'keep-uid');
+    assert.equal(data.get('mykep_group'),'ПІ-24-02');
+    assert.equal(data.get('mykep_duration1'),'80');
+    run(`fetch=async()=>({ok:true,status:200,headers:{get:()=>null},json:async()=>({status:'success',cycle,meta:{}})})`);
+    const result=await run(`fetchSchedule('current','ПІ-24-02')`);
+    assert.ok(result.data);
+    assert.equal(run(`cachedScheduleForKey('ІНША|80|60').key`),'ІНША|80|60');
+});
+
+test('schedule response supplies calendar configuration for subsequent offline views',async()=>{
+    const {run,data}=fixture();
+    run(`fetch=async()=>({ok:true,status:200,headers:{get:()=>null},json:async()=>({status:'success',cycle,meta:{},calendar:{config:{cycle_start:'2026-09-07',cycle_weeks:4}}})})`);
+    const online=await run(`fetchSchedule('next','ПІ-24-02')`);
+    assert.equal(online.calendar.cycle,3);
+    assert.equal(JSON.parse(data.get('mykep_calendar')).cycle_start,'2026-09-07');
+    run(`fetch=async()=>{throw new Error('offline')}`);
+    const offline=await run(`fetchSchedule('next','ПІ-24-02')`);
+    assert.equal(offline.calendar.cycle,3);
+});
+
+test('next calendar week has dates and filters future-start lessons',()=>{
+    const {run}=fixture();
+    run(`cycle[4]['понеділок']=[{...sampleLesson,starts_on:'2026-10-26'}]`);
+    assert.equal(run(`materializeSchedule(entry,'next','ПІ-24-02',new Date(2026,9,14)).calendar.monday`),'2026-10-19');
+    assert.equal(run(`materializeSchedule(entry,'next','ПІ-24-02',new Date(2026,9,14)).data['понеділок'].length`),0);
+    assert.equal(run(`materializeSchedule(entry,'4','ПІ-24-02',new Date(2026,9,14)).data['понеділок'].length`),1);
+});
 test('calendar week waits for actual Saturday end, Sunday advances, Monday resets',()=>{
     const {run}=fixture();
     assert.equal(run(`dateKey(defaultMonday(entry,'ПІ-24-02'))`),'2026-10-12');
@@ -140,4 +221,25 @@ test('failed coalesced requests use each exact legacy week and never invent miss
     assert.equal(third.data['понеділок'].length,0);
     assert.equal(fourth.data['понеділок'].length,1);
     assert.equal(first.data,null);
+});
+
+test('room cues retain all parallel rooms and escape room text',()=>{
+    const {run}=fixture();
+    const rooms=run("renderRoomCue('101 / 102')");
+    assert.match(rooms,/Аудиторії/);
+    assert.match(rooms,/>101<.*>102</);
+    assert.match(run("renderRoomCue('101/3')"),/>101\/3</);
+    assert.match(run("renderRoomCue('<b>101</b>')"),/&lt;b&gt;101&lt;\/b&gt;/);
+    assert.match(run("renderRoomCue('')"),/Не вказано/);
+});
+
+test('room cues shorten gym names and reduce long labels without changing numeric rooms',()=>{
+    const {run}=fixture();
+    for (const room of ['спортивний зал','Спортзал','спорт. зал']) {
+        const html=run(`renderRoomCue(${JSON.stringify(room)})`);
+        assert.match(html,/class="room-cue-number is-text"/);
+        assert.match(html,/>спорт\. зал</);
+    }
+    assert.match(run("renderRoomCue('навчально-виробнича майстерня')"),/class="room-cue-number is-long"/);
+    assert.match(run("renderRoomCue('313')"),/class="room-cue-number"/);
 });

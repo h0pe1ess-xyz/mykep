@@ -185,21 +185,22 @@ const App = (() => {
         started = true;
         const weekSelect = document.getElementById('schedule-week');
         const initialWeek=getScheduleWeekSelection();
-        if (initialWeek === 'next') {
-            const next = document.createElement('option');
-            next.value = 'next'; next.textContent = 'Наступний';
-            weekSelect.insertBefore(next,weekSelect.options[1]);
-        }
-        weekSelect.value = initialWeek === 'current' ? 'auto' : initialWeek;
+        weekSelect.value = initialWeek;
         weekSelect.addEventListener('change', () => {
-            storage.set('mykep_schedule_week', normalizeWeekSelection(weekSelect.value));
+            setScheduleWeekSelection(weekSelect.value);
             updateHeaderDisplays();
             load('schedule','interaction');
         });
         enter(Tabs.current,true);
         setInterval(resume, 10000);
         document.addEventListener('visibilitychange', () => resume(true));
-        window.addEventListener('pageshow', event => { if (event.persisted) resume(true); });
+        window.addEventListener('pageshow', event => {
+            if (event.persisted) {
+                setScheduleWeekSelection('auto');
+                weekSelect.value = 'auto';
+                resume(true);
+            }
+        });
         window.addEventListener('online', () => resume(true));
         window.addEventListener('offline', () => resume());
     }

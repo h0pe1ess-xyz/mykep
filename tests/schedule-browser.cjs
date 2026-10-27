@@ -19,9 +19,25 @@ async function run() {
                 });
                 await page.goto(server.url+'/schedule.html');
                 await page.waitForFunction(()=>typeof schedulePageData!=='undefined' && schedulePageData);
+                assert.equal(await page.locator('#schedule-week').inputValue(),'auto');
+                assert.equal(await page.evaluate(()=>localStorage.getItem('mykep_schedule_week')),null);
+                await page.selectOption('#schedule-week','next');
+                await page.waitForFunction(()=>currentScheduleCalendar.monday==='2026-10-19');
                 assert.equal(await page.locator('#schedule-week').inputValue(),'next');
                 assert.equal(await page.evaluate(()=>currentScheduleCalendar.monday),'2026-10-19');
                 assert.equal(await page.evaluate(()=>getScheduleWeekSelection()),'next');
+                await page.evaluate(()=>{Tabs.show('settings');Tabs.show('schedule');});
+                assert.equal(await page.locator('#schedule-week').inputValue(),'next');
+                await page.reload();
+                await page.waitForFunction(()=>typeof schedulePageData!=='undefined' && schedulePageData);
+                assert.equal(await page.locator('#schedule-week').inputValue(),'auto');
+                assert.equal(await page.evaluate(()=>storage.get('mykep_uid')),'preserved-test-uid');
+                assert.equal(await page.evaluate(()=>storage.get('mykep_group')),'ПІ-24-02');
+                await page.selectOption('#schedule-week','next');
+                await page.waitForFunction(()=>currentScheduleCalendar.monday==='2026-10-19');
+                await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));
+                await page.waitForFunction(()=>currentScheduleCalendar.monday==='2026-10-12');
+                assert.equal(await page.locator('#schedule-week').inputValue(),'auto');
                 await page.selectOption('#schedule-week','auto');
                 await page.waitForFunction(()=>currentScheduleCalendar.monday==='2026-10-12' && scheduleRequests.size===0);
                 // Keep requests pending at fetch, so response order is deterministic.
@@ -119,10 +135,10 @@ async function run() {
                 await page.waitForFunction(()=>scheduleRequests.size===0);
                 assert.equal(await page.locator('#schedule-notice').isVisible(),false);
                 assert.equal(await page.evaluate(()=>storage.get('mykep_uid')),'preserved-test-uid');
-                // Legacy next remains explicit on Monday, aliases auto on Sunday.
-                for(const [date,monday,option] of [['2026-10-17T16:00:00Z','2026-10-19','auto'],['2026-10-18T10:00:00Z','2026-10-19','auto'],['2026-10-19T10:00:00Z','2026-10-26','next']]) {
+                // Explicit next always points to the next calendar Monday.
+                for(const [date,monday,option] of [['2026-10-17T16:00:00Z','2026-10-19','next'],['2026-10-18T10:00:00Z','2026-10-19','next'],['2026-10-19T10:00:00Z','2026-10-26','next']]) {
                     await page.clock.setSystemTime(new Date(date));
-                    await page.evaluate(()=>{storage.set('mykep_schedule_week','next');App.enter('schedule');});
+                    await page.evaluate(()=>{setScheduleWeekSelection('next');App.enter('schedule');});
                     await page.waitForFunction(day=>currentScheduleCalendar.monday===day,monday);
                     assert.equal(await page.locator('#schedule-week').inputValue(),option);
                     const labels=await page.locator('#schedule-week option').allTextContents();

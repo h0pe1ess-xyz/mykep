@@ -28,7 +28,7 @@ async function run() {
                 assert.equal(await page.locator('#bells-table .bell-end').last().textContent(),'17:20');
                 assert.equal(await page.locator('#bells-table .bell-row').count(),8);
                 assert.deepEqual(await page.locator('.bells-shift-label > span:first-child').allTextContents(),['Перша зміна','Друга зміна']);
-                for (const selector of ['.day-picker','.schedule-header-actions','#dynamic-schedule-list','#schedule-notice','#schedule-share-status']) assert.equal(await page.locator(selector).isVisible(),false);
+                for (const selector of ['.day-picker','.schedule-header-actions','.schedule-toolbar .week-control','#dynamic-schedule-list','#schedule-notice','#schedule-share-status']) assert.equal(await page.locator(selector).isVisible(),false);
                 assert.equal(await page.locator('.bottom-nav a').count(),3);
                 assert.equal(await page.locator('#bells-table [aria-current="time"] th').innerText(),'1 Зараз');
                 const bellsHeader=await page.locator('.view-schedule .app-header').evaluate(n=>n.getBoundingClientRect().height);
@@ -38,10 +38,16 @@ async function run() {
                 await page.locator('#schedule-bells-tab').click();
                 for (const first of ['60','80']) for (const second of ['60','80']) {
                     await page.evaluate(({first,second})=>{storage.set('mykep_duration1',first);storage.set('mykep_duration2',second);BellSchedule.render();},{first,second});
-                    const expected=Array.from({length:8},(_,i)=>bells[i<4?first:second][i]);
+                    const expected=Array.from({length:8},(_,i)=>bells[i<4?first:second][i].map(value=>{
+                        const [h,m]=value.split(':').map(Number);
+                        const minute=h*60+m+(i>=4?(+first- +second)*4:0);
+                        return `${String(Math.floor(minute/60)).padStart(2,'0')}:${String(minute%60).padStart(2,'0')}`;
+                    }));
                     await page.waitForFunction(expected=>JSON.stringify([...document.querySelectorAll('#bells-table .bell-row')].map(row=>[...row.querySelectorAll('.bell-start,.bell-end')].map(n=>n.textContent)))===JSON.stringify(expected),expected);
                     const times=await page.locator('#bells-table .bell-row').evaluateAll(rows=>rows.map(row=>[...row.querySelectorAll('.bell-start,.bell-end')].map(n=>n.textContent)));
                     assert.deepEqual(times,expected);
+                    assert.equal(times[4][0],first==='80'?'14:10':'12:50');
+                    assert.equal(await page.locator('#bells-custom').isVisible(),first!=='60'||second!=='60');
                     assert.deepEqual(await page.locator('.bells-duration').allTextContents(),[`${first} хв`,`${second} хв`]);
                 }
                 await page.clock.setSystemTime(new Date('2026-10-14T06:20:00Z'));
@@ -63,6 +69,7 @@ async function run() {
                 await page.locator('#schedule-bells-tab').focus();
                 await page.keyboard.press('Home');
                 assert.equal(await page.locator('#dynamic-schedule-list').isVisible(),true);
+                assert.equal(await page.locator('.schedule-toolbar .week-control').isVisible(),true);
                 assert.equal(await page.locator('#schedule-week').inputValue(),'2');
                 // A normal subview switch preserves the day; changing durations may rebuild it.
                 const selected=await page.evaluate(()=>schedulePickerState.activeDay);
