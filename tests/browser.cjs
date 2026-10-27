@@ -21,8 +21,8 @@ async function run() {
                 assert.equal(new Set(weekOptions).size,weekOptions.length);
                 assert.equal(await page.locator('#schedule-week option[value=current]').count(),1);
                 assert.equal(await page.locator('#schedule-week option[value=next]').count(),1);
-                assert.equal(await page.locator('#schedule-week').inputValue(),'current');
-                assert.equal(await page.evaluate(()=>getScheduleWeekSelection()),'current');
+                assert.equal(await page.locator('#schedule-week').inputValue(),'auto');
+                assert.equal(await page.evaluate(()=>getScheduleWeekSelection()),'auto');
                 await page.locator('#schedule-week').focus();
                 await page.locator('#schedule-week').evaluate(n=>Promise.all(n.getAnimations().map(a=>a.finished)));
                 const focusRing=await page.locator('#schedule-week').evaluate(n=>({radius:getComputedStyle(n).borderRadius,shadow:getComputedStyle(n).boxShadow,outline:getComputedStyle(n).outlineStyle}));

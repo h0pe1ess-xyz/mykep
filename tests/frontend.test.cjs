@@ -46,6 +46,19 @@ test('server calendar configuration is validated, cached and used offline',()=>{
     assert.equal(second.run(`cycleWeek(new Date(2026,9,26))`),4);
 });
 
+test('week choice is temporary and ignores the previous saved launch',()=>{
+    const {run,data}=fixture({mykep_schedule_week:'4',mykep_uid:'preserved-uid'});
+    assert.equal(run('getScheduleWeekSelection()'),'auto');
+    assert.equal(data.has('mykep_schedule_week'),false);
+    assert.equal(data.get('mykep_uid'),'preserved-uid');
+    run("setScheduleWeekSelection('next')");
+    assert.equal(run('getScheduleWeekSelection()'),'next');
+    assert.equal(data.has('mykep_schedule_week'),false);
+    run("setScheduleWeekSelection('invalid')");
+    assert.equal(run('getScheduleWeekSelection()'),'auto');
+    assert.equal(fixture({mykep_schedule_week:'next'}).run('getScheduleWeekSelection()'),'auto');
+});
+
 test('corrupt cycles cannot hide behind valid data or erase other cached groups',async()=>{
     const {run,data}=fixture();
     data.set('mykep_uid','keep-uid');

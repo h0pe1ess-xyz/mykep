@@ -59,7 +59,10 @@ async function fetchGroups(force = false) {
 function normalizeWeekSelection(value) {
     return ['auto', 'current', 'next', '1', '2', '3', '4'].includes(String(value)) ? String(value) : 'auto';
 }
-function getScheduleWeekSelection() { return normalizeWeekSelection(storage.get('mykep_schedule_week')); }
+let scheduleWeekSelection = 'auto';
+storage.remove('mykep_schedule_week');
+function getScheduleWeekSelection() { return scheduleWeekSelection; }
+function setScheduleWeekSelection(value) { scheduleWeekSelection = normalizeWeekSelection(value); }
 function dateKey(date) {
     return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
