@@ -129,9 +129,10 @@ a {
 
 
 
-.timer-widget { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; }
-.timer-widget::before { content: ''; position: absolute; top: 20%; left: 50%; transform: translateX(-50%); width: 200px; height: 100px; background: rgba(255, 85, 0, 0.15); filter: blur(40px); border-radius: 50%; z-index: 0; pointer-events: none; }
-.timer-svg { width: 100%; max-height: 180px; position: relative; z-index: 1; overflow: visible; filter: drop-shadow(0 0 10px rgba(255, 85, 0, 0.15)); }
+.timer-widget { position: relative; isolation: isolate; width: 100%; display: flex; flex-direction: column; align-items: center; }
+/* Avoid filtered surfaces beneath updating text on WebKit's sliding track. */
+.timer-widget::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 55%, rgba(255, 85, 0, 0.14), rgba(255, 85, 0, 0) 70%); z-index: 0; pointer-events: none; }
+.timer-svg { width: 100%; max-height: 180px; position: relative; z-index: 1; overflow: visible; }
 .arc-track { fill: none; stroke: var(--border-color); stroke-width: 30; stroke-linecap: round; }
 .arc-progress {
     fill: none;
@@ -743,7 +744,7 @@ html.android-viewport .bottom-nav::after {
 
 /* Date labels keep the existing decorative day picker. */
 .day-date { display: block; font-size: 11px; white-space: nowrap; margin-top: 4px; color: #e4d9d1; }
-.day-item[aria-current="date"] .day-name { text-decoration: underline; text-underline-offset: 4px; }
+.day-item[aria-current="date"] .day-name { color: #ffb58f; }
 .day-item[aria-current="date"] .day-date { color: #ffb58f; }
 .lesson-condition { font-size: 12px; color: var(--text-muted); margin: 6px 0; }
 .data-notice { margin: 16px 0; font-size: 13px; color: var(--text-muted); line-height: 1.6; }
