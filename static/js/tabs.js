@@ -19,6 +19,7 @@ const Tabs = (() => {
     let settleTimer = 0;
     let nativeTouching = false;
     let nativeOrigin = null;
+    let nativeSteps = 0;
     let settleFrame = 0;
     let scrollRevision = 0;
 
@@ -32,6 +33,7 @@ const Tabs = (() => {
         if (!names.includes(tab)) return;
         if (native && !fromScroll) {
             nativeOrigin = null;
+            nativeSteps = 0;
             nativeTouching = false;
             clearTimeout(settleTimer);
             cancelAnimationFrame(settleFrame);
@@ -94,6 +96,7 @@ const Tabs = (() => {
         if (native && track) {
             nativeTouching = false;
             nativeOrigin = null;
+            nativeSteps = 0;
             clearTimeout(settleTimer);
             cancelAnimationFrame(settleFrame);
             settleFrame = 0;
@@ -192,10 +195,11 @@ const Tabs = (() => {
         if (nativeTouching || !track.clientWidth) return;
         if (isBlocked()) { reset(); return; }
         const width = track.clientWidth;
-        const min = nativeOrigin === null ? 0 : Math.max(0, nativeOrigin - 1);
-        const max = nativeOrigin === null ? names.length - 1 : Math.min(names.length - 1, nativeOrigin + 1);
+        const min = nativeOrigin === null ? 0 : Math.max(0, nativeOrigin - nativeSteps);
+        const max = nativeOrigin === null ? names.length - 1 : Math.min(names.length - 1, nativeOrigin + nativeSteps);
         const index = Math.max(min, Math.min(max, Math.round(track.scrollLeft / width)));
         nativeOrigin = null;
+        nativeSteps = 0;
         // A second touch can cancel the browser's snap at a fractional offset.
         // Recover only once scrolling has stopped, never fight live momentum or
         // rubber-banding from the per-scroll handler.
@@ -230,12 +234,19 @@ const Tabs = (() => {
         track = views.querySelector('.views-track');
         nav = document.querySelector('.bottom-nav');
         if (native) {
-            track.addEventListener('touchstart', () => {
+            track.addEventListener('touchstart', event => {
                 clearTimeout(settleTimer);
                 cancelAnimationFrame(settleFrame);
                 settleFrame = 0;
                 nativeTouching = true;
-                nativeOrigin = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
+                if (event.touches.length !== 1) return;
+                // Each new gesture before settlement earns another tab step.
+                // Rounding the still-moving position can otherwise treat the
+                // second swipe as the first one and bounce back to the middle.
+                if (nativeOrigin === null) {
+                    nativeOrigin = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
+                    nativeSteps = 1;
+                } else nativeSteps = Math.min(names.length - 1, nativeSteps + 1);
             }, {passive: true});
             const releaseNative = event => {
                 if (!nativeTouching) return;

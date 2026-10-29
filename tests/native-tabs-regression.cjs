@@ -4,6 +4,8 @@ const {chromium,webkit} = require('playwright');
 const {startFixtureServer} = require('./fixture-server.cjs');
 
 async function aligned(page,tab) {
+    // WebKit can briefly match the old geometry before processing resize/snap.
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     await page.waitForFunction(tab => Tabs.current === tab &&
         Math.abs(document.querySelector(`[data-view="${tab}"]`).getBoundingClientRect().left -
             document.querySelector('.views').getBoundingClientRect().left)<1,tab);
@@ -87,6 +89,22 @@ async function main() {
                     await page.evaluate(()=>Tabs.show('dashboard',{immediate:true}));await aligned(page,'dashboard');
                     await page.setViewportSize({width:932,height:430});await aligned(page,'dashboard');
                     await page.setViewportSize({width:430,height:932});await aligned(page,'dashboard');
+                    for(const [origin,partial,target] of [[2,1.7,0],[0,.3,2]]) {
+                        await page.evaluate(({origin,partial,target})=>{
+                            Tabs.show(['schedule','dashboard','settings'][origin],{immediate:true});
+                            const track=document.querySelector('.views-track');track.style.scrollSnapType='none';
+                            function send(type) {
+                                const e=new Event(type,{bubbles:true});
+                                Object.defineProperty(e,'touches',{value:type==='touchstart'?[{identifier:9,clientX:200,clientY:180}]:[]});
+                                track.dispatchEvent(e);
+                            }
+                            send('touchstart');track.scrollTo({left:partial*track.clientWidth,behavior:'instant'});send('touchend');
+                            send('touchstart');track.scrollTo({left:target*track.clientWidth,behavior:'instant'});send('touchend');
+                        },{origin,partial,target});
+                        await aligned(page,['schedule','dashboard','settings'][target]);
+                        await page.locator('.views-track').evaluate(n=>n.style.scrollSnapType='');
+                        await aligned(page,['schedule','dashboard','settings'][target]);
+                    }
                     if(engine==='chromium') {
                         const cdp=await context.newCDPSession(page);
                         await page.evaluate(()=>Tabs.show('settings',{immediate:true}));await aligned(page,'settings');
@@ -113,7 +131,7 @@ async function main() {
                     } else assert.equal(await page.locator('.swipe-edge-guard').count(),0);
                     await page.screenshot({path:`.mykep-local/screens/${engine}-${platform}-native-cached.png`});
                     assert.deepEqual(errors,[]);await context.close();
-                    console.log(`${engine} ${platform}: cache, failed revalidation, idle-only correction, interrupted snaps, rotation and edge guard passed`);
+                    console.log(`${engine} ${platform}: cache, failed revalidation, idle-only correction, interrupted snaps, chained swipes, rotation and edge guard passed`);
                 }
             } finally {await browser.close();}
         }
