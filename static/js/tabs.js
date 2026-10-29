@@ -15,9 +15,12 @@ const Tabs = (() => {
     const listeners = new Set();
     const native = document.documentElement.dataset.swipe === 'native';
     const pointer = document.documentElement.dataset.swipe === 'pointer';
+    const replaceTabHistory = (native || pointer) && document.documentElement.classList.contains('ios-standalone');
     let settleTimer = 0;
     let nativeTouching = false;
     let nativeOrigin = null;
+    let settleFrame = 0;
+    let scrollRevision = 0;
 
     function isBlocked() {
         return document.getElementById('main-app').inert ||
@@ -27,11 +30,17 @@ const Tabs = (() => {
 
     function show(tab, { historyMode = 'push', focus = false, fromScroll = false, immediate = false } = {}) {
         if (!names.includes(tab)) return;
-        if (native && !fromScroll && !immediate) {
+        if (native && !fromScroll) {
             nativeOrigin = null;
-            track.scrollTo({left: names.indexOf(tab) * track.clientWidth,
-                behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
-            return;
+            nativeTouching = false;
+            clearTimeout(settleTimer);
+            cancelAnimationFrame(settleFrame);
+            settleFrame = 0;
+            if (!immediate) {
+                track.scrollTo({left: names.indexOf(tab) * track.clientWidth,
+                    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+                return;
+            }
         }
         cancelDrag();
         const changed = current !== tab;
@@ -60,7 +69,9 @@ const Tabs = (() => {
             else link.removeAttribute('aria-current');
         }
         if (historyMode === 'push' && changed) {
-            history.pushState(null, '', paths[tab] + location.search);
+            // iOS otherwise animates stale tab snapshots during its own edge
+            // navigation, independently of the live in-page carousel.
+            history[replaceTabHistory ? 'replaceState' : 'pushState'](null, '', paths[tab] + location.search);
         }
         if (changed) listeners.forEach(listener => listener(tab));
         if (native && !fromScroll) {
@@ -84,6 +95,8 @@ const Tabs = (() => {
             nativeTouching = false;
             nativeOrigin = null;
             clearTimeout(settleTimer);
+            cancelAnimationFrame(settleFrame);
+            settleFrame = 0;
             track.scrollTo({left: names.indexOf(current) * track.clientWidth, behavior: 'instant'});
         }
     }
@@ -176,20 +189,33 @@ const Tabs = (() => {
 
     function settleNative() {
         clearTimeout(settleTimer);
-        if (nativeTouching || isBlocked() || !track.clientWidth) return;
-        limitNativeGesture();
-        const index = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
+        if (nativeTouching || !track.clientWidth) return;
+        if (isBlocked()) { reset(); return; }
+        const width = track.clientWidth;
+        const min = nativeOrigin === null ? 0 : Math.max(0, nativeOrigin - 1);
+        const max = nativeOrigin === null ? names.length - 1 : Math.min(names.length - 1, nativeOrigin + 1);
+        const index = Math.max(min, Math.min(max, Math.round(track.scrollLeft / width)));
         nativeOrigin = null;
+        // A second touch can cancel the browser's snap at a fractional offset.
+        // Recover only once scrolling has stopped, never fight live momentum or
+        // rubber-banding from the per-scroll handler.
+        if (Math.abs(track.scrollLeft - index * width) > 1) {
+            track.scrollTo({left:index * width, behavior:'instant'});
+        }
         if (names[index] !== current) show(names[index], {fromScroll: true});
     }
 
-    function limitNativeGesture() {
-        if (nativeOrigin === null) return;
-        const width = track.clientWidth;
-        const min = Math.max(0, nativeOrigin - 1) * width;
-        const max = Math.min(names.length - 1, nativeOrigin + 1) * width;
-        const position = Math.max(min, Math.min(max, track.scrollLeft));
-        if (Math.abs(position - track.scrollLeft) > 1) track.scrollTo({left:position, behavior:'instant'});
+    function nativeScrollEnded() {
+        // An interrupted scroll can queue its old scrollend after a new one
+        // starts. Confirm two frames without scroll events before repairing it.
+        cancelAnimationFrame(settleFrame);
+        const revision = scrollRevision;
+        settleFrame = requestAnimationFrame(() => {
+            settleFrame = requestAnimationFrame(() => {
+                settleFrame = 0;
+                if (revision === scrollRevision) settleNative();
+            });
+        });
     }
 
     function pointerEvent(event, ended = false) {
@@ -205,6 +231,9 @@ const Tabs = (() => {
         nav = document.querySelector('.bottom-nav');
         if (native) {
             track.addEventListener('touchstart', () => {
+                clearTimeout(settleTimer);
+                cancelAnimationFrame(settleFrame);
+                settleFrame = 0;
                 nativeTouching = true;
                 nativeOrigin = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
             }, {passive: true});
@@ -217,12 +246,12 @@ const Tabs = (() => {
             window.addEventListener('touchend', releaseNative, {passive: true});
             window.addEventListener('touchcancel', releaseNative, {passive: true});
             track.addEventListener('scroll', () => {
-                limitNativeGesture();
+                ++scrollRevision;
                 clearTimeout(settleTimer);
                 // Fallback for engines without scrollend. Does not drive movement.
                 settleTimer = setTimeout(settleNative, 180);
             }, {passive: true});
-            track.addEventListener('scrollend', settleNative);
+            track.addEventListener('scrollend', nativeScrollEnded);
             // Late viewport/safe-area changes must not leave the wrong tab visible.
             let width = track.clientWidth;
             new ResizeObserver(() => {

@@ -33,25 +33,78 @@ async function main() {
                     assert.equal(await page.locator('#dashboard-main').getAttribute('data-ready'),'true');
                     assert.ok(await page.locator('#dynamic-schedule-list .lesson-card').count());
                     assert.doesNotMatch(await page.locator('#dashboard-main').textContent(),/Завантаження розкладу/);
-                    // Deliberately cross two tabs in a single held gesture. The native
-                    // boundary must constrain it to the adjacent tab before settlement.
+                    // Deliberately cross two tabs. While a finger is down, JS must
+                    // not fight the browser's scroll position; constrain the final tab.
                     await page.evaluate(()=>Tabs.show('schedule',{immediate:true}));await aligned(page,'schedule');
-                    await page.evaluate(()=>{
+                    await page.evaluate(async()=>{
                         const track=document.querySelector('.views-track');
+                        window.testScrollWrites=0;
+                        const scrollTo=track.scrollTo;
+                        track.scrollTo=function(...args){window.testScrollWrites++;return scrollTo.apply(this,args);};
                         const touch={identifier:7,clientX:390,clientY:180};
                         const e=new Event('touchstart',{bubbles:true,cancelable:true});
                         Object.defineProperties(e,{touches:{value:[touch]},changedTouches:{value:[touch]}});
                         track.dispatchEvent(e);track.scrollTo({left:track.clientWidth*2,behavior:'instant'});
+                        await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);
                     });
-                    await page.waitForFunction(()=>document.querySelector('.views-track').scrollLeft<=document.querySelector('.views-track').clientWidth+1);
+                    assert.equal(await page.evaluate(()=>window.testScrollWrites),1,'scroll handler must not rewrite a held gesture');
                     assert.equal(await page.evaluate(()=>Tabs.current),'schedule','held gesture must not commit navigation');
                     await page.evaluate(()=>{
                         const e=new Event('touchend',{bubbles:true});Object.defineProperties(e,{touches:{value:[]},changedTouches:{value:[]}});
                         document.querySelector('.views-track').dispatchEvent(e);
                     });
                     await aligned(page,'dashboard');
+                    // Reproduce an interrupted native snap leaving a fractional
+                    // scroll offset. Previously settlement changed metadata only.
+                    await page.evaluate(()=>{
+                        Tabs.show('schedule',{immediate:true});
+                        const track=document.querySelector('.views-track');
+                        // Emulate the reported browser failure to finish snapping.
+                        // A normal desktop browser would otherwise auto-correct it.
+                        track.style.scrollSnapType='none';
+                        const e=new Event('touchstart',{bubbles:true});
+                        Object.defineProperty(e,'touches',{value:[{identifier:8,clientX:350,clientY:180}]});
+                        track.dispatchEvent(e);
+                        track.scrollTo({left:track.clientWidth*.42,behavior:'instant'});
+                        const end=new Event('touchend',{bubbles:true});
+                        Object.defineProperty(end,'touches',{value:[]});track.dispatchEvent(end);
+                    });
+                    await aligned(page,'schedule');
+                    await page.evaluate(()=>{
+                        const track=document.querySelector('.views-track');
+                        for(let i=0;i<20;i++) {
+                            const start=new Event('touchstart',{bubbles:true});
+                            Object.defineProperty(start,'touches',{value:[{identifier:8,clientX:350,clientY:180}]});
+                            track.dispatchEvent(start);
+                            track.scrollTo({left:track.clientWidth*(i%2?.63:.37),behavior:'instant'});
+                            const end=new Event('touchend',{bubbles:true});
+                            Object.defineProperty(end,'touches',{value:[]});track.dispatchEvent(end);
+                            // A new gesture arrives before either snap/settlement ends.
+                        }
+                    });
+                    await aligned(page,'dashboard');
+                    await page.locator('.views-track').evaluate(n=>n.style.scrollSnapType='');
+                    await page.evaluate(()=>Tabs.show('dashboard',{immediate:true}));await aligned(page,'dashboard');
                     await page.setViewportSize({width:932,height:430});await aligned(page,'dashboard');
                     await page.setViewportSize({width:430,height:932});await aligned(page,'dashboard');
+                    if(engine==='chromium') {
+                        const cdp=await context.newCDPSession(page);
+                        await page.evaluate(()=>Tabs.show('settings',{immediate:true}));await aligned(page,'settings');
+                        for(let drag=0;drag<2;drag++) {
+                            await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:90,y:180}]});
+                            for(let step=1;step<=10;step++) {
+                                await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:90+24*step,y:180}]});
+                                await page.evaluate(()=>new Promise(requestAnimationFrame));
+                            }
+                            await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+                            // Immediately grab the still-settling native scroller again.
+                        }
+                        await page.waitForFunction(()=>{
+                            const n=document.querySelector('.views-track');
+                            const index=['schedule','dashboard','settings'].indexOf(Tabs.current);
+                            return Math.abs(n.scrollLeft-index*n.clientWidth)<1 && index<2;
+                        });
+                    }
                     if(platform==='iPhone') {
                         assert.equal(await page.locator('.swipe-edge-guard').count(),2);
                         assert.ok(await page.locator('.swipe-edge-left').evaluate(n=>{
@@ -60,7 +113,7 @@ async function main() {
                     } else assert.equal(await page.locator('.swipe-edge-guard').count(),0);
                     await page.screenshot({path:`.mykep-local/screens/${engine}-${platform}-native-cached.png`});
                     assert.deepEqual(errors,[]);await context.close();
-                    console.log(`${engine} ${platform}: cached neighbours before swipe, failed revalidation, one-tab limit, held gesture, rotation and edge guard passed`);
+                    console.log(`${engine} ${platform}: cache, failed revalidation, idle-only correction, interrupted snaps, rotation and edge guard passed`);
                 }
             } finally {await browser.close();}
         }

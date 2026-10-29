@@ -106,6 +106,13 @@ async function run() {
                 await page.evaluate(()=>restoreDayFetch());
                 assert.equal(await page.locator('#schedule-notice').isVisible(),false);
                 await page.waitForFunction(()=>!schedulePickerState.programmatic);
+                // Previous week/group changes can leave native picker snapping
+                // pending after the programmatic flag clears. Center the chosen
+                // day before testing sharing; otherwise correct stale-file
+                // cancellation races the PNG assertion.
+                await page.locator('.day-picker .active').click();
+                await page.waitForFunction(()=>!schedulePickerState.programmatic &&
+                    !schedulePickerState.frame && schedulePickerState.activeDay===schedulePickerState.closestDay);
                 // File-only sharing is mocked at the platform boundary; PNG is real.
                 await page.evaluate(()=>{
                     window.testShares=[];

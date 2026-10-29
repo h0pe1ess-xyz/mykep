@@ -39,6 +39,7 @@ async function main() {
                     await page.waitForFunction(()=>typeof currentGlobalSchedule!=='undefined' && currentGlobalSchedule);
                     await aligned(page,'dashboard');
                     assert.equal(await page.locator('html').getAttribute('data-swipe'),mode);
+                    const historyLength = await page.evaluate(()=>history.length);
                     for (const viewport of [{width:320,height:568},{width:844,height:390},{width:390,height:844}]) {
                         await page.setViewportSize(viewport);
                         await aligned(page,'dashboard');
@@ -49,10 +50,15 @@ async function main() {
                         await aligned(page,tab);
                         assert.equal(await page.locator('.bottom-nav [aria-current="page"]').getAttribute('data-tab'),tab);
                     }
-                    await page.goBack();
-                    await aligned(page,'dashboard');
-                    await page.goForward();
-                    await aligned(page,'settings');
+                    if(platform==='iPhone' && mode!=='baseline') {
+                        assert.equal(await page.evaluate(()=>history.length),historyLength,'iOS PWA tab changes do not create snapshot history');
+                        // Actual history traversal remains supported, without a trap.
+                        await page.evaluate(()=>history.pushState(null,'','/'));
+                        await page.goBack();await aligned(page,'settings');
+                    } else {
+                        await page.goBack();await aligned(page,'dashboard');
+                        await page.goForward();await aligned(page,'settings');
+                    }
                     await page.locator('#open-group-modal').click();
                     await page.locator('#group-modal.active').waitFor();
                     await page.locator('#close-modal').click();
@@ -69,7 +75,9 @@ async function main() {
                         // CDP sends real browser input, unlike dispatching DOM TouchEvents.
                         const cdp = await context.newCDPSession(page);
                         await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:290,y:100}]});
-                        for (let step=1;step<=10;step++) {
+                        // Cross half the viewport even after native touch slop;
+                        // do not depend on machine-dependent fling velocity.
+                        for (let step=1;step<=12;step++) {
                             await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:290-step*20,y:100}]});
                             await page.evaluate(()=>new Promise(requestAnimationFrame));
                         }
