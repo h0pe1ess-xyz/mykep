@@ -10,6 +10,20 @@ async function aligned(page,tab) {
         Math.abs(document.querySelector(`[data-view="${tab}"]`).getBoundingClientRect().left -
             document.querySelector('.views').getBoundingClientRect().left)<1,tab);
 }
+async function remainsAligned(page,tab) {
+    // The supplied phone video reaches its destination, then returns about
+    // 600ms later. A single aligned frame must not count as a passing swipe.
+    await page.evaluate(async tab=>{
+        const until=performance.now()+1000;
+        while(performance.now()<until) {
+            const view=document.querySelector(`[data-view="${tab}"]`),viewport=document.querySelector('.views');
+            if(Tabs.current!==tab || Math.abs(view.getBoundingClientRect().left-viewport.getBoundingClientRect().left)>viewport.clientWidth*.1)
+                throw new Error(`Late swipe return: expected ${tab}, got ${Tabs.current}`);
+            await new Promise(requestAnimationFrame);
+        }
+    },tab);
+    await aligned(page,tab);
+}
 async function main() {
     const server=await startFixtureServer();
     try {
@@ -26,6 +40,8 @@ async function main() {
                     const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
                     await page.goto(server.url+'/settings.html');
                     await aligned(page,'settings');
+                    assert.equal(await page.locator('.views-track').evaluate(n=>getComputedStyle(n).scrollSnapType),'none',
+                        'native panning and JS settling must not compete with CSS snapping');
                     await page.waitForFunction(()=>typeof currentGlobalSchedule!=='undefined' && currentGlobalSchedule && schedulePageData && document.querySelector('#dashboard-main').dataset.ready==='true');
                     assert.ok(await page.locator('#dynamic-schedule-list .lesson-card').count());
                     // A reload into settings must paint both neighbours from persistent cache,
@@ -109,7 +125,7 @@ async function main() {
                     // gestures. Test direction/intent without forcing the final
                     // endpoint, including non-swipes that must not add a step.
                     for(const [origin,dx,kind,target] of [
-                        [2,150,'swipe',0],[0,-150,'swipe',2],
+                        [2,150,'swipe',0],[0,-150,'swipe',2],[2,150,'retarget',0],
                         [2,150,'tap',1],[2,150,'vertical',1],
                         [2,150,'cancel',1],[2,150,'day-picker',1]
                     ]) {
@@ -124,7 +140,8 @@ async function main() {
                             }
                             send('touchstart',200);track.scrollTo({left:(origin===2?1.7:.3)*track.clientWidth,behavior:'instant'});
                             send('touchend',200+dx);
-                            const target=kind==='day-picker'?document.querySelector('.day-picker'):track;
+                            const target=kind==='day-picker'?document.querySelector('.day-picker'):
+                                kind==='retarget'?document.querySelector('.views'):track;
                             send('touchstart',200,180,target);
                             track.scrollTo({left:track.clientWidth,behavior:'instant'});
                             send(kind==='cancel'?'touchcancel':'touchend',kind==='tap'?204:200+dx,kind==='vertical'?480:180,target);
@@ -132,6 +149,7 @@ async function main() {
                             track.scrollTo({left:track.clientWidth,behavior:'instant'});
                         },{origin,dx,kind});
                         await aligned(page,['schedule','dashboard','settings'][target]);
+                        if(kind==='swipe') await remainsAligned(page,['schedule','dashboard','settings'][target]);
                         await page.locator('.views-track').evaluate(n=>n.style.scrollSnapType='');
                         await aligned(page,['schedule','dashboard','settings'][target]);
                     }
@@ -153,8 +171,20 @@ async function main() {
                                 // Immediately grab the still-settling native scroller again.
                             }
                             await aligned(page,target);
+                            await remainsAligned(page,target);
                         }
                     }
+                    await page.evaluate(()=>{
+                        Tabs.show('settings',{immediate:true});
+                        Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.copiedSwipeReport=JSON.parse(text);}}});
+                    });
+                    await aligned(page,'settings');
+                    await page.locator('#swipe-test-panel summary').click();
+                    await page.locator('#copy-swipe-diagnostics').click();
+                    await page.waitForFunction(()=>document.getElementById('swipe-test-status').textContent==='Діагностику скопійовано');
+                    const report=await page.evaluate(()=>window.copiedSwipeReport);
+                    assert.equal(report.mode,'native');assert.equal(report.snap,'none');
+                    assert.ok(report.events.length>0 && report.events.length<=120);
                     if(platform==='iPhone') {
                         assert.equal(await page.locator('.swipe-edge-guard').count(),2);
                         assert.ok(await page.locator('.swipe-edge-left').evaluate(n=>{

@@ -32,6 +32,15 @@ function initSettings() {
     const swipeBlur = document.getElementById('swipe-test-blur');
     swipeMode.value = document.documentElement.dataset.swipe || 'baseline';
     swipeBlur.checked = document.documentElement.dataset.swipeBlur !== 'off';
+    document.getElementById('copy-swipe-diagnostics').addEventListener('click', async () => {
+        const status = document.getElementById('swipe-test-status');
+        try {
+            await navigator.clipboard.writeText(JSON.stringify(Tabs.diagnostics()));
+            status.textContent = 'Діагностику скопійовано';
+        } catch {
+            status.textContent = 'Не вдалося скопіювати діагностику';
+        }
+    });
     document.getElementById('swipe-test-active').textContent =
         `Зараз: ${swipeMode.selectedOptions[0].textContent}, розмиття ${swipeBlur.checked ? 'увімкнено' : 'вимкнено'}`;
     document.getElementById('swipe-test-form').addEventListener('submit', event => {

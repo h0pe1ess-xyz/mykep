@@ -116,7 +116,7 @@ async function main() {
                     await page.locator('#swipe-test-panel summary').click();
                     await page.selectOption('#swipe-test-mode',mode==='native'?'pointer':'native');
                     await page.locator('#swipe-test-blur').uncheck();
-                    await Promise.all([page.waitForEvent('load'),page.locator('#swipe-test-form button').click()]);
+                    await Promise.all([page.waitForEvent('load'),page.locator('#swipe-test-form button[type="submit"]').click()]);
                     await aligned(page,'settings');
                     assert.equal(await page.locator('html').getAttribute('data-swipe'),mode==='native'?'pointer':'native');
                     assert.equal(await page.locator('html').getAttribute('data-swipe-blur'),'off');
