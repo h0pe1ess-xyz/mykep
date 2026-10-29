@@ -105,23 +105,55 @@ async function main() {
                         await page.locator('.views-track').evaluate(n=>n.style.scrollSnapType='');
                         await aligned(page,['schedule','dashboard','settings'][target]);
                     }
+                    // The browser can snap to the middle even after two valid
+                    // gestures. Test direction/intent without forcing the final
+                    // endpoint, including non-swipes that must not add a step.
+                    for(const [origin,dx,kind,target] of [
+                        [2,150,'swipe',0],[0,-150,'swipe',2],
+                        [2,150,'tap',1],[2,150,'vertical',1],
+                        [2,150,'cancel',1],[2,150,'day-picker',1]
+                    ]) {
+                        await page.evaluate(({origin,dx,kind})=>{
+                            Tabs.show(['schedule','dashboard','settings'][origin],{immediate:true});
+                            const track=document.querySelector('.views-track');track.style.scrollSnapType='none';
+                            function send(type,x,y=180,target=track) {
+                                const e=new Event(type,{bubbles:true});
+                                const point={identifier:10,clientX:x,clientY:y};
+                                Object.defineProperties(e,{touches:{value:type==='touchstart'?[point]:[]},changedTouches:{value:[point]}});
+                                target.dispatchEvent(e);
+                            }
+                            send('touchstart',200);track.scrollTo({left:(origin===2?1.7:.3)*track.clientWidth,behavior:'instant'});
+                            send('touchend',200+dx);
+                            const target=kind==='day-picker'?document.querySelector('.day-picker'):track;
+                            send('touchstart',200,180,target);
+                            track.scrollTo({left:track.clientWidth,behavior:'instant'});
+                            send(kind==='cancel'?'touchcancel':'touchend',kind==='tap'?204:200+dx,kind==='vertical'?480:180,target);
+                            // Emulate the browser selecting its old middle snap.
+                            track.scrollTo({left:track.clientWidth,behavior:'instant'});
+                        },{origin,dx,kind});
+                        await aligned(page,['schedule','dashboard','settings'][target]);
+                        await page.locator('.views-track').evaluate(n=>n.style.scrollSnapType='');
+                        await aligned(page,['schedule','dashboard','settings'][target]);
+                    }
                     if(engine==='chromium') {
                         const cdp=await context.newCDPSession(page);
-                        await page.evaluate(()=>Tabs.show('settings',{immediate:true}));await aligned(page,'settings');
-                        for(let drag=0;drag<2;drag++) {
-                            await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:90,y:180}]});
-                            for(let step=1;step<=10;step++) {
-                                await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:90+24*step,y:180}]});
-                                await page.evaluate(()=>new Promise(requestAnimationFrame));
+                        for(const [origin,directions,target] of [
+                            ['settings',[1,1],'schedule'],['schedule',[-1,-1],'settings'],
+                            ['settings',[1,-1],'settings']
+                        ]) {
+                            await page.evaluate(tab=>Tabs.show(tab,{immediate:true}),origin);await aligned(page,origin);
+                            for(const direction of directions) {
+                                const x=direction>0?90:330;
+                                await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y:180}]});
+                                for(let step=1;step<=10;step++) {
+                                    await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+direction*24*step,y:180}]});
+                                    await page.evaluate(()=>new Promise(requestAnimationFrame));
+                                }
+                                await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+                                // Immediately grab the still-settling native scroller again.
                             }
-                            await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-                            // Immediately grab the still-settling native scroller again.
+                            await aligned(page,target);
                         }
-                        await page.waitForFunction(()=>{
-                            const n=document.querySelector('.views-track');
-                            const index=['schedule','dashboard','settings'].indexOf(Tabs.current);
-                            return Math.abs(n.scrollLeft-index*n.clientWidth)<1 && index<2;
-                        });
                     }
                     if(platform==='iPhone') {
                         assert.equal(await page.locator('.swipe-edge-guard').count(),2);

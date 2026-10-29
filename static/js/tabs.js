@@ -20,6 +20,9 @@ const Tabs = (() => {
     let nativeTouching = false;
     let nativeOrigin = null;
     let nativeSteps = 0;
+    let nativeGesture = null;
+    let nativeTarget = null;
+    let nativeSwipes = 0;
     let settleFrame = 0;
     let scrollRevision = 0;
 
@@ -34,6 +37,9 @@ const Tabs = (() => {
         if (native && !fromScroll) {
             nativeOrigin = null;
             nativeSteps = 0;
+            nativeGesture = null;
+            nativeTarget = null;
+            nativeSwipes = 0;
             nativeTouching = false;
             clearTimeout(settleTimer);
             cancelAnimationFrame(settleFrame);
@@ -97,6 +103,9 @@ const Tabs = (() => {
             nativeTouching = false;
             nativeOrigin = null;
             nativeSteps = 0;
+            nativeGesture = null;
+            nativeTarget = null;
+            nativeSwipes = 0;
             clearTimeout(settleTimer);
             cancelAnimationFrame(settleFrame);
             settleFrame = 0;
@@ -124,9 +133,9 @@ const Tabs = (() => {
         track.style.transform = `translate3d(${gesture.position}px, 0, 0)`;
     }
 
-    function ownsHorizontalScroll(target) {
+    function ownsHorizontalScroll(target, boundary = views) {
         if (target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="slider"], [data-no-swipe], .day-picker')) return true;
-        for (let node = target; node && node !== views; node = node.parentElement) {
+        for (let node = target; node && node !== boundary; node = node.parentElement) {
             if (node.scrollWidth > node.clientWidth + 1 &&
                 /auto|scroll/.test(getComputedStyle(node).overflowX)) return true;
         }
@@ -197,9 +206,16 @@ const Tabs = (() => {
         const width = track.clientWidth;
         const min = nativeOrigin === null ? 0 : Math.max(0, nativeOrigin - nativeSteps);
         const max = nativeOrigin === null ? names.length - 1 : Math.min(names.length - 1, nativeOrigin + nativeSteps);
-        const index = Math.max(min, Math.min(max, Math.round(track.scrollLeft / width)));
+        // Native snapping can still choose the middle tab when the second
+        // swipe starts before the first snap finishes. Two recognised swipes
+        // have an explicit destination, independently of that partial offset.
+        const index = nativeSwipes > 1 ? nativeTarget :
+            Math.max(min, Math.min(max, Math.round(track.scrollLeft / width)));
         nativeOrigin = null;
         nativeSteps = 0;
+        nativeGesture = null;
+        nativeTarget = null;
+        nativeSwipes = 0;
         // A second touch can cancel the browser's snap at a fractional offset.
         // Recover only once scrolling has stopped, never fight live momentum or
         // rubber-banding from the per-scroll handler.
@@ -239,6 +255,7 @@ const Tabs = (() => {
                 cancelAnimationFrame(settleFrame);
                 settleFrame = 0;
                 nativeTouching = true;
+                nativeGesture = null;
                 if (event.touches.length !== 1) return;
                 // Each new gesture before settlement earns another tab step.
                 // Rounding the still-moving position can otherwise treat the
@@ -246,11 +263,34 @@ const Tabs = (() => {
                 if (nativeOrigin === null) {
                     nativeOrigin = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
                     nativeSteps = 1;
+                    nativeTarget = nativeOrigin;
+                    nativeSwipes = 0;
                 } else nativeSteps = Math.min(names.length - 1, nativeSteps + 1);
+                if (!isBlocked() && !ownsHorizontalScroll(event.target, track)) {
+                    const point = event.touches[0];
+                    nativeGesture = {id:point.identifier, x:point.clientX, y:point.clientY,
+                        time:event.timeStamp, width:track.clientWidth};
+                }
             }, {passive: true});
             const releaseNative = event => {
                 if (!nativeTouching) return;
                 nativeTouching = event.touches.length > 0;
+                const point = nativeGesture && Array.from(event.changedTouches || []).find(touch => touch.identifier === nativeGesture.id);
+                if (!nativeTouching && event.type === 'touchend' && point) {
+                    const dx = point.clientX - nativeGesture.x;
+                    const dy = point.clientY - nativeGesture.y;
+                    const velocity = Math.abs(dx) / Math.max(event.timeStamp - nativeGesture.time, 1);
+                    if (Math.abs(dx) > Math.abs(dy) * 1.2 &&
+                        (Math.abs(dx) >= nativeGesture.width * .25 || Math.abs(dx) >= 30 && velocity > .35)) {
+                        nativeTarget = Math.max(0, Math.min(names.length - 1, nativeTarget + (dx < 0 ? 1 : -1)));
+                        ++nativeSwipes;
+                        if (nativeSwipes > 1) {
+                            track.scrollTo({left:nativeTarget * track.clientWidth,
+                                behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+                        }
+                    }
+                }
+                nativeGesture = null;
                 clearTimeout(settleTimer);
                 settleTimer = setTimeout(settleNative, 180);
             };
