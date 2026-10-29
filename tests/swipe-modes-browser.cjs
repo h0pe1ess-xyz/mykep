@@ -85,7 +85,7 @@ async function main() {
                         await aligned(page,'settings');
                     } else if (mode === 'native') {
                         // Desktop WebKit cannot emulate a physical iPhone drag.
-                        await page.locator('.views-track').evaluate(n=>n.scrollTo({left:n.clientWidth*2,behavior:'smooth'}));
+                        await page.evaluate(()=>Tabs.show('settings'));
                         await aligned(page,'settings');
                     } else if (mode === 'pointer') {
                         await page.mouse.move(290,100);
