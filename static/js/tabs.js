@@ -14,6 +14,7 @@ const Tabs = (() => {
     let clickBlockedUntil = 0;
     const listeners = new Set();
     const native = document.documentElement.dataset.swipe === 'native';
+    const originalNative = native && document.documentElement.dataset.nativeFlow === 'original';
     const pointer = document.documentElement.dataset.swipe === 'pointer';
     const replaceTabHistory = (native || pointer) && document.documentElement.classList.contains('ios-standalone');
     let settleTimer = 0;
@@ -38,7 +39,7 @@ const Tabs = (() => {
 
     function diagnostics() {
         return {version:document.querySelector('meta[name="mykep-build"]')?.content,
-            mode:document.documentElement.dataset.swipe, userAgent:navigator.userAgent,
+            mode:document.documentElement.dataset.swipeChoice || document.documentElement.dataset.swipe, userAgent:navigator.userAgent,
             snap:track && getComputedStyle(track).scrollSnapType,
             current, events:nativeTrace.slice()};
     }
@@ -222,6 +223,14 @@ const Tabs = (() => {
         clearTimeout(settleTimer);
         if (nativeTouching || !track.clientWidth) return;
         if (isBlocked()) { reset(); return; }
+        if (originalNative) {
+            // Restore the first phone-tested native flow: observe the browser's
+            // settled page without clamping, snapping or scrolling it again.
+            const index = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
+            traceNative('native-observed', {index});
+            if (names[index] !== current) show(names[index], {fromScroll:true});
+            return;
+        }
         const width = track.clientWidth;
         const min = nativeOrigin === null ? 0 : Math.max(0, nativeOrigin - nativeSteps);
         const max = nativeOrigin === null ? names.length - 1 : Math.min(names.length - 1, nativeOrigin + nativeSteps);
@@ -283,6 +292,7 @@ const Tabs = (() => {
                 settleFrame = 0;
                 nativeTouching = true;
                 nativeGesture = null;
+                if (originalNative) return;
                 if (event.touches.length !== 1) return;
                 // Each new gesture before settlement earns another tab step.
                 // Rounding the still-moving position can otherwise treat the
@@ -302,6 +312,11 @@ const Tabs = (() => {
             const releaseNative = event => {
                 if (!nativeTouching) return;
                 nativeTouching = event.touches.length > 0;
+                if (originalNative) {
+                    clearTimeout(settleTimer);
+                    settleTimer = setTimeout(settleNative, 180);
+                    return;
+                }
                 const point = nativeGesture && Array.from(event.changedTouches || []).find(touch => touch.identifier === nativeGesture.id);
                 if (!nativeTouching && event.type === 'touchend' && point) {
                     const dx = point.clientX - nativeGesture.x;

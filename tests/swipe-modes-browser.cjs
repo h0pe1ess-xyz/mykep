@@ -39,6 +39,11 @@ async function main() {
                     await page.waitForFunction(()=>typeof currentGlobalSchedule!=='undefined' && currentGlobalSchedule);
                     await aligned(page,'dashboard');
                     assert.equal(await page.locator('html').getAttribute('data-swipe'),mode);
+                    if(mode==='native') {
+                        assert.equal(await page.locator('html').getAttribute('data-native-flow'),'original');
+                        assert.equal(await page.locator('.views-track').evaluate(n=>getComputedStyle(n).scrollSnapType),'x mandatory');
+                        assert.equal(await page.locator('.view').evaluateAll(nodes=>nodes.filter(n=>getComputedStyle(n).scrollSnapAlign==='start').length),3);
+                    }
                     const historyLength = await page.evaluate(()=>history.length);
                     for (const viewport of [{width:320,height:568},{width:844,height:390},{width:390,height:844}]) {
                         await page.setViewportSize(viewport);
@@ -74,6 +79,11 @@ async function main() {
                     if (engine === 'chromium') {
                         // CDP sends real browser input, unlike dispatching DOM TouchEvents.
                         const cdp = await context.newCDPSession(page);
+                        if(mode==='native') await page.evaluate(()=>{
+                            const track=document.querySelector('.views-track'),scroll=track.scrollTo;
+                            window.originalNativeWrites=0;
+                            track.scrollTo=function(...args){window.originalNativeWrites++;return scroll.apply(this,args);};
+                        });
                         await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:290,y:100}]});
                         // Cross half the viewport even after native touch slop;
                         // do not depend on machine-dependent fling velocity.
@@ -83,6 +93,16 @@ async function main() {
                         }
                         await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
                         await aligned(page,'settings');
+                        if(mode==='native') {
+                            await page.evaluate(async()=>{
+                                const until=performance.now()+1000;
+                                while(performance.now()<until) {
+                                    if(Tabs.current!=='settings') throw new Error('Original native returned after arrival');
+                                    await new Promise(requestAnimationFrame);
+                                }
+                            });
+                            assert.equal(await page.evaluate(()=>window.originalNativeWrites),0,'original native must not drive or complete a swipe with JS scroll commands');
+                        }
                     } else if (mode === 'native') {
                         // Desktop WebKit cannot emulate a physical iPhone drag.
                         await page.locator('.views-track').evaluate(n=>n.scrollTo({left:n.clientWidth*2,behavior:'smooth'}));

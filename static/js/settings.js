@@ -30,7 +30,7 @@ function initSettings() {
     renderSettings();
     const swipeMode = document.getElementById('swipe-test-mode');
     const swipeBlur = document.getElementById('swipe-test-blur');
-    swipeMode.value = document.documentElement.dataset.swipe || 'baseline';
+    swipeMode.value = document.documentElement.dataset.swipeChoice || document.documentElement.dataset.swipe || 'baseline';
     swipeBlur.checked = document.documentElement.dataset.swipeBlur !== 'off';
     document.getElementById('copy-swipe-diagnostics').addEventListener('click', async () => {
         const status = document.getElementById('swipe-test-status');
@@ -45,7 +45,7 @@ function initSettings() {
         `Зараз: ${swipeMode.selectedOptions[0].textContent}, розмиття ${swipeBlur.checked ? 'увімкнено' : 'вимкнено'}`;
     document.getElementById('swipe-test-form').addEventListener('submit', event => {
         event.preventDefault();
-        if (!['baseline', 'native', 'pointer'].includes(swipeMode.value)) return;
+        if (!['baseline', 'native', 'native-controlled', 'pointer'].includes(swipeMode.value)) return;
         const blur = swipeBlur.checked ? 'on' : 'off';
         try {
             localStorage.setItem('mykep_swipe_test', swipeMode.value);

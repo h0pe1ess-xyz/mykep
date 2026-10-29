@@ -1,4 +1,6 @@
 'use strict';
+// Queued-controller coverage for native-controlled. The restored original
+// native flow is covered separately in swipe-modes-browser.cjs.
 const assert = require('node:assert/strict');
 const {chromium,webkit} = require('playwright');
 const {startFixtureServer} = require('./fixture-server.cjs');
@@ -34,7 +36,7 @@ async function main() {
                     const context=await browser.newContext({viewport:{width:430,height:932},hasTouch:true,isMobile:true,serviceWorkers:'block',
                         userAgent:platform==='iPhone'?'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile Safari/604.1':'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36'});
                     await context.addInitScript(()=>{
-                        localStorage.setItem('mykep_onboarded','true');localStorage.setItem('mykep_swipe_test','native');
+                        localStorage.setItem('mykep_onboarded','true');localStorage.setItem('mykep_swipe_test','native-controlled');
                         sessionStorage.setItem('mykep_browser_session','yes');Object.defineProperty(navigator,'standalone',{value:true});
                     });
                     const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -210,7 +212,7 @@ async function main() {
                     await page.locator('#copy-swipe-diagnostics').click();
                     await page.waitForFunction(()=>document.getElementById('swipe-test-status').textContent==='Діагностику скопійовано');
                     const report=await page.evaluate(()=>window.copiedSwipeReport);
-                    assert.equal(report.mode,'native');assert.equal(report.snap,'none');
+                    assert.equal(report.mode,'native-controlled');assert.equal(report.snap,'none');
                     assert.ok(report.events.length>0 && report.events.length<=120);
                     if(platform==='iPhone') {
                         assert.equal(await page.locator('.swipe-edge-guard').count(),2);
@@ -220,7 +222,7 @@ async function main() {
                     } else assert.equal(await page.locator('.swipe-edge-guard').count(),0);
                     await page.screenshot({path:`.mykep-local/screens/${engine}-${platform}-native-cached.png`});
                     assert.deepEqual(errors,[]);await context.close();
-                    console.log(`${engine} ${platform}: cache, failed revalidation, idle-only correction, interrupted snaps, chained swipes, rotation and edge guard passed`);
+                    console.log(`${engine} ${platform} native-controlled: cache, failed revalidation, idle-only correction, interrupted snaps, chained swipes, rotation and edge guard passed`);
                 }
             } finally {await browser.close();}
         }
