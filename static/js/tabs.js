@@ -23,6 +23,7 @@ const Tabs = (() => {
     let nativeSteps = 0;
     let nativeGesture = null;
     let nativeTarget = null;
+    let nativeNavigation = null;
     let nativeSwipes = 0;
     let settleFrame = 0;
     let scrollRevision = 0;
@@ -54,6 +55,7 @@ const Tabs = (() => {
         if (!names.includes(tab)) return;
         traceNative('show', {tab, fromScroll, immediate});
         if (native && !fromScroll) {
+            nativeNavigation = null;
             nativeOrigin = null;
             nativeSteps = 0;
             nativeGesture = null;
@@ -64,6 +66,7 @@ const Tabs = (() => {
             cancelAnimationFrame(settleFrame);
             settleFrame = 0;
             if (!immediate) {
+                if (originalNative) nativeNavigation = tab;
                 track.scrollTo({left: names.indexOf(tab) * track.clientWidth,
                     behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
                 return;
@@ -129,6 +132,14 @@ const Tabs = (() => {
             clearTimeout(settleTimer);
             cancelAnimationFrame(settleFrame);
             settleFrame = 0;
+            if (nativeNavigation) {
+                // A resize must preserve the user's last navigation tap instead
+                // of cancelling it back to the previously committed tab.
+                const destination = nativeNavigation;
+                nativeNavigation = null;
+                show(destination, {immediate:true});
+                return;
+            }
             track.scrollTo({left: names.indexOf(current) * track.clientWidth, behavior: 'instant'});
         }
     }
@@ -227,6 +238,8 @@ const Tabs = (() => {
             // Restore the first phone-tested native flow: observe the browser's
             // settled page without clamping, snapping or scrolling it again.
             const index = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
+            if (nativeNavigation && names[index] !== nativeNavigation) return;
+            nativeNavigation = null;
             traceNative('native-observed', {index});
             if (names[index] !== current) show(names[index], {fromScroll:true});
             return;
@@ -287,6 +300,7 @@ const Tabs = (() => {
                 }, {passive:true, capture:true});
             }
             views.addEventListener('touchstart', event => {
+                nativeNavigation = null;
                 clearTimeout(settleTimer);
                 cancelAnimationFrame(settleFrame);
                 settleFrame = 0;
@@ -345,6 +359,8 @@ const Tabs = (() => {
                 // Fallback for engines without scrollend. Does not drive movement.
                 settleTimer = setTimeout(settleNative, 180);
             }, {passive: true});
+            views.addEventListener('wheel', () => { nativeNavigation = null; }, {passive: true});
+            views.addEventListener('pointerdown', () => { nativeNavigation = null; }, {passive: true});
             track.addEventListener('scrollend', nativeScrollEnded);
             // Late viewport/safe-area changes must not leave the wrong tab visible.
             let width = track.clientWidth;

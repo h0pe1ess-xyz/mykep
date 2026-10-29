@@ -814,6 +814,8 @@ html[data-swipe-blur="off"] .view .credits-block {
 /* The shared 16px input rule prevents iOS focus zoom. Android can use a
    smaller label here without changing the select's width or touch target. */
 html.android-viewport .schedule-toolbar .week-select { font-size: 14px !important; padding-inline: 8px; }
+/* Keep iOS's 16px focus-safe font while leaving room for the native arrow. */
+html.ios-standalone .schedule-toolbar .week-select { padding-inline: 4px; }
 html.android-viewport .day-item { scroll-snap-stop: always; }
 .schedule-toolbar .week-select:focus { outline: 2px solid var(--accent-orange); outline-offset: 0; }
 .view-schedule[data-schedule-mode="bells"] .schedule-notice,

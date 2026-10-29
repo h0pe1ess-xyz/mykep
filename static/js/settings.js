@@ -30,7 +30,7 @@ function initSettings() {
     renderSettings();
     const swipeMode = document.getElementById('swipe-test-mode');
     const swipeBlur = document.getElementById('swipe-test-blur');
-    swipeMode.value = document.documentElement.dataset.swipeChoice || document.documentElement.dataset.swipe || 'baseline';
+    swipeMode.value = document.documentElement.dataset.swipeChoice || document.documentElement.dataset.swipe || 'native';
     swipeBlur.checked = document.documentElement.dataset.swipeBlur !== 'off';
     document.getElementById('copy-swipe-diagnostics').addEventListener('click', async () => {
         const status = document.getElementById('swipe-test-status');
