@@ -52,6 +52,12 @@ brain/
 .claude/
 .playwright-mcp/
 
+# Local-only project documentation and tests
+/docs/
+/tests/
+/ADMIN.md
+/admin.md
+
 # Browser test artifacts
 node_modules/
 playwright-report/
