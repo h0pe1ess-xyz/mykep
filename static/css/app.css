@@ -770,6 +770,9 @@ html[data-swipe-blur="off"] .view .credits-block {
 .swipe-test-controls select { width: 100%; min-height: 44px; }
 .swipe-test-controls label { display: flex; align-items: center; gap: 10px; }
 .swipe-test-controls input { width: 20px; height: 20px; accent-color: var(--accent-orange); }
+.swipe-edge-guard { position: fixed; top: 0; bottom: 0; width: 20px; z-index: 900; touch-action: pan-y; }
+.swipe-edge-left { left: 0; }
+.swipe-edge-right { right: 0; }
 
 /* Date labels keep the existing decorative day picker. */
 .day-date { display: block; font-size: 11px; white-space: nowrap; margin-top: 4px; color: #e4d9d1; }

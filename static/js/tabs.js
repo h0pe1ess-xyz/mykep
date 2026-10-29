@@ -17,6 +17,7 @@ const Tabs = (() => {
     const pointer = document.documentElement.dataset.swipe === 'pointer';
     let settleTimer = 0;
     let nativeTouching = false;
+    let nativeOrigin = null;
 
     function isBlocked() {
         return document.getElementById('main-app').inert ||
@@ -26,6 +27,12 @@ const Tabs = (() => {
 
     function show(tab, { historyMode = 'push', focus = false, fromScroll = false, immediate = false } = {}) {
         if (!names.includes(tab)) return;
+        if (native && !fromScroll && !immediate) {
+            nativeOrigin = null;
+            track.scrollTo({left: names.indexOf(tab) * track.clientWidth,
+                behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+            return;
+        }
         cancelDrag();
         const changed = current !== tab;
         const activeElement = document.activeElement;
@@ -75,6 +82,7 @@ const Tabs = (() => {
         resetScroll();
         if (native && track) {
             nativeTouching = false;
+            nativeOrigin = null;
             clearTimeout(settleTimer);
             track.scrollTo({left: names.indexOf(current) * track.clientWidth, behavior: 'instant'});
         }
@@ -169,8 +177,19 @@ const Tabs = (() => {
     function settleNative() {
         clearTimeout(settleTimer);
         if (nativeTouching || isBlocked() || !track.clientWidth) return;
+        limitNativeGesture();
         const index = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
+        nativeOrigin = null;
         if (names[index] !== current) show(names[index], {fromScroll: true});
+    }
+
+    function limitNativeGesture() {
+        if (nativeOrigin === null) return;
+        const width = track.clientWidth;
+        const min = Math.max(0, nativeOrigin - 1) * width;
+        const max = Math.min(names.length - 1, nativeOrigin + 1) * width;
+        const position = Math.max(min, Math.min(max, track.scrollLeft));
+        if (Math.abs(position - track.scrollLeft) > 1) track.scrollTo({left:position, behavior:'instant'});
     }
 
     function pointerEvent(event, ended = false) {
@@ -185,7 +204,10 @@ const Tabs = (() => {
         track = views.querySelector('.views-track');
         nav = document.querySelector('.bottom-nav');
         if (native) {
-            track.addEventListener('touchstart', () => { nativeTouching = true; }, {passive: true});
+            track.addEventListener('touchstart', () => {
+                nativeTouching = true;
+                nativeOrigin = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
+            }, {passive: true});
             const releaseNative = event => {
                 if (!nativeTouching) return;
                 nativeTouching = event.touches.length > 0;
@@ -195,11 +217,19 @@ const Tabs = (() => {
             window.addEventListener('touchend', releaseNative, {passive: true});
             window.addEventListener('touchcancel', releaseNative, {passive: true});
             track.addEventListener('scroll', () => {
+                limitNativeGesture();
                 clearTimeout(settleTimer);
                 // Fallback for engines without scrollend. Does not drive movement.
                 settleTimer = setTimeout(settleNative, 180);
             }, {passive: true});
             track.addEventListener('scrollend', settleNative);
+            // Late viewport/safe-area changes must not leave the wrong tab visible.
+            let width = track.clientWidth;
+            new ResizeObserver(() => {
+                if (width === track.clientWidth) return;
+                width = track.clientWidth;
+                reset();
+            }).observe(track);
         } else if (pointer) {
             views.addEventListener('pointerdown', event => {
                 if (!event.isPrimary) { reset(); return; }
@@ -247,6 +277,19 @@ const Tabs = (() => {
         window.addEventListener('blur', reset);
         document.addEventListener('visibilitychange', reset);
         show(current, { historyMode: 'none', immediate: true });
+        if (document.documentElement.classList.contains('ios-standalone') && (native || pointer)) {
+            // Keep cancelable listeners in the two edge strips, not over the
+            // entire native scroller. This restores the former iOS edge guard.
+            for (const side of ['left', 'right']) {
+                const edge = document.createElement('div');
+                edge.className = `swipe-edge-guard swipe-edge-${side}`;
+                edge.setAttribute('aria-hidden', 'true');
+                edge.addEventListener('touchstart', event => {
+                    if (event.cancelable) event.preventDefault();
+                }, {passive:false});
+                document.body.appendChild(edge);
+            }
+        }
     }
 
     return { init, show, get current() { return current; }, onChange(listener) { listeners.add(listener); } };

@@ -127,7 +127,8 @@ const App = (() => {
         if (token !== target.token) return;
         target.pending = false;
         busyNode.setAttribute('aria-busy', 'false');
-        if (Tabs.current !== tab || contextFor(tab).key !== key) return;
+        if (contextFor(tab).key !== key || Tabs.current !== tab &&
+            (document.documentElement.dataset.swipe !== 'native' || target.result)) return;
         target.cacheEntry = cachedScheduleForKey(context.cacheKey);
         updateFreshness(tab,result.meta);
         notice(tab, result.notice, result.data === null);
@@ -156,6 +157,16 @@ const App = (() => {
         if ((!target.pending || target.requestKey !== context.key) && (!target.lastLoad || changed || Date.now() - target.lastLoad >= refreshInterval)) load(tab);
     }
 
+    function prepareTabs() {
+        if (document.documentElement.dataset.swipe !== 'native') return;
+        // Native scrolling can reveal a neighbour before its navigation event.
+        // Paint cached content now and share any necessary in-flight API request.
+        for (const tab of Object.keys(targets)) {
+            showCached(tab, contextFor(tab));
+            if (!targets[tab].result) load(tab);
+        }
+    }
+
     function reload() {
         for (const tab of Object.keys(targets)) {
             ++targets[tab].token;
@@ -167,6 +178,7 @@ const App = (() => {
             notice(tab, '');
         }
         updateHeaderDisplays();
+        prepareTabs();
         enter(Tabs.current);
     }
 
@@ -191,6 +203,7 @@ const App = (() => {
             updateHeaderDisplays();
             load('schedule','interaction');
         });
+        prepareTabs();
         enter(Tabs.current,true);
         setInterval(resume, 10000);
         document.addEventListener('visibilitychange', () => resume(true));

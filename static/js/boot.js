@@ -62,7 +62,7 @@ window.mykepViewportReport = function() {
         const box = node.getBoundingClientRect();
         return {top:box.top,bottom:box.bottom};
     });
-    return { version: '2.9.25-swipe.1', mode: getMyKepDisplayMode(),
+    return { version: '2.9.25-swipe.2', mode: getMyKepDisplayMode(),
         iosFixActive: document.documentElement.classList.contains('ios-standalone'),
         screen: {width:window.screen.width,height:window.screen.height,
             availableHeight:window.screen.availHeight,pixelRatio:window.devicePixelRatio,
@@ -220,7 +220,8 @@ window.mykepViewportReport = function() {
     function fit() {
         frame = 0;
         const main = document.getElementById('dashboard-main');
-        if (!main || document.documentElement.dataset.tab !== 'dashboard' || !main.clientHeight) return;
+        if (!main || !main.clientHeight || document.documentElement.dataset.tab !== 'dashboard' &&
+            document.documentElement.dataset.swipe !== 'native') return;
         const width = main.clientWidth, height = main.clientHeight;
         if (!needsFit && width === fittedWidth && height === fittedHeight) return;
         needsFit = false;
