@@ -23,6 +23,7 @@ const Tabs = (() => {
     let nativeGesture = null;
     let nativeTarget = null;
     let nativeSwipes = 0;
+    let nativeMotion = null;
     let settleFrame = 0;
     let scrollRevision = 0;
     const nativeTrace = [];
@@ -49,10 +50,43 @@ const Tabs = (() => {
             storage.get('mykep_onboarded') !== 'true';
     }
 
+    function cancelNativeMotion() {
+        if (nativeMotion) cancelAnimationFrame(nativeMotion.frame);
+        nativeMotion = null;
+    }
+
+    function finishNative(index, velocity = 0) {
+        cancelNativeMotion();
+        const start = track.scrollLeft;
+        const distance = index * track.clientWidth - start;
+        if (Math.abs(distance) < 1 || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            track.scrollTo({left:index * track.clientWidth, behavior:'instant'});
+            return;
+        }
+        const duration = Math.max(140, Math.min(240, Math.abs(distance) / Math.max(Math.abs(velocity), 1.5) * 1.25));
+        const slope = Math.max(0, Math.min(3, velocity * duration / distance));
+        const motion = {frame:0};
+        nativeMotion = motion;
+        const began = performance.now();
+        traceNative('motion-start', {index, duration:Math.round(duration), velocity});
+        // Match release velocity, then decelerate to zero. No writes run while
+        // the finger is down; a new touch cancels this completion immediately.
+        function render(now) {
+            if (nativeMotion !== motion) return;
+            const t = Math.max(0, Math.min(1, (now - began) / duration));
+            const progress = ((slope - 2) * t + 3 - 2 * slope) * t * t + slope * t;
+            track.scrollTo({left:start + distance * progress, behavior:'instant'});
+            if (t < 1) motion.frame = requestAnimationFrame(render);
+            else { nativeMotion = null; settleNative(); }
+        }
+        motion.frame = requestAnimationFrame(render);
+    }
+
     function show(tab, { historyMode = 'push', focus = false, fromScroll = false, immediate = false } = {}) {
         if (!names.includes(tab)) return;
         traceNative('show', {tab, fromScroll, immediate});
         if (native && !fromScroll) {
+            cancelNativeMotion();
             nativeOrigin = null;
             nativeSteps = 0;
             nativeGesture = null;
@@ -63,8 +97,7 @@ const Tabs = (() => {
             cancelAnimationFrame(settleFrame);
             settleFrame = 0;
             if (!immediate) {
-                track.scrollTo({left: names.indexOf(tab) * track.clientWidth,
-                    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+                finishNative(names.indexOf(tab));
                 return;
             }
         }
@@ -114,6 +147,7 @@ const Tabs = (() => {
 
     function reset(event) {
         traceNative('reset', {reason:event?.type || 'manual'});
+        cancelNativeMotion();
         cancelDrag();
         track?.classList.remove('is-dragging');
         if (track) track.style.transform = '';
@@ -220,7 +254,7 @@ const Tabs = (() => {
 
     function settleNative() {
         clearTimeout(settleTimer);
-        if (nativeTouching || !track.clientWidth) return;
+        if (nativeTouching || nativeMotion || !track.clientWidth) return;
         if (isBlocked()) { reset(); return; }
         const width = track.clientWidth;
         const min = nativeOrigin === null ? 0 : Math.max(0, nativeOrigin - nativeSteps);
@@ -278,6 +312,7 @@ const Tabs = (() => {
                 }, {passive:true, capture:true});
             }
             views.addEventListener('touchstart', event => {
+                cancelNativeMotion();
                 clearTimeout(settleTimer);
                 cancelAnimationFrame(settleFrame);
                 settleFrame = 0;
@@ -296,9 +331,17 @@ const Tabs = (() => {
                 if (!isBlocked() && !ownsHorizontalScroll(event.target, track)) {
                     const point = event.touches[0];
                     nativeGesture = {id:point.identifier, x:point.clientX, y:point.clientY,
-                        time:event.timeStamp, width:track.clientWidth};
+                        width:track.clientWidth, samples:[[event.timeStamp,point.clientX]]};
                 }
             }, {passive: true, capture: true});
+            views.addEventListener('touchmove', event => {
+                if (!nativeGesture || event.touches.length !== 1) return;
+                const point = event.touches[0];
+                if (point.identifier !== nativeGesture.id) return;
+                const samples = nativeGesture.samples;
+                samples.push([event.timeStamp,point.clientX]);
+                while (samples.length > 2 && samples[1][0] < event.timeStamp - 100) samples.shift();
+            }, {passive:true, capture:true});
             const releaseNative = event => {
                 if (!nativeTouching) return;
                 nativeTouching = event.touches.length > 0;
@@ -306,17 +349,17 @@ const Tabs = (() => {
                 if (!nativeTouching && event.type === 'touchend' && point) {
                     const dx = point.clientX - nativeGesture.x;
                     const dy = point.clientY - nativeGesture.y;
-                    const velocity = Math.abs(dx) / Math.max(event.timeStamp - nativeGesture.time, 1);
+                    const sample = nativeGesture.samples[0];
+                    const velocity = (point.clientX - sample[1]) / Math.max(event.timeStamp - sample[0], 1);
                     if (Math.abs(dx) > Math.abs(dy) * 1.2 &&
-                        (Math.abs(dx) >= nativeGesture.width * .25 || Math.abs(dx) >= 30 && velocity > .35)) {
+                        (Math.abs(dx) >= nativeGesture.width * .25 || Math.abs(dx) >= 30 && Math.abs(velocity) > .35 && Math.sign(velocity) === Math.sign(dx))) {
                         nativeTarget = Math.max(0, Math.min(names.length - 1, nativeTarget + (dx < 0 ? 1 : -1)));
                         ++nativeSwipes;
                         traceNative('release-target');
                     }
                     // A short drag returns smoothly too; a tap during an
                     // unfinished transition resumes the existing destination.
-                    track.scrollTo({left:nativeTarget * track.clientWidth,
-                        behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+                    finishNative(nativeTarget, -velocity);
                 }
                 nativeGesture = null;
                 clearTimeout(settleTimer);

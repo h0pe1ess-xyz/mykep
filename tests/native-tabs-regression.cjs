@@ -185,6 +185,24 @@ async function main() {
                     const report=await page.evaluate(()=>window.copiedSwipeReport);
                     assert.equal(report.mode,'native');assert.equal(report.snap,'none');
                     assert.ok(report.events.length>0 && report.events.length<=120);
+                    const motions=report.events.filter(e=>e.kind==='motion-start');
+                    assert.ok(motions.length>0);
+                    assert.ok(motions.every(e=>e.duration>=140 && e.duration<=240),'completion must stay shorter than the reported 320ms browser animation');
+                    await page.evaluate(async()=>{
+                        Tabs.show('schedule',{immediate:true});Tabs.show('settings');
+                        await new Promise(requestAnimationFrame);
+                        const track=document.querySelector('.views-track');
+                        const e=new Event('touchstart',{bubbles:true});
+                        Object.defineProperty(e,'touches',{value:[{identifier:11,clientX:200,clientY:180}]});
+                        track.dispatchEvent(e);
+                        const writes=window.testScrollWrites;
+                        for(let frame=0;frame<4;frame++) await new Promise(requestAnimationFrame);
+                        if(window.testScrollWrites!==writes) throw new Error('Completion continued writing during the next touch');
+                        const end=new Event('touchcancel',{bubbles:true});
+                        Object.defineProperty(end,'touches',{value:[]});track.dispatchEvent(end);
+                        Tabs.show('settings',{immediate:true});
+                    });
+                    await aligned(page,'settings');
                     if(platform==='iPhone') {
                         assert.equal(await page.locator('.swipe-edge-guard').count(),2);
                         assert.ok(await page.locator('.swipe-edge-left').evaluate(n=>{
