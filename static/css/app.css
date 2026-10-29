@@ -755,6 +755,10 @@ html[data-swipe="native"] .views-track::-webkit-scrollbar { display: none; }
 html[data-swipe="native"][data-native-flow="original"] .views-track { scroll-snap-type: x mandatory; }
 html[data-swipe="native"][data-native-flow="original"] .view { scroll-snap-align: start; scroll-snap-stop: always; }
 html[data-swipe="native"] .day-picker { overscroll-behavior-x: contain; }
+/* Create the iOS touch scroller only when its tab is interactive. Keeping an
+   inert overflow scroller alive can leave native hit-testing stale on reveal.
+   Hidden overflow preserves the selected day's programmatic scroll position. */
+html.ios-standalone .view-schedule[inert] .day-picker { overflow-x: hidden; }
 html[data-swipe="native"] .view .main-content,
 html[data-swipe="native"] .view .schedule-list,
 html[data-swipe="native"] .view .bells-panel { overscroll-behavior-x: auto; }
