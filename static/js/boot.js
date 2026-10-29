@@ -1,10 +1,10 @@
 document.documentElement.dataset.tab = location.pathname === '/schedule.html' ? 'schedule' : location.pathname === '/settings.html' ? 'settings' : 'dashboard';
-// Native scrolling is the default; explicit comparison choices stay available.
+// Native scrolling is the default; preserve the released classic option.
 (() => {
     let mode = 'native', blur = 'on';
     try {
         const saved = localStorage.getItem('mykep_swipe_test');
-        if (['baseline', 'native', 'native-controlled', 'pointer'].includes(saved)) mode = saved;
+        if (['baseline', 'native'].includes(saved)) mode = saved;
         if (localStorage.getItem('mykep_swipe_blur') === 'off') blur = 'off';
     } catch { /* Unavailable storage keeps the default native carousel. */ }
     document.documentElement.dataset.swipeChoice = mode;
@@ -64,7 +64,7 @@ window.mykepViewportReport = function() {
         const box = node.getBoundingClientRect();
         return {top:box.top,bottom:box.bottom};
     });
-    return { version: '2.9.25-swipe.14', mode: getMyKepDisplayMode(),
+    return { version: '2.9.25-swipe.15', mode: getMyKepDisplayMode(),
         iosFixActive: document.documentElement.classList.contains('ios-standalone'),
         screen: {width:window.screen.width,height:window.screen.height,
             availableHeight:window.screen.availHeight,pixelRatio:window.devicePixelRatio,

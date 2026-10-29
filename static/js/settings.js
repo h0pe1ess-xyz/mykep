@@ -28,30 +28,15 @@ function initSettings() {
         App.reload();
     }
     renderSettings();
-    const swipeMode = document.getElementById('swipe-test-mode');
-    const swipeBlur = document.getElementById('swipe-test-blur');
+    const swipeMode = document.getElementById('swipe-version');
     swipeMode.value = document.documentElement.dataset.swipeChoice || document.documentElement.dataset.swipe || 'native';
-    swipeBlur.checked = document.documentElement.dataset.swipeBlur !== 'off';
-    document.getElementById('copy-swipe-diagnostics').addEventListener('click', async () => {
-        const status = document.getElementById('swipe-test-status');
-        try {
-            await navigator.clipboard.writeText(JSON.stringify(Tabs.diagnostics()));
-            status.textContent = 'Діагностику скопійовано';
-        } catch {
-            status.textContent = 'Не вдалося скопіювати діагностику';
-        }
-    });
-    document.getElementById('swipe-test-active').textContent =
-        `Зараз: ${swipeMode.selectedOptions[0].textContent}, розмиття ${swipeBlur.checked ? 'увімкнено' : 'вимкнено'}`;
-    document.getElementById('swipe-test-form').addEventListener('submit', event => {
+    document.getElementById('swipe-version-form').addEventListener('submit', event => {
         event.preventDefault();
-        if (!['baseline', 'native', 'native-controlled', 'pointer'].includes(swipeMode.value)) return;
-        const blur = swipeBlur.checked ? 'on' : 'off';
+        if (!['baseline', 'native'].includes(swipeMode.value)) return;
         try {
             localStorage.setItem('mykep_swipe_test', swipeMode.value);
-            localStorage.setItem('mykep_swipe_blur', blur);
         } catch {
-            document.getElementById('swipe-test-status').textContent = 'Не вдалося зберегти вибір у браузері';
+            document.getElementById('swipe-version-status').textContent = 'Не вдалося зберегти вибір у браузері';
             return;
         }
         location.reload();
