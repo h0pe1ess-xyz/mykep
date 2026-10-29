@@ -746,11 +746,12 @@ html.android-viewport .bottom-nav::after {
 html[data-swipe="native"] .views-track {
     transform: none; transition: none; will-change: auto;
     overflow-x: auto; overflow-y: hidden;
-    scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+    /* Touch panning stays native. JS owns the destination after release so
+       iOS cannot replay a stale CSS snap point after an interrupted swipe. */
+    scroll-snap-type: none; overscroll-behavior-x: contain;
     scrollbar-width: none;
 }
 html[data-swipe="native"] .views-track::-webkit-scrollbar { display: none; }
-html[data-swipe="native"] .view { scroll-snap-align: none; scroll-snap-stop: always; }
 html[data-swipe="native"] .day-picker { overscroll-behavior-x: contain; }
 html[data-swipe="native"] .view .main-content,
 html[data-swipe="native"] .view .schedule-list,

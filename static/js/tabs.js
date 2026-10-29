@@ -49,20 +49,10 @@ const Tabs = (() => {
             storage.get('mykep_onboarded') !== 'true';
     }
 
-    function selectNativeSnap(index) {
-        const tab = names[index];
-        if (track.dataset.snapTab === tab) return;
-        track.dataset.snapTab = tab;
-        for (const view of track.children) view.style.scrollSnapAlign = view.dataset.view === tab ? 'start' : 'none';
-        traceNative('snap-target', {index});
-    }
-
     function show(tab, { historyMode = 'push', focus = false, fromScroll = false, immediate = false } = {}) {
         if (!names.includes(tab)) return;
         traceNative('show', {tab, fromScroll, immediate});
         if (native && !fromScroll) {
-            track.style.scrollBehavior = immediate || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
-            selectNativeSnap(names.indexOf(tab));
             nativeOrigin = null;
             nativeSteps = 0;
             nativeGesture = null;
@@ -73,6 +63,8 @@ const Tabs = (() => {
             cancelAnimationFrame(settleFrame);
             settleFrame = 0;
             if (!immediate) {
+                track.scrollTo({left: names.indexOf(tab) * track.clientWidth,
+                    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
                 return;
             }
         }
@@ -127,8 +119,6 @@ const Tabs = (() => {
         if (track) track.style.transform = '';
         resetScroll();
         if (native && track) {
-            track.style.scrollBehavior = 'auto';
-            selectNativeSnap(names.indexOf(current));
             nativeTouching = false;
             nativeOrigin = null;
             nativeSteps = 0;
@@ -228,24 +218,17 @@ const Tabs = (() => {
         show(passed && target ? target : current);
     }
 
-    function settleNative(repair = false) {
+    function settleNative() {
         clearTimeout(settleTimer);
         if (nativeTouching || !track.clientWidth) return;
         if (isBlocked()) { reset(); return; }
         const width = track.clientWidth;
         const min = nativeOrigin === null ? 0 : Math.max(0, nativeOrigin - nativeSteps);
         const max = nativeOrigin === null ? names.length - 1 : Math.min(names.length - 1, nativeOrigin + nativeSteps);
-        // Every recognised swipe has a queued destination. The browser settles
-        // to its single active snap point; only stalled offsets need a repair.
+        // Every recognised swipe has a queued destination. Only this controller
+        // settles the track; CSS snapping must not replay a previous target.
         const index = nativeSwipes > 0 ? nativeTarget :
             Math.max(min, Math.min(max, Math.round(track.scrollLeft / width)));
-        if (Math.abs(track.scrollLeft - index * width) > 1 && !repair) {
-            // A queued scrollend can arrive before the browser starts its new
-            // snap. Give the single active snap point ownership of completion.
-            settleTimer = setTimeout(() => settleNative(true), 180);
-            return;
-        }
-        selectNativeSnap(index);
         traceNative('settle', {index});
         nativeOrigin = null;
         nativeSteps = 0;
@@ -295,7 +278,6 @@ const Tabs = (() => {
                 }, {passive:true, capture:true});
             }
             views.addEventListener('touchstart', event => {
-                track.style.scrollBehavior = 'auto';
                 clearTimeout(settleTimer);
                 cancelAnimationFrame(settleFrame);
                 settleFrame = 0;
@@ -314,20 +296,9 @@ const Tabs = (() => {
                 if (!isBlocked() && !ownsHorizontalScroll(event.target, track)) {
                     const point = event.touches[0];
                     nativeGesture = {id:point.identifier, x:point.clientX, y:point.clientY,
-                        time:event.timeStamp, width:track.clientWidth, base:nativeTarget};
+                        time:event.timeStamp, width:track.clientWidth};
                 }
             }, {passive: true, capture: true});
-            views.addEventListener('touchmove', event => {
-                if (!nativeGesture || event.touches.length !== 1) return;
-                const point = event.touches[0];
-                if (point.identifier !== nativeGesture.id) return;
-                const dx = point.clientX - nativeGesture.x, dy = point.clientY - nativeGesture.y;
-                if (Math.abs(dx) <= Math.abs(dy) * 1.2) return;
-                const speed = Math.abs(dx) / Math.max(event.timeStamp - nativeGesture.time, 1);
-                const passed = Math.abs(dx) >= nativeGesture.width * .25 || Math.abs(dx) >= 30 && speed > .35;
-                const index = nativeGesture.base + (passed ? dx < 0 ? 1 : -1 : 0);
-                selectNativeSnap(Math.max(0, Math.min(names.length - 1, index)));
-            }, {passive:true, capture:true});
             const releaseNative = event => {
                 if (!nativeTouching) return;
                 nativeTouching = event.touches.length > 0;
@@ -342,11 +313,14 @@ const Tabs = (() => {
                         ++nativeSwipes;
                         traceNative('release-target');
                     }
-                    selectNativeSnap(nativeTarget);
+                    // A short drag returns smoothly too; a tap during an
+                    // unfinished transition resumes the existing destination.
+                    track.scrollTo({left:nativeTarget * track.clientWidth,
+                        behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
                 }
                 nativeGesture = null;
                 clearTimeout(settleTimer);
-                settleTimer = setTimeout(() => settleNative(true), 180);
+                settleTimer = setTimeout(settleNative, 180);
             };
             window.addEventListener('touchend', releaseNative, {passive: true, capture: true});
             window.addEventListener('touchcancel', releaseNative, {passive: true, capture: true});
@@ -354,7 +328,7 @@ const Tabs = (() => {
                 ++scrollRevision;
                 clearTimeout(settleTimer);
                 // Fallback for engines without scrollend. Does not drive movement.
-                settleTimer = setTimeout(() => settleNative(true), 180);
+                settleTimer = setTimeout(settleNative, 180);
             }, {passive: true});
             track.addEventListener('scrollend', nativeScrollEnded);
             // Late viewport/safe-area changes must not leave the wrong tab visible.

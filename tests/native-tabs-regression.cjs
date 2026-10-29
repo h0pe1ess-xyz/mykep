@@ -40,9 +40,8 @@ async function main() {
                     const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
                     await page.goto(server.url+'/settings.html');
                     await aligned(page,'settings');
-                    assert.equal(await page.locator('.views-track').evaluate(n=>getComputedStyle(n).scrollSnapType),'x mandatory');
-                    assert.equal(await page.locator('.views-track > .view').evaluateAll(nodes=>nodes.filter(n=>getComputedStyle(n).scrollSnapAlign==='start').length),1,
-                        'only the intended tab may be a native snap point');
+                    assert.equal(await page.locator('.views-track').evaluate(n=>getComputedStyle(n).scrollSnapType),'none',
+                        'native panning and JS settling must not compete with CSS snapping');
                     await page.waitForFunction(()=>typeof currentGlobalSchedule!=='undefined' && currentGlobalSchedule && schedulePageData && document.querySelector('#dashboard-main').dataset.ready==='true');
                     assert.ok(await page.locator('#dynamic-schedule-list .lesson-card').count());
                     // A reload into settings must paint both neighbours from persistent cache,
@@ -52,12 +51,38 @@ async function main() {
                     assert.equal(await page.locator('#dashboard-main').getAttribute('data-ready'),'true');
                     assert.ok(await page.locator('#dynamic-schedule-list .lesson-card').count());
                     assert.doesNotMatch(await page.locator('#dashboard-main').textContent(),/Завантаження розкладу/);
+                    await page.emulateMedia({reducedMotion:'no-preference'});
+                    for(const origin of [0,2]) {
+                        const motion=await page.evaluate(async origin=>{
+                            Tabs.show(['schedule','dashboard','settings'][origin],{immediate:true});
+                            const track=document.querySelector('.views-track'),width=track.clientWidth;
+                            function send(type,x) {
+                                const point={identifier:12,clientX:x,clientY:450},event=new Event(type,{bubbles:true});
+                                Object.defineProperties(event,{touches:{value:type==='touchstart'?[point]:[]},changedTouches:{value:[point]}});
+                                track.dispatchEvent(event);
+                            }
+                            send('touchstart',200);
+                            const start=(origin===0?.25:1.75)*width;
+                            track.scrollTo({left:start,behavior:'instant'});
+                            for(let frame=0;frame<4;frame++) await new Promise(requestAnimationFrame);
+                            const held=track.scrollLeft;
+                            send('touchend',origin===0?0:400);
+                            const positions=[],until=performance.now()+800;
+                            while(performance.now()<until) {
+                                await new Promise(requestAnimationFrame);positions.push(track.scrollLeft);
+                            }
+                            const low=Math.min(start,width),high=Math.max(start,width);
+                            return {held,start,intermediate:new Set(positions.filter(x=>x>low+1&&x<high-1).map(Math.round)).size};
+                        },origin);
+                        assert.ok(Math.abs(motion.held-motion.start)<1,'a held swipe must not jump to a snap point');
+                        assert.ok(motion.intermediate>=2,'release must render intermediate positions instead of jumping instantly');
+                        await aligned(page,'dashboard');
+                    }
                     // Deliberately cross two tabs. While a finger is down, JS must
                     // not fight the browser's scroll position; constrain the final tab.
                     await page.evaluate(()=>Tabs.show('schedule',{immediate:true}));await aligned(page,'schedule');
                     await page.evaluate(async()=>{
                         const track=document.querySelector('.views-track');
-                        track.style.scrollSnapType='none';
                         window.testScrollWrites=0;
                         const scrollTo=track.scrollTo;
                         track.scrollTo=function(...args){window.testScrollWrites++;return scrollTo.apply(this,args);};
@@ -74,7 +99,6 @@ async function main() {
                         document.querySelector('.views-track').dispatchEvent(e);
                     });
                     await aligned(page,'dashboard');
-                    await page.locator('.views-track').evaluate(n=>n.style.scrollSnapType='');
                     // Reproduce an interrupted native snap leaving a fractional
                     // scroll offset. Previously settlement changed metadata only.
                     await page.evaluate(()=>{
@@ -170,9 +194,7 @@ async function main() {
                                     await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+direction*24*step,y:180}]});
                                     await page.evaluate(()=>new Promise(requestAnimationFrame));
                                 }
-                                const writes=await page.evaluate(()=>window.testScrollWrites);
                                 await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-                                assert.equal(await page.evaluate(()=>window.testScrollWrites),writes,'release must use native snapping without a JS scroll command');
                                 // Immediately grab the still-settling native scroller again.
                             }
                             await aligned(page,target);
@@ -188,7 +210,7 @@ async function main() {
                     await page.locator('#copy-swipe-diagnostics').click();
                     await page.waitForFunction(()=>document.getElementById('swipe-test-status').textContent==='Діагностику скопійовано');
                     const report=await page.evaluate(()=>window.copiedSwipeReport);
-                    assert.equal(report.mode,'native');assert.equal(report.snap,'x mandatory');
+                    assert.equal(report.mode,'native');assert.equal(report.snap,'none');
                     assert.ok(report.events.length>0 && report.events.length<=120);
                     if(platform==='iPhone') {
                         assert.equal(await page.locator('.swipe-edge-guard').count(),2);
