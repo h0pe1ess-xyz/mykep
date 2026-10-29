@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.cjs",
-    "test:browser": "node tests/browser.cjs && node tests/schedule-browser.cjs && node tests/theme-browser.cjs && node tests/bells-browser.cjs",
+    "test:browser": "node tests/browser.cjs && node tests/schedule-browser.cjs && node tests/theme-browser.cjs && node tests/bells-browser.cjs && node tests/swipe-modes-browser.cjs",
     "test:swipe-performance": "node tests/swipe-performance.cjs"
   },
   "devDependencies": {

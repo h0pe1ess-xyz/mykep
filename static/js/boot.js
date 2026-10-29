@@ -1,4 +1,15 @@
 document.documentElement.dataset.tab = location.pathname === '/schedule.html' ? 'schedule' : location.pathname === '/settings.html' ? 'settings' : 'dashboard';
+// Dev comparison: read before CSS paints, without changing saved app preferences.
+(() => {
+    let mode = 'baseline', blur = 'on';
+    try {
+        const saved = localStorage.getItem('mykep_swipe_test');
+        if (['native', 'pointer'].includes(saved)) mode = saved;
+        if (localStorage.getItem('mykep_swipe_blur') === 'off') blur = 'off';
+    } catch { /* Unavailable storage keeps the existing carousel. */ }
+    document.documentElement.dataset.swipe = mode;
+    document.documentElement.dataset.swipeBlur = blur;
+})();
 /* Run in <head>: only installed iOS gets the viewport-anchored app shell.
  * Safari tabs, Android and the installation/onboarding UI keep their layout.
  */
@@ -51,7 +62,7 @@ window.mykepViewportReport = function() {
         const box = node.getBoundingClientRect();
         return {top:box.top,bottom:box.bottom};
     });
-    return { version: '2.9.22', mode: getMyKepDisplayMode(),
+    return { version: '2.9.25-swipe.1', mode: getMyKepDisplayMode(),
         iosFixActive: document.documentElement.classList.contains('ios-standalone'),
         screen: {width:window.screen.width,height:window.screen.height,
             availableHeight:window.screen.availHeight,pixelRatio:window.devicePixelRatio,
@@ -110,6 +121,9 @@ window.mykepViewportReport = function() {
  */
 (() => {
     'use strict';
+    // Experimental modes let CSS/native scrolling own gestures. A document-wide
+    // cancelable listener would still put the whole carousel on the slow path.
+    if (document.documentElement.dataset.swipe !== 'baseline') return;
     const ua = navigator.userAgent || '';
     const ios = /iPad|iPhone|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
     const options = { passive: false, capture: true };

@@ -13,6 +13,10 @@ const Tabs = (() => {
     let frame = 0;
     let clickBlockedUntil = 0;
     const listeners = new Set();
+    const native = document.documentElement.dataset.swipe === 'native';
+    const pointer = document.documentElement.dataset.swipe === 'pointer';
+    let settleTimer = 0;
+    let nativeTouching = false;
 
     function isBlocked() {
         return document.getElementById('main-app').inert ||
@@ -20,7 +24,7 @@ const Tabs = (() => {
             storage.get('mykep_onboarded') !== 'true';
     }
 
-    function show(tab, { historyMode = 'push', focus = false } = {}) {
+    function show(tab, { historyMode = 'push', focus = false, fromScroll = false, immediate = false } = {}) {
         if (!names.includes(tab)) return;
         cancelDrag();
         const changed = current !== tab;
@@ -52,6 +56,10 @@ const Tabs = (() => {
             history.pushState(null, '', paths[tab] + location.search);
         }
         if (changed) listeners.forEach(listener => listener(tab));
+        if (native && !fromScroll) {
+            track.scrollTo({left: names.indexOf(tab) * track.clientWidth,
+                behavior: immediate || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+        }
     }
 
     function cancelDrag() {
@@ -65,6 +73,11 @@ const Tabs = (() => {
         track?.classList.remove('is-dragging');
         if (track) track.style.transform = '';
         resetScroll();
+        if (native && track) {
+            nativeTouching = false;
+            clearTimeout(settleTimer);
+            track.scrollTo({left: names.indexOf(current) * track.clientWidth, behavior: 'instant'});
+        }
     }
 
     function resetScroll() {
@@ -74,7 +87,7 @@ const Tabs = (() => {
 
     function restoreHistory() {
         const tab = names.find(name => paths[name] === location.pathname) || 'dashboard';
-        show(tab, { historyMode: 'none' });
+        show(tab, { historyMode: 'none', immediate: true });
         // The browser already animates Back/Forward; settle the app's transition.
         track.getAnimations().forEach(animation => animation.finish());
         resetScroll();
@@ -127,7 +140,7 @@ const Tabs = (() => {
             track.style.transform = `translate3d(${gesture.origin}px, 0, 0)`;
             track.classList.add('is-dragging');
         }
-        if (event.cancelable) event.preventDefault();
+        if (!pointer && event.cancelable) event.preventDefault();
         gesture.samples.push([event.timeStamp, point.clientX]);
         while (gesture.samples.length > 2 && gesture.samples[1][0] < event.timeStamp - 100) gesture.samples.shift();
         const { index, width, origin } = gesture;
@@ -153,14 +166,64 @@ const Tabs = (() => {
         show(passed && target ? target : current);
     }
 
+    function settleNative() {
+        clearTimeout(settleTimer);
+        if (nativeTouching || isBlocked() || !track.clientWidth) return;
+        const index = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
+        if (names[index] !== current) show(names[index], {fromScroll: true});
+    }
+
+    function pointerEvent(event, ended = false) {
+        // Reuse touch recognition; CSS touch-action owns browser cancellation.
+        const point = {identifier: event.pointerId, clientX: event.clientX, clientY: event.clientY};
+        return {target: event.target, touches: ended ? [] : [point], changedTouches: [point],
+            timeStamp: event.timeStamp, cancelable: true};
+    }
+
     function init() {
         views = document.getElementById('views');
         track = views.querySelector('.views-track');
         nav = document.querySelector('.bottom-nav');
-        views.addEventListener('touchstart', start, { passive: true });
-        views.addEventListener('touchmove', move, { passive: false });
-        window.addEventListener('touchend', end, { passive: true });
-        document.addEventListener('touchcancel', reset, { passive: true, capture: true });
+        if (native) {
+            track.addEventListener('touchstart', () => { nativeTouching = true; }, {passive: true});
+            const releaseNative = event => {
+                if (!nativeTouching) return;
+                nativeTouching = event.touches.length > 0;
+                clearTimeout(settleTimer);
+                settleTimer = setTimeout(settleNative, 180);
+            };
+            window.addEventListener('touchend', releaseNative, {passive: true});
+            window.addEventListener('touchcancel', releaseNative, {passive: true});
+            track.addEventListener('scroll', () => {
+                clearTimeout(settleTimer);
+                // Fallback for engines without scrollend. Does not drive movement.
+                settleTimer = setTimeout(settleNative, 180);
+            }, {passive: true});
+            track.addEventListener('scrollend', settleNative);
+        } else if (pointer) {
+            views.addEventListener('pointerdown', event => {
+                if (!event.isPrimary) { reset(); return; }
+                if (event.pointerType === 'mouse' && event.button !== 0) return;
+                start(pointerEvent(event));
+            });
+            views.addEventListener('pointermove', event => {
+                if (!event.isPrimary) { reset(); return; }
+                move(pointerEvent(event));
+                if (gesture?.axis === 'x' && !views.hasPointerCapture(event.pointerId)) views.setPointerCapture(event.pointerId);
+            });
+            window.addEventListener('pointerup', event => end(pointerEvent(event, true)));
+            window.addEventListener('pointercancel', reset);
+            views.addEventListener('lostpointercapture', event => {
+                // Moving implicit touch capture from a child to views also emits
+                // this event on the child; it must not cancel the live drag.
+                if (event.target === views && gesture) reset();
+            });
+        } else {
+            views.addEventListener('touchstart', start, { passive: true });
+            views.addEventListener('touchmove', move, { passive: false });
+            window.addEventListener('touchend', end, { passive: true });
+            document.addEventListener('touchcancel', reset, { passive: true, capture: true });
+        }
         views.addEventListener('scroll', resetScroll, { passive: true });
         views.addEventListener('click', event => {
             if (performance.now() < clickBlockedUntil) {
@@ -183,7 +246,7 @@ const Tabs = (() => {
         window.addEventListener('pageshow', restoreHistory);
         window.addEventListener('blur', reset);
         document.addEventListener('visibilitychange', reset);
-        show(current, { historyMode: 'none' });
+        show(current, { historyMode: 'none', immediate: true });
     }
 
     return { init, show, get current() { return current; }, onChange(listener) { listeners.add(listener); } };

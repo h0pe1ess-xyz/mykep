@@ -28,6 +28,25 @@ function initSettings() {
         App.reload();
     }
     renderSettings();
+    const swipeMode = document.getElementById('swipe-test-mode');
+    const swipeBlur = document.getElementById('swipe-test-blur');
+    swipeMode.value = document.documentElement.dataset.swipe || 'baseline';
+    swipeBlur.checked = document.documentElement.dataset.swipeBlur !== 'off';
+    document.getElementById('swipe-test-active').textContent =
+        `Зараз: ${swipeMode.selectedOptions[0].textContent}, розмиття ${swipeBlur.checked ? 'увімкнено' : 'вимкнено'}`;
+    document.getElementById('swipe-test-form').addEventListener('submit', event => {
+        event.preventDefault();
+        if (!['baseline', 'native', 'pointer'].includes(swipeMode.value)) return;
+        const blur = swipeBlur.checked ? 'on' : 'off';
+        try {
+            localStorage.setItem('mykep_swipe_test', swipeMode.value);
+            localStorage.setItem('mykep_swipe_blur', blur);
+        } catch {
+            document.getElementById('swipe-test-status').textContent = 'Не вдалося зберегти вибір у браузері';
+            return;
+        }
+        location.reload();
+    });
     const installHelp = document.getElementById('show-install-help');
     const installCard = document.getElementById('settings-install-card');
     function updateInstallHelp() {
