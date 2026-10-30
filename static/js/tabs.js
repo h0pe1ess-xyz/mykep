@@ -26,6 +26,7 @@ const Tabs = (() => {
     let nativeNavigation = null;
     let nativeSwipes = 0;
     let nativeChainFrame = 0;
+    let nativeCompleting = false;
     let settleFrame = 0;
     let scrollRevision = 0;
     const nativeTrace = [];
@@ -55,6 +56,7 @@ const Tabs = (() => {
     function clearNativeGesture() {
         cancelAnimationFrame(nativeChainFrame);
         nativeChainFrame = 0;
+        nativeCompleting = false;
         track?.style.removeProperty('scroll-snap-type');
         nativeOrigin = null;
         nativeSteps = 0;
@@ -63,10 +65,12 @@ const Tabs = (() => {
         nativeSwipes = 0;
     }
 
-    function continueNativeChain() {
-        // Only an interrupted series needs an explicit destination. Leave a
-        // single swipe to the browser, including its usual snap and momentum.
-        if (!originalNative || nativeSwipes < 2 || nativeTarget === null) return;
+    function continueNativeChain(limitedSwipe = false) {
+        // Complete interrupted series and short swipes with too little screen
+        // left to pan. Ordinary single swipes retain browser-owned snapping.
+        if (!originalNative || nativeTarget === null ||
+            (!nativeCompleting && nativeSwipes < 2 && !limitedSwipe)) return;
+        nativeCompleting = true;
         track.style.scrollSnapType = 'none';
         const target = nativeTarget;
         cancelAnimationFrame(nativeChainFrame);
@@ -147,7 +151,7 @@ const Tabs = (() => {
         resetScroll();
         if (native && track) {
             const destination = nativeNavigation ||
-                (originalNative && nativeSwipes > 1 ? names[nativeTarget] : null);
+                (originalNative && nativeCompleting ? names[nativeTarget] : null);
             nativeTouching = false;
             clearNativeGesture();
             clearTimeout(settleTimer);
@@ -255,7 +259,7 @@ const Tabs = (() => {
         if (nativeTouching || !track.clientWidth) return;
         if (isBlocked()) { reset(); return; }
         if (originalNative) {
-            if (nativeSwipes > 1 && Math.abs(track.scrollLeft - nativeTarget * track.clientWidth) > 1) {
+            if (nativeCompleting && Math.abs(track.scrollLeft - nativeTarget * track.clientWidth) > 1) {
                 continueNativeChain();
                 return;
             }
@@ -349,21 +353,32 @@ const Tabs = (() => {
                 if (!isBlocked() && !ownsHorizontalScroll(event.target, track)) {
                     const point = event.touches[0];
                     nativeGesture = {id:point.identifier, x:point.clientX, y:point.clientY,
-                        time:event.timeStamp, width:track.clientWidth};
+                        time:event.timeStamp, width:track.clientWidth, left:track.getBoundingClientRect().left};
                 }
             }, {passive: true, capture: true});
             const releaseNative = event => {
                 if (!nativeTouching) return;
                 nativeTouching = event.touches.length > 0;
                 if (originalNative && event.type === 'touchcancel') clearNativeGesture();
+                let limitedSwipe = false;
                 const point = nativeGesture && Array.from(event.changedTouches || []).find(touch => touch.identifier === nativeGesture.id);
                 if (!nativeTouching && event.type === 'touchend' && point) {
                     const dx = point.clientX - nativeGesture.x;
                     const dy = point.clientY - nativeGesture.y;
                     const velocity = Math.abs(dx) / Math.max(event.timeStamp - nativeGesture.time, 1);
+                    // Near the outgoing edge, use the available travel as the
+                    // drag threshold, while still requiring horizontal intent.
+                    const room = dx > 0 ? nativeGesture.left + nativeGesture.width - nativeGesture.x :
+                        nativeGesture.x - nativeGesture.left;
+                    const minimum = originalNative && room <= 48 ? 8 : 30;
+                    const crossedEdge = originalNative && room <= 48 &&
+                        Math.abs(dx) >= Math.max(8, room * .5);
                     if (Math.abs(dx) > Math.abs(dy) * 1.2 &&
-                        (Math.abs(dx) >= nativeGesture.width * .25 || Math.abs(dx) >= 30 && velocity > .35)) {
+                        (Math.abs(dx) >= nativeGesture.width * .25 || crossedEdge ||
+                            Math.abs(dx) >= minimum && velocity > .35)) {
                         const target = Math.max(0, Math.min(names.length - 1, nativeTarget + (dx < 0 ? 1 : -1)));
+                        limitedSwipe = room <= 48 && target !== nativeTarget;
+                        if (originalNative && limitedSwipe) clickBlockedUntil = performance.now() + 400;
                         if (!originalNative || target !== nativeTarget) ++nativeSwipes;
                         nativeTarget = target;
                         traceNative('release-target');
@@ -373,7 +388,7 @@ const Tabs = (() => {
                     if (!originalNative) track.scrollTo({left:nativeTarget * track.clientWidth,
                         behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
                 }
-                if (originalNative && !nativeTouching) continueNativeChain();
+                if (originalNative && !nativeTouching) continueNativeChain(limitedSwipe);
                 nativeGesture = null;
                 clearTimeout(settleTimer);
                 settleTimer = setTimeout(settleNative, 180);
@@ -450,9 +465,12 @@ const Tabs = (() => {
         document.addEventListener('visibilitychange', reset);
         show(current, { historyMode: 'none', immediate: true });
         if (document.documentElement.classList.contains('ios-standalone') && (native || pointer)) {
-            // Keep cancelable listeners in the two edge strips, not over the
-            // entire native scroller. This restores the former iOS edge guard.
+            // Keep cancelable Back protection off the native scroller. The
+            // historical pointer mode retains its original pair of guards.
             for (const side of ['left', 'right']) {
+                // iOS Back starts at the left edge. A right-edge overlay also
+                // blocks native outward tab swipes and their interruption.
+                if (originalNative && side === 'right') continue;
                 const edge = document.createElement('div');
                 edge.className = `swipe-edge-guard swipe-edge-${side}`;
                 edge.setAttribute('aria-hidden', 'true');
