@@ -754,6 +754,26 @@ html[data-swipe="native"] .views-track {
 html[data-swipe="native"] .views-track::-webkit-scrollbar { display: none; }
 html[data-swipe="native"][data-native-flow="original"] .views-track { scroll-snap-type: x mandatory; }
 html[data-swipe="native"][data-native-flow="original"] .view { scroll-snap-align: start; scroll-snap-stop: always; }
+/* iOS standalone keeps one stable strip layer instead of rebuilding native
+   overflow tiles between gestures. Vertical and day-picker scrolling stay native. */
+html[data-native-render="composited"] .views-track {
+    overflow: visible; scroll-snap-type: none !important;
+    transform: translate3d(-100%, 0, 0); transition: transform 180ms ease-out;
+    will-change: transform; touch-action: pan-y pinch-zoom;
+}
+html[data-native-render="composited"][data-tab="schedule"] .views-track { transform: translate3d(0, 0, 0); }
+html[data-native-render="composited"][data-tab="settings"] .views-track { transform: translate3d(-200%, 0, 0); }
+html[data-native-render="composited"] .views-track.is-dragging { transition: none; }
+html[data-native-render="composited"] .view { contain: layout paint; scroll-snap-align: none; }
+html[data-native-render="composited"] .view .lesson-card,
+html[data-native-render="composited"] .view .lesson-card-detailed,
+html[data-native-render="composited"] .view .settings-card,
+html[data-native-render="composited"] .view .credits-block {
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+@media (prefers-reduced-motion: reduce) {
+    html[data-native-render="composited"] .views-track { transition: none; }
+}
 html[data-swipe="native"] .day-picker { overscroll-behavior-x: contain; }
 /* Create the iOS touch scroller only when its tab is interactive. Keeping an
    inert overflow scroller alive can leave native hit-testing stale on reveal.
