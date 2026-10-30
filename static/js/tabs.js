@@ -87,8 +87,8 @@ const Tabs = (() => {
             nativeSwipes !== 1 || nativeTarget !== 1) return false;
         const direction = Math.sign(nativeTarget - nativeOrigin);
         if (direction * (track.scrollLeft - nativeTarget * track.clientWidth) <= 1) return false;
-        // One released swipe earns one page, even if native momentum passes
-        // the adjacent snap point. Retarget once, without steering each frame.
+        // Repair a skipped snap only after native scrolling stops. Retargeting
+        // live momentum can lock out the next touch on iOS.
         traceNative('single-overshoot');
         continueNativeChain(true);
         return true;
@@ -401,7 +401,7 @@ const Tabs = (() => {
                     if (!originalNative) track.scrollTo({left:nativeTarget * track.clientWidth,
                         behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
                 }
-                if (originalNative && !nativeTouching && !recoverNativeOvershoot()) {
+                if (originalNative && !nativeTouching) {
                     continueNativeChain(limitedSwipe);
                 }
                 nativeGesture = null;
@@ -412,7 +412,6 @@ const Tabs = (() => {
             window.addEventListener('touchcancel', releaseNative, {passive: true, capture: true});
             track.addEventListener('scroll', () => {
                 ++scrollRevision;
-                recoverNativeOvershoot();
                 clearTimeout(settleTimer);
                 // Observe idle scrolling on engines without scrollend.
                 settleTimer = setTimeout(settleNative, 180);
