@@ -84,13 +84,13 @@ const Tabs = (() => {
 
     function recoverNativeOvershoot() {
         if (!originalNative || nativeTouching || nativeCompleting ||
-            nativeSteps !== 1 || nativeSwipes !== 1 || nativeTarget !== 1) return false;
+            nativeSwipes !== 1 || nativeTarget !== 1) return false;
         const direction = Math.sign(nativeTarget - nativeOrigin);
         if (direction * (track.scrollLeft - nativeTarget * track.clientWidth) <= 1) return false;
         // Repair a skipped snap only after native scrolling stops. Retargeting
         // live momentum can lock out the next touch on iOS.
-        // A second touch invalidates the single-swipe assumption even when its
-        // native flick is shorter than our recognised-swipe threshold.
+        // Count horizontal releases, including short native flicks. Taps must
+        // neither grant another page nor disable single-swipe recovery.
         traceNative('single-overshoot');
         continueNativeChain(true);
         return true;
@@ -381,16 +381,16 @@ const Tabs = (() => {
                     const dx = point.clientX - nativeGesture.x;
                     const dy = point.clientY - nativeGesture.y;
                     const velocity = Math.abs(dx) / Math.max(event.timeStamp - nativeGesture.time, 1);
-                    // Near the outgoing edge, use the available travel as the
-                    // drag threshold, while still requiring horizontal intent.
+                    // Native scrolling can accept a short flick that does not
+                    // meet the legacy 30px threshold. Count its horizontal
+                    // intent without changing browser-owned single-swipe motion.
                     const room = dx > 0 ? nativeGesture.left + nativeGesture.width - nativeGesture.x :
                         nativeGesture.x - nativeGesture.left;
-                    const minimum = originalNative && room <= 48 ? 8 : 30;
-                    const crossedEdge = originalNative && room <= 48 &&
-                        Math.abs(dx) >= Math.max(8, room * .5);
+                    const passed = originalNative ? Math.abs(dx) >= 8 :
+                        Math.abs(dx) >= nativeGesture.width * .25 ||
+                        Math.abs(dx) >= 30 && velocity > .35;
                     if (Math.abs(dx) > Math.abs(dy) * 1.2 &&
-                        (Math.abs(dx) >= nativeGesture.width * .25 || crossedEdge ||
-                            Math.abs(dx) >= minimum && velocity > .35)) {
+                        passed) {
                         const target = Math.max(0, Math.min(names.length - 1, nativeTarget + (dx < 0 ? 1 : -1)));
                         limitedSwipe = room <= 48 && target !== nativeTarget;
                         if (originalNative && limitedSwipe) clickBlockedUntil = performance.now() + 400;
