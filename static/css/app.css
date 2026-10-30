@@ -742,6 +742,65 @@ html.android-viewport .bottom-nav::after {
     .views-track { transition: none; }
 }
 
+/* Dev comparison keeps the accepted shell and card geometry in every mode. */
+html[data-swipe="native"] .views-track {
+    transform: none; transition: none; will-change: auto;
+    overflow-x: auto; overflow-y: hidden;
+    /* Touch panning stays native. JS owns the destination after release so
+       iOS cannot replay a stale CSS snap point after an interrupted swipe. */
+    scroll-snap-type: none; overscroll-behavior-x: contain;
+    scrollbar-width: none;
+}
+html[data-swipe="native"] .views-track::-webkit-scrollbar { display: none; }
+html[data-swipe="native"][data-native-flow="original"] .views-track { scroll-snap-type: x mandatory; }
+html[data-swipe="native"][data-native-flow="original"] .view { scroll-snap-align: start; scroll-snap-stop: always; }
+html[data-swipe="native"] .day-picker { overscroll-behavior-x: contain; }
+/* Create the iOS touch scroller only when its tab is interactive. Keeping an
+   inert overflow scroller alive can leave native hit-testing stale on reveal.
+   Hidden overflow preserves the selected day's programmatic scroll position. */
+html.ios-standalone .view-schedule[inert] .day-picker { overflow-x: hidden; }
+html[data-swipe="native"] .view .main-content,
+html[data-swipe="native"] .view .schedule-list,
+html[data-swipe="native"] .view .bells-panel { overscroll-behavior-x: auto; }
+html[data-swipe="native"] .view input,
+html[data-swipe="native"] .view textarea,
+html[data-swipe="native"] .view select { touch-action: pan-y; }
+html[data-swipe="pointer"] .view > .app-header,
+html[data-swipe="pointer"] .view > main { touch-action: pan-y; }
+html[data-swipe-blur="off"] .view .lesson-card,
+html[data-swipe-blur="off"] .view .lesson-card-detailed,
+html[data-swipe-blur="off"] .view .settings-card,
+html[data-swipe-blur="off"] .view .credits-block {
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.advanced-settings { --advanced-inset: 20px; margin-bottom: calc(-1 * var(--advanced-inset)); }
+.advanced-settings > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: calc(44px + var(--advanced-inset)); line-height: 1.4; font-weight: 500; cursor: pointer; list-style: none; }
+.advanced-settings > summary::-webkit-details-marker { display: none; }
+.advanced-settings > summary::marker { content: ''; }
+.advanced-settings > summary::after { content: ''; flex: 0 0 auto; width: 8px; height: 8px; margin-right: 3px; border-right: 2px solid var(--text-muted); border-bottom: 2px solid var(--text-muted); transform: rotate(45deg); transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.advanced-settings[open] > summary::after { transform: rotate(-135deg); }
+.advanced-settings > summary:focus-visible { outline: 2px solid var(--accent-orange); outline-offset: 4px; border-radius: 4px; }
+.advanced-settings-body { padding-bottom: var(--advanced-inset); }
+@media (max-width: 375px) { .advanced-settings { --advanced-inset: 16px; } }
+.advanced-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.advanced-section-heading h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.advanced-section-hint { margin: 4px 0 0; color: var(--text-muted); font-size: 12px; }
+.advanced-section-heading .settings-btn { min-height: 44px; }
+.advanced-duration .duration-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 12px 0; border: 0; }
+.advanced-duration .settings-title { font-size: 14px; }
+.advanced-duration .duration-options { gap: 2px; padding: 3px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-surface); }
+.advanced-duration .duration-choice span { min-width: 54px; min-height: 44px; padding: 6px 8px; border-color: transparent; border-radius: 7px; background: transparent; font-size: 13px; }
+.advanced-duration .duration-choice.is-selected span { border-color: var(--accent-orange); background: #503120; }
+.swipe-version-form { display: grid; gap: 12px; margin-top: 20px; padding-top: 24px; border-top: 1px solid var(--border-color); }
+.swipe-version-form > .settings-title { font-size: 14px; font-weight: 600; }
+.swipe-version-form .native-select-wrapper { display: flex; min-width: 0; }
+.swipe-version-form select { width: 100%; min-height: 44px; }
+.swipe-version-form .help-text { margin: 0; }
+.swipe-version-form [role="status"]:empty { display: none; }
+.swipe-edge-guard { position: fixed; top: 0; bottom: 0; width: 20px; z-index: 900; touch-action: pan-y; }
+.swipe-edge-left { left: 0; }
+.swipe-edge-right { right: 0; }
+
 /* Date labels keep the existing decorative day picker. */
 .day-date { display: block; font-size: 11px; white-space: nowrap; margin-top: 4px; color: #e4d9d1; }
 .day-item[aria-current="date"] .day-name { color: #ffb58f; }
@@ -772,6 +831,12 @@ html.android-viewport .bottom-nav::after {
 .schedule-toolbar .week-control { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 0; border-radius: 10px; }
 .week-control-label { color: var(--text-muted); font-size: 10px; line-height: 1.3; }
 .schedule-toolbar .week-select { width: 140px; max-width: 42vw; min-width: 0; min-height: 44px; padding: 9px 10px; border: 1px solid rgba(255,255,255,.1); background: var(--bg-surface); color: var(--text-main); box-shadow: none; font-size: 12px; }
+/* The shared 16px input rule prevents iOS focus zoom. Android can use a
+   smaller label here without changing the select's width or touch target. */
+html.android-viewport .schedule-toolbar .week-select { font-size: 14px !important; padding-inline: 8px; }
+/* Keep iOS's 16px focus-safe font while leaving room for the native arrow. */
+html.ios-standalone .schedule-toolbar .week-select { padding-inline: 4px; }
+html.android-viewport .day-item { scroll-snap-stop: always; }
 .schedule-toolbar .week-select:focus { outline: 2px solid var(--accent-orange); outline-offset: 0; }
 .view-schedule[data-schedule-mode="bells"] .schedule-notice,
 .view-schedule[data-schedule-mode="bells"] .schedule-share-status { display: none; }

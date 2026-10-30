@@ -49,9 +49,7 @@ async function getSupportModel(nav = navigator) {
 function buildSupportReport(device) {
     const build = document.querySelector('meta[name="mykep-build"]')?.content || 'Не визначено';
     const mode = isPWA() ? 'PWA (запущено як застосунок)' : 'Браузер';
-    const viewport = device.system === 'iOS' && typeof window.mykepViewportReport === 'function'
-        ? `\nГеометрія екрана: ${JSON.stringify(window.mykepViewportReport())}` : '';
-    return `Повідомлення MyKep\n\nПроблема або ідея: [опишіть тут]\n\nДані застосунку:\nВерсія: ${build}\nСистема: ${device.system}\nМодель: ${device.model}\nБраузер: ${device.browser}\nРежим: ${mode}\nВікно: ${window.innerWidth} × ${window.innerHeight}${viewport}`;
+    return `Повідомлення MyKep\n\nПроблема або ідея: [опишіть тут]\n\nДані застосунку:\nВерсія: ${build}\nСистема: ${device.system}\nМодель: ${device.model}\nБраузер: ${device.browser}\nРежим: ${mode}\nВікно: ${window.innerWidth} × ${window.innerHeight}`;
 }
 
 function createSupportTelegramURL(report, destination = 'https://t.me/oddxq') {
@@ -81,7 +79,7 @@ function initSupportReport() {
         if (link.dataset.supportDraft === 'true') {
             link.href = createSupportTelegramURL(report, destination);
         }
-        return report;
+        return preview.value;
     }
     refresh();
     // Information stays on this device until the person copies it or opens Telegram.

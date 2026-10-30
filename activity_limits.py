@@ -30,6 +30,10 @@ class ActivityLimits:
         recent = client['recent']
         key = (group, kind)
         interval = {'interaction': 2, 'refresh': 60}.get(kind, 10)
+        if kind == 'usage-state':
+            interval = 0
+        elif kind.startswith('usage-page-'):
+            interval = 2
         if key in recent and now - recent[key] < interval:
             return 'duplicate'
         self.tokens = min(self.global_burst, self.tokens + max(0, now-self.updated)*self.global_rate)

@@ -24,10 +24,24 @@ function initSettings() {
     }
     function refreshSettings() {
         renderSettings();
+        recordUsage();
         document.querySelectorAll('.modal-overlay.active').forEach(modal => modal.classList.remove('active'));
         App.reload();
     }
     renderSettings();
+    const swipeMode = document.getElementById('swipe-version');
+    swipeMode.value = document.documentElement.dataset.swipeChoice || document.documentElement.dataset.swipe || 'native';
+    document.getElementById('swipe-version-form').addEventListener('submit', event => {
+        event.preventDefault();
+        if (!['baseline', 'native'].includes(swipeMode.value)) return;
+        try {
+            localStorage.setItem('mykep_swipe_test', swipeMode.value);
+        } catch {
+            document.getElementById('swipe-version-status').textContent = 'Не вдалося зберегти вибір у браузері';
+            return;
+        }
+        location.reload();
+    });
     const installHelp = document.getElementById('show-install-help');
     const installCard = document.getElementById('settings-install-card');
     function updateInstallHelp() {

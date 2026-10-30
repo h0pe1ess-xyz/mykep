@@ -269,3 +269,43 @@ function recordScheduleAction(event,group = scheduleRequestContext().group) {
         if (!response.ok) console.warn('Activity was not recorded:',response.status);
     }).catch(error => console.warn('Activity delivery failed:',error.name));
 }
+
+// At most one request in flight and eight pending receipts. Nothing is stored
+// offline or retried; analytics must never block navigation or keep growing.
+const usageReceipts = { pending: [], recent: new Map(), sending: false, scheduled: false };
+function recordUsage(page = null) {
+    if (navigator.onLine === false || document.hidden || storage.get('mykep_onboarded') !== 'true') return;
+    if (page === 'schedule' && typeof BellSchedule !== 'undefined' && BellSchedule.mode === 'bells') page = 'bells';
+    const payload = {uid:getUserId(),page,
+        duration1:storage.get('mykep_duration1') === '80' ? 80 : 60,
+        duration2:storage.get('mykep_duration2') === '80' ? 80 : 60,
+        swipe:document.documentElement.dataset.swipe === 'baseline' ? 'baseline' : 'native'};
+    const key = page || 'state', signature = JSON.stringify(payload), now = performance.now();
+    const previous = usageReceipts.recent.get(key);
+    if (previous?.signature === signature && now - previous.time < 2000) return;
+    usageReceipts.recent.set(key,{signature,time:now});
+    if (usageReceipts.pending.length === 8) usageReceipts.pending.shift();
+    usageReceipts.pending.push(signature);
+    if (usageReceipts.sending || usageReceipts.scheduled) return;
+    usageReceipts.scheduled = true;
+    const send = () => { usageReceipts.scheduled = false; sendUsage(); };
+    if (window.requestIdleCallback) window.requestIdleCallback(send,{timeout:1500});
+    else setTimeout(send,300);
+}
+async function sendUsage() {
+    if (usageReceipts.sending) return;
+    usageReceipts.sending = true;
+    try {
+        while (usageReceipts.pending.length) {
+            const body = usageReceipts.pending.shift();
+            if (navigator.onLine === false) { usageReceipts.pending.length = 0; break; }
+            const controller = new AbortController(), timeout = setTimeout(() => controller.abort(),5000);
+            try {
+                const response = await fetch('/api/usage',{method:'POST',cache:'no-store',keepalive:true,
+                    headers:{'Content-Type':'application/json'},body,signal:controller.signal});
+                if (!response.ok) console.warn('Usage was not recorded:',response.status);
+            } catch (error) { console.warn('Usage delivery failed:',error.name); }
+            finally { clearTimeout(timeout); }
+        }
+    } finally { usageReceipts.sending = false; }
+}

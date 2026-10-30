@@ -6,7 +6,7 @@ import json
 from datetime import datetime, date
 from contextlib import asynccontextmanager
 from typing import Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
@@ -31,6 +31,8 @@ logger = logging.getLogger(__name__)
 schedule = ScheduleService()
 teachers = TeacherHintsService()
 activity_limits = ActivityLimits()
+usage_limits = ActivityLimits(client_burst=12, global_burst=120, global_rate=60,
+                              daily_limit=50000, client_daily_limit=500, max_clients=10000)
 admin_api.bind(schedule)
 ADMIN_DIR = BASE_DIR / 'admin_static'
 
@@ -228,6 +230,44 @@ async def record_activity(request: Request, event: ActivityEvent):
                                         request.headers.get('user-agent', ''), event.mode, event.event)
     if not accepted:
         activity_limits.forget(event.uid, group, event.event)
+        return Response(status_code=503, headers={'Retry-After': '30'})
+    return Response(status_code=204)
+
+
+class UsageEvent(BaseModel):
+    model_config = {'extra': 'forbid'}
+    uid: str = Field(min_length=8, max_length=128, pattern=r'^[A-Za-z0-9_-]+$')
+    duration1: Literal[60, 80]
+    duration2: Literal[60, 80]
+    swipe: Literal['native', 'baseline']
+    page: Optional[Literal['dashboard', 'schedule', 'settings', 'bells']] = None
+
+
+@app.post('/api/usage', status_code=204)
+async def record_usage(request: Request):
+    origin = request.headers.get('origin')
+    if origin and origin != str(request.base_url).rstrip('/'):
+        return Response(status_code=403)
+    body = bytearray()
+    async for chunk in request.stream():
+        if len(body) + len(chunk) > 1024:
+            return Response(status_code=413)
+        body.extend(chunk)
+    try:
+        event = UsageEvent.model_validate_json(bytes(body))
+    except ValidationError:
+        return Response(status_code=422)
+    kind = f'usage-page-{event.page}' if event.page else 'usage-state'
+    admission = usage_limits.check(event.uid, '', kind)
+    if admission == 'duplicate':
+        # Preserve the newest settings even when the page opening is deduplicated.
+        kind = 'usage-state'
+        admission = usage_limits.check(event.uid, '', kind)
+        event.page = None
+    if admission == 'limited':
+        return Response(status_code=429, headers={'Retry-After': '60'})
+    if not analytics.record_usage(event.uid, event.duration1, event.duration2, event.swipe, event.page):
+        usage_limits.forget(event.uid, '', kind)
         return Response(status_code=503, headers={'Retry-After': '30'})
     return Response(status_code=204)
 

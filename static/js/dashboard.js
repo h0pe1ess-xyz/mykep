@@ -6,6 +6,13 @@ function updateTimerDisplay(percentage) {
 
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const isFirstPaint = document.getElementById('dashboard-main')?.dataset.ready !== 'true';
+    if (isFirstPaint && Tabs.current !== 'dashboard') {
+        arc.style.transition = 'none';
+        knob.style.transition = 'none';
+    } else if (!isFirstPaint) {
+        arc.style.transition = '';
+        knob.style.transition = '';
+    }
 
     const totalLength = 130 * Math.PI;
 
@@ -17,7 +24,7 @@ function updateTimerDisplay(percentage) {
         knob.style.transform = `rotate(${rotation}deg)`;
     };
 
-    if (isFirstPaint && !reducedMotion && document.visibilityState !== 'hidden') {
+    if (isFirstPaint && !reducedMotion && document.visibilityState !== 'hidden' && Tabs.current === 'dashboard') {
         arc.style.transition = 'none';
         knob.style.transition = 'none';
         applyState(0);
@@ -208,6 +215,13 @@ function renderDashboard(schedule, tomorrow = null) {
     const isFirstPaint = document.getElementById('dashboard-main')?.dataset.ready !== 'true';
 
     if (progressFill && progressThumb && progressText) {
+        if (isFirstPaint && Tabs.current !== 'dashboard') {
+            progressFill.style.transition = 'none';
+            progressThumb.style.transition = 'none';
+        } else if (!isFirstPaint) {
+            progressFill.style.transition = '';
+            progressThumb.style.transition = '';
+        }
         const setStyles = (val) => {
             progressFill.style.width = `${val}%`;
 
@@ -224,7 +238,7 @@ function renderDashboard(schedule, tomorrow = null) {
             progressThumb.style.transform = `translateX(-50%)`;
         };
 
-        if (isFirstPaint && !reducedMotion && document.visibilityState !== 'hidden') {
+        if (isFirstPaint && !reducedMotion && document.visibilityState !== 'hidden' && Tabs.current === 'dashboard') {
             progressFill.style.transition = 'none';
             progressThumb.style.transition = 'none';
             setStyles(0);
@@ -259,7 +273,8 @@ let tomorrowGlobalSchedule = null;
 let dashboardInterval = null;
 let lastDashboardMinute = '';
 function tickDashboard(force = false) {
-    if (document.visibilityState === 'hidden' || !currentGlobalSchedule || Tabs.current !== 'dashboard') return;
+    if (document.visibilityState === 'hidden' || !currentGlobalSchedule ||
+        Tabs.current !== 'dashboard' && !(force && document.documentElement.dataset.swipe === 'native')) return;
     const now = getKyivNow();
     const minute = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}-${now.getMinutes()}`;
     if (!force && minute === lastDashboardMinute) return;

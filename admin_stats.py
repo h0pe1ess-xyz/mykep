@@ -181,7 +181,9 @@ async def _stats(range_key):
     today = _today()
     n = RANGES[range_key]
     if n is None:
-        first = (await _rows(f'SELECT MIN(timestamp) FROM analytics WHERE {VIEWS}'))[0][0]
+        first = (await _rows(f'''SELECT MIN(day) FROM (
+            SELECT SUBSTR(MIN(timestamp),1,10) AS day FROM analytics WHERE {VIEWS}
+            UNION ALL SELECT MIN(day) FROM usage_daily)'''))[0][0]
         start = date.fromisoformat(first[:10]) if first else today
     else:
         start = today - timedelta(days=n - 1)
@@ -281,6 +283,7 @@ async def _stats(range_key):
     return {
         'semantics': 'До оновлення: успішні запити API (legacy_request). Нові view/interaction: відкриття та дії користувача. refresh: технічні перевірки, виключені з переглядів.',
         'range': range_key, 'start': s0, 'end': today.isoformat(), 'days': ndays,
+        'usage': await usage_stats(s0, s1),
         'totals': {'views': total_views, 'users': total_users, 'views_per_user': views_per_user,
                    'avg_daily_views': round(total_views / ndays, 1) if ndays else 0,
                    'avg_dau': round(sum(x['users'] for x in series) / ndays, 1) if ndays else 0,
@@ -336,6 +339,24 @@ def _slot_breakdown(counter, start=None, end=None):
         'standard_note': 'За стандартними дзвінками на дату кожної події' if mixed else f'За стандартними дзвінками {durations} хв',
         'profile_note': f'Підсвітка: стандартні дзвінки {durations} хв' + ('; за період стандарт змінювався' if mixed else ''),
     }
+
+
+async def usage_stats(start, end):
+    profiles = await _rows('''SELECT duration1,duration2,swipe,COUNT(*) FROM usage_profiles
+        WHERE seen >= ? AND seen < ? GROUP BY duration1,duration2,swipe''', (start,end))
+    first, second, swipes = {60:0,80:0}, {60:0,80:0}, {'native':0,'baseline':0}
+    for d1,d2,swipe,count in profiles:
+        first[d1] += count
+        second[d2] += count
+        swipes[swipe] += count
+    rows = await _rows('''SELECT page,SUM(views),COUNT(DISTINCT uid) FROM usage_daily
+        WHERE day >= ? AND day < ? GROUP BY page''', (start,end))
+    by_page = {page:(views,users) for page,views,users in rows}
+    return {'users':sum(swipes.values()), 'duration1':first, 'duration2':second, 'swipes':swipes,
+            'pages':[{'page':page,'label':label,'views':by_page.get(page,(0,0))[0],
+                      'users':by_page.get(page,(0,0))[1]}
+                     for page,label in [('dashboard','Головна'),('schedule','Розклад пар'),
+                                        ('bells','Дзвінки'),('settings','Налаштування')]]}
 
 
 def _retention(active_rows, start, today):

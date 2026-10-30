@@ -1,6 +1,7 @@
 """Anonymous schedule-view counters. A bounded queue prevents per-request SQLite writers."""
 import asyncio
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from config import KYIV, DB_PATH
@@ -26,7 +27,9 @@ async def init_analytics_db():
     # different deployment database or replace historical rows.
     async with connect() as db:
         columns = {row[1] for row in await db.execute_fetchall('PRAGMA table_info(analytics)')}
-    if columns and ('event_kind' not in columns or 'display_mode' not in columns):
+        tables = {row[0] for row in await db.execute_fetchall("SELECT name FROM sqlite_master WHERE type='table'")}
+    if columns and ('event_kind' not in columns or 'display_mode' not in columns or
+                    not {'usage_profiles', 'usage_daily'} <= tables):
         await asyncio.to_thread(migration_backup, Path(DB_PATH))
     async with connect() as db:
         await db.execute('BEGIN IMMEDIATE')
@@ -54,6 +57,16 @@ async def init_analytics_db():
             id INTEGER PRIMARY KEY CHECK(id=1), last_id INTEGER NOT NULL)''')
         await db.execute('''CREATE TABLE IF NOT EXISTS analytics_size (
             day TEXT PRIMARY KEY, bytes INTEGER NOT NULL, details INTEGER NOT NULL)''')
+        await db.execute('''CREATE TABLE IF NOT EXISTS usage_profiles (
+            uid TEXT PRIMARY KEY, seen TEXT NOT NULL, received REAL NOT NULL,
+            duration1 INTEGER NOT NULL CHECK(duration1 IN (60,80)),
+            duration2 INTEGER NOT NULL CHECK(duration2 IN (60,80)),
+            swipe TEXT NOT NULL CHECK(swipe IN ('native','baseline')))''')
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_usage_seen ON usage_profiles(seen)')
+        await db.execute('''CREATE TABLE IF NOT EXISTS usage_daily (
+            day TEXT NOT NULL, uid TEXT NOT NULL,
+            page TEXT NOT NULL CHECK(page IN ('dashboard','schedule','settings','bells')),
+            views INTEGER NOT NULL, PRIMARY KEY(day,uid,page))''')
         await update_daily(db)
         await db.commit()
         _last_rollup_success = datetime.now(KYIV).isoformat()
@@ -73,6 +86,28 @@ async def start_writer():
 
 
 DISPLAY_MODES = {'standalone', 'browser'}
+
+
+@dataclass(frozen=True)
+class UsageRecord:
+    timestamp: str
+    uid: str
+    duration1: int
+    duration2: int
+    swipe: str
+    page: str | None
+    received: float
+
+
+def record_usage(uid: str, duration1: int, duration2: int, swipe: str, page: str | None) -> bool:
+    global _dropped
+    if _queue is None or _queue.full():
+        _dropped += 1
+        return False
+    now = datetime.now(KYIV)
+    _queue.put_nowait(UsageRecord(now.strftime('%Y-%m-%d %H:%M:%S'),
+                                uid, duration1, duration2, swipe, page, now.timestamp()))
+    return True
 
 
 def record_request(uid, group_name, endpoint, user_agent='', display_mode=None, event_kind='legacy_request'):
@@ -122,7 +157,20 @@ async def _write_loop():
         for attempt in range(3):
             try:
                 async with connect() as db:
-                    await db.executemany('INSERT INTO analytics (timestamp, uid, group_name, endpoint, user_agent, display_mode, event_kind) VALUES (?, ?, ?, ?, ?, ?, ?)', batch)
+                    legacy = [row for row in batch if not isinstance(row, UsageRecord)]
+                    usage = [row for row in batch if isinstance(row, UsageRecord)]
+                    if legacy:
+                        await db.executemany('INSERT INTO analytics (timestamp, uid, group_name, endpoint, user_agent, display_mode, event_kind) VALUES (?, ?, ?, ?, ?, ?, ?)', legacy)
+                    if usage:
+                        await db.executemany('''INSERT INTO usage_profiles(uid,seen,duration1,duration2,swipe,received)
+                            VALUES (?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET
+                            seen=excluded.seen,duration1=excluded.duration1,duration2=excluded.duration2,
+                            swipe=excluded.swipe,received=excluded.received
+                            WHERE excluded.received >= usage_profiles.received''',
+                            [(r.uid,r.timestamp,r.duration1,r.duration2,r.swipe,r.received) for r in usage])
+                        await db.executemany('''INSERT INTO usage_daily(day,uid,page,views) VALUES (?,?,?,1)
+                            ON CONFLICT(day,uid,page) DO UPDATE SET views=views+1''',
+                            [(r.timestamp[:10],r.uid,r.page) for r in usage if r.page])
                     await db.commit()
                 _last_write_error = False
                 break

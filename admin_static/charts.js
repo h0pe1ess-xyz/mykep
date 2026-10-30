@@ -70,11 +70,18 @@
                 const w = Math.round(container.clientWidth);
                 if (container._chart && w && Math.abs(w - lastWidth) > 4) {
                     lastWidth = w;
-                    const previous = container.querySelector('.chart-data');
-                    const expanded = previous && previous.open;
-                    container._chart.render(container, container._chart.opts);
-                    const current = container.querySelector('.chart-data');
-                    if (current && expanded) current.open = true;
+                    // Defer layout writes outside ResizeObserver delivery and
+                    // combine width changes into one redraw per frame.
+                    if (container._resizeFrame) return;
+                    container._resizeFrame = requestAnimationFrame(() => {
+                        container._resizeFrame = 0;
+                        if (!container.isConnected || !container._chart) return;
+                        const previous = container.querySelector('.chart-data');
+                        const expanded = previous && previous.open;
+                        container._chart.render(container, container._chart.opts);
+                        const current = container.querySelector('.chart-data');
+                        if (current && expanded) current.open = true;
+                    });
                 }
             });
             container._observer.observe(container);
@@ -427,6 +434,8 @@
             if (chart._observer) chart._observer.disconnect();
             chart._observer = null;
             chart._chart = null;
+            cancelAnimationFrame(chart._resizeFrame);
+            chart._resizeFrame = 0;
         });
     }
 
