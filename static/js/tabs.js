@@ -65,11 +65,11 @@ const Tabs = (() => {
         nativeSwipes = 0;
     }
 
-    function continueNativeChain(limitedSwipe = false) {
-        // Complete interrupted series and short swipes with too little screen
-        // left to pan. Ordinary single swipes retain browser-owned snapping.
+    function continueNativeChain(forceDestination = false) {
+        // Complete interrupted series, limited edge swipes and overshoot.
+        // Ordinary single swipes retain browser-owned snapping.
         if (!originalNative || nativeTarget === null ||
-            (!nativeCompleting && nativeSwipes < 2 && !limitedSwipe)) return;
+            (!nativeCompleting && nativeSwipes < 2 && !forceDestination)) return;
         nativeCompleting = true;
         track.style.scrollSnapType = 'none';
         const target = nativeTarget;
@@ -80,6 +80,18 @@ const Tabs = (() => {
             track.scrollTo({left:target * track.clientWidth,
                 behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
         });
+    }
+
+    function recoverNativeOvershoot() {
+        if (!originalNative || nativeTouching || nativeCompleting ||
+            nativeSwipes !== 1 || nativeTarget !== 1) return false;
+        const direction = Math.sign(nativeTarget - nativeOrigin);
+        if (direction * (track.scrollLeft - nativeTarget * track.clientWidth) <= 1) return false;
+        // One released swipe earns one page, even if native momentum passes
+        // the adjacent snap point. Retarget once, without steering each frame.
+        traceNative('single-overshoot');
+        continueNativeChain(true);
+        return true;
     }
 
     function show(tab, { historyMode = 'push', focus = false, fromScroll = false, immediate = false } = {}) {
@@ -259,6 +271,7 @@ const Tabs = (() => {
         if (nativeTouching || !track.clientWidth) return;
         if (isBlocked()) { reset(); return; }
         if (originalNative) {
+            if (recoverNativeOvershoot()) return;
             if (nativeCompleting && Math.abs(track.scrollLeft - nativeTarget * track.clientWidth) > 1) {
                 continueNativeChain();
                 return;
@@ -388,7 +401,9 @@ const Tabs = (() => {
                     if (!originalNative) track.scrollTo({left:nativeTarget * track.clientWidth,
                         behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
                 }
-                if (originalNative && !nativeTouching) continueNativeChain(limitedSwipe);
+                if (originalNative && !nativeTouching && !recoverNativeOvershoot()) {
+                    continueNativeChain(limitedSwipe);
+                }
                 nativeGesture = null;
                 clearTimeout(settleTimer);
                 settleTimer = setTimeout(settleNative, 180);
@@ -397,6 +412,7 @@ const Tabs = (() => {
             window.addEventListener('touchcancel', releaseNative, {passive: true, capture: true});
             track.addEventListener('scroll', () => {
                 ++scrollRevision;
+                recoverNativeOvershoot();
                 clearTimeout(settleTimer);
                 // Observe idle scrolling on engines without scrollend.
                 settleTimer = setTimeout(settleNative, 180);

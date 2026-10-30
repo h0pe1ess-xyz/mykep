@@ -1,5 +1,5 @@
 /* MyKep Admin service worker: network-first app shell, never caches API data. */
-const CACHE_NAME = 'mykep-admin-v2.9.31';
+const CACHE_NAME = 'mykep-admin-v2.9.32';
 const SHELL = ['/admin/', '/admin/admin.css', '/admin/admin.js', '/admin/charts.js',
     '/admin/manifest.webmanifest', '/admin/icon-192.png', '/admin/apple-touch-icon.png'];
 
