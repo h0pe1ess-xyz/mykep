@@ -69,10 +69,10 @@ const Tabs = (() => {
 
     function restoreNativePanner() {
         if (!nativePanner) return;
-        const {left, overflow, transforms} = nativePanner;
+        const {left, overflow, transform} = nativePanner;
         nativePanner = null;
         track.style.overflow = overflow;
-        for (const [view, transform] of transforms) view.style.transform = transform;
+        track.style.transform = transform;
         track.scrollTo({left, behavior:'instant'});
     }
 
@@ -86,12 +86,12 @@ const Tabs = (() => {
         if (stopMomentum) {
             restoreNativePanner();
             const left = track.scrollLeft;
-            const transforms = Array.from(track.children, view => [view, view.style.transform]);
-            nativePanner = {left, overflow:track.style.overflow, transforms};
+            nativePanner = {left, overflow:track.style.overflow, transform:track.style.transform};
             // Hidden overflow is still a scrolling box and can keep flinging.
-            // Remove the released panner for one frame. Hold its contents at
-            // exactly the same visible position while the outer viewport clips.
-            for (const [view] of transforms) view.style.transform = `translate3d(${-left}px, 0, 0)`;
+            // Hold the entire strip as one layer while retiring its panner.
+            // The previous per-page hold showed overlapping overflow tiles on
+            // iOS. Keep the page-local compositing layers untouched.
+            track.style.transform = `translate3d(${-left}px, 0, 0)`;
             track.style.overflow = 'visible';
             track.getBoundingClientRect();
         }
