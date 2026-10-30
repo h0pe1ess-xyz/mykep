@@ -27,6 +27,7 @@ const Tabs = (() => {
     let nativeSwipes = 0;
     let nativeChainFrame = 0;
     let nativeCompleting = false;
+    let nativePanner = null;
     let settleFrame = 0;
     let scrollRevision = 0;
     const nativeTrace = [];
@@ -56,6 +57,7 @@ const Tabs = (() => {
     function clearNativeGesture() {
         cancelAnimationFrame(nativeChainFrame);
         nativeChainFrame = 0;
+        restoreNativePanner();
         nativeCompleting = false;
         track?.style.removeProperty('scroll-snap-type');
         nativeOrigin = null;
@@ -65,35 +67,50 @@ const Tabs = (() => {
         nativeSwipes = 0;
     }
 
-    function continueNativeChain(forceDestination = false) {
-        // Complete interrupted series, limited edge swipes and overshoot.
-        // Ordinary single swipes retain browser-owned snapping.
+    function restoreNativePanner() {
+        if (!nativePanner) return;
+        const {left, overflow, transforms} = nativePanner;
+        nativePanner = null;
+        track.style.overflow = overflow;
+        for (const [view, transform] of transforms) view.style.transform = transform;
+        track.scrollTo({left, behavior:'instant'});
+    }
+
+    function continueNativeChain(forceDestination = false, stopMomentum = false) {
+        // Native smooth completion replaces outer-page momentum at release.
+        // A new touch can retarget it before the previous destination arrives.
         if (!originalNative || nativeTarget === null ||
             (!nativeCompleting && nativeSwipes < 2 && !forceDestination)) return;
         nativeCompleting = true;
         track.style.scrollSnapType = 'none';
+        if (stopMomentum) {
+            restoreNativePanner();
+            const left = track.scrollLeft;
+            const transforms = Array.from(track.children, view => [view, view.style.transform]);
+            nativePanner = {left, overflow:track.style.overflow, transforms};
+            // Hidden overflow is still a scrolling box and can keep flinging.
+            // Remove the released panner for one frame. Hold its contents at
+            // exactly the same visible position while the outer viewport clips.
+            for (const [view] of transforms) view.style.transform = `translate3d(${-left}px, 0, 0)`;
+            track.style.overflow = 'visible';
+            track.getBoundingClientRect();
+        }
         const target = nativeTarget;
         cancelAnimationFrame(nativeChainFrame);
         nativeChainFrame = requestAnimationFrame(() => {
             nativeChainFrame = 0;
-            if (nativeTouching || isBlocked() || nativeTarget !== target) return;
-            track.scrollTo({left:target * track.clientWidth,
-                behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+            if (nativeTouching || isBlocked() || nativeTarget !== target) {
+                restoreNativePanner();
+                return;
+            }
+            nativeChainFrame = requestAnimationFrame(() => {
+                nativeChainFrame = 0;
+                restoreNativePanner();
+                if (nativeTouching || isBlocked() || nativeTarget !== target) return;
+                track.scrollTo({left:target * track.clientWidth,
+                    behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+            });
         });
-    }
-
-    function recoverNativeOvershoot() {
-        if (!originalNative || nativeTouching || nativeCompleting ||
-            nativeSwipes !== 1 || nativeTarget !== 1) return false;
-        const direction = Math.sign(nativeTarget - nativeOrigin);
-        if (direction * (track.scrollLeft - nativeTarget * track.clientWidth) <= 1) return false;
-        // Repair a skipped snap only after native scrolling stops. Retargeting
-        // live momentum can lock out the next touch on iOS.
-        // Count horizontal releases, including short native flicks. Taps must
-        // neither grant another page nor disable single-swipe recovery.
-        traceNative('single-overshoot');
-        continueNativeChain(true);
-        return true;
     }
 
     function sampleNativeGesture(point) {
@@ -282,10 +299,9 @@ const Tabs = (() => {
 
     function settleNative() {
         clearTimeout(settleTimer);
-        if (nativeTouching || !track.clientWidth) return;
+        if (nativeTouching || nativePanner || !track.clientWidth) return;
         if (isBlocked()) { reset(); return; }
         if (originalNative) {
-            if (recoverNativeOvershoot()) return;
             if (nativeCompleting && Math.abs(track.scrollLeft - nativeTarget * track.clientWidth) > 1) {
                 continueNativeChain();
                 return;
@@ -368,6 +384,7 @@ const Tabs = (() => {
                 cancelAnimationFrame(settleFrame);
                 settleFrame = 0;
                 nativeTouching = true;
+                restoreNativePanner();
                 nativeGesture = null;
                 cancelAnimationFrame(nativeChainFrame);
                 nativeChainFrame = 0;
@@ -434,7 +451,12 @@ const Tabs = (() => {
                         behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
                 }
                 if (originalNative && !nativeTouching) {
-                    continueNativeChain(limitedSwipe);
+                    // Bound the first leg before native inertia can skip the
+                    // middle page. Repairing it after arrival also undoes iOS
+                    // follow-up swipes whose DOM touch events were suppressed.
+                    const adjacentMiddle = nativeSwipes === 1 && nativeTarget === 1 && nativeOrigin !== 1;
+                    if (adjacentMiddle) traceNative('release-adjacent');
+                    continueNativeChain(limitedSwipe || adjacentMiddle, true);
                 }
                 nativeGesture = null;
                 clearTimeout(settleTimer);
