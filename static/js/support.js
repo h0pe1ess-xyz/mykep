@@ -49,9 +49,7 @@ async function getSupportModel(nav = navigator) {
 function buildSupportReport(device) {
     const build = document.querySelector('meta[name="mykep-build"]')?.content || 'Не визначено';
     const mode = isPWA() ? 'PWA (запущено як застосунок)' : 'Браузер';
-    const viewport = device.system === 'iOS' && typeof window.mykepViewportReport === 'function'
-        ? `\nГеометрія екрана: ${JSON.stringify(window.mykepViewportReport())}` : '';
-    return `Повідомлення MyKep\n\nПроблема або ідея: [опишіть тут]\n\nДані застосунку:\nВерсія: ${build}\nСистема: ${device.system}\nМодель: ${device.model}\nБраузер: ${device.browser}\nРежим: ${mode}\nВікно: ${window.innerWidth} × ${window.innerHeight}${viewport}`;
+    return `Повідомлення MyKep\n\nПроблема або ідея: [опишіть тут]\n\nДані застосунку:\nВерсія: ${build}\nСистема: ${device.system}\nМодель: ${device.model}\nБраузер: ${device.browser}\nРежим: ${mode}\nВікно: ${window.innerWidth} × ${window.innerHeight}`;
 }
 
 function createSupportTelegramURL(report, destination = 'https://t.me/oddxq') {
@@ -75,11 +73,9 @@ function initSupportReport() {
     if (!link || !copy || !toggle || !preview || !status) return;
     const destination = link.href;
     const device = supportDeviceInfo = getSupportDevice();
-    function refresh(includeNavigation = false) {
+    function refresh() {
         const report = buildSupportReport(device);
-        const navigation = includeNavigation === true && typeof Tabs !== 'undefined' ? Tabs.diagnostics() : null;
-        const diagnostic = navigation?.events.length ? `\n\nПерелистування вкладок: ${JSON.stringify(navigation)}` : '';
-        preview.value = report + diagnostic;
+        preview.value = report;
         if (link.dataset.supportDraft === 'true') {
             link.href = createSupportTelegramURL(report, destination);
         }
@@ -91,7 +87,7 @@ function initSupportReport() {
     link.addEventListener('click', refresh);
     link.addEventListener('focus', refresh);
     toggle.addEventListener('click', () => {
-        refresh(true);
+        refresh();
         preview.hidden = !preview.hidden;
         toggle.setAttribute('aria-expanded', String(!preview.hidden));
         toggle.textContent = preview.hidden ? 'Показати дані' : 'Сховати дані';
@@ -101,7 +97,7 @@ function initSupportReport() {
         copy.disabled = true;
         status.textContent = 'Готуємо дані…';
         await ready;
-        const report = refresh(true);
+        const report = refresh();
         try {
             if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
             await navigator.clipboard.writeText(report);

@@ -29,23 +29,12 @@ const Tabs = (() => {
     let nativeCompleting = false;
     let settleFrame = 0;
     let scrollRevision = 0;
-    const nativeTrace = [];
-
-    function traceNative(kind, details = {}) {
-        if (!native || !track) return;
-        if (nativeTrace.length === 120) nativeTrace.shift();
-        nativeTrace.push({time:Math.round(performance.now()), kind, current,
-            left:Math.round(track.scrollLeft), width:track.clientWidth,
-            outerLeft:Math.round(views.scrollLeft), touching:nativeTouching,
-            origin:nativeOrigin, steps:nativeSteps, target:nativeTarget, swipes:nativeSwipes, ...details});
-    }
-
     function diagnostics() {
         return {version:document.querySelector('meta[name="mykep-build"]')?.content,
             mode:document.documentElement.dataset.swipeChoice || document.documentElement.dataset.swipe,
-            engine:native ? 'native' : 'legacy', userAgent:navigator.userAgent,
+            engine:native ? 'native' : 'legacy',
             snap:track && getComputedStyle(track).scrollSnapType,
-            current, events:nativeTrace.slice()};
+            current};
     }
 
     function isBlocked() {
@@ -97,7 +86,6 @@ const Tabs = (() => {
 
     function show(tab, { historyMode = 'push', focus = false, fromScroll = false, immediate = false } = {}) {
         if (!names.includes(tab)) return;
-        traceNative('show', {tab, fromScroll, immediate});
         if (native && !fromScroll) {
             nativeNavigation = null;
             clearNativeGesture();
@@ -156,8 +144,7 @@ const Tabs = (() => {
         gesture = null;
     }
 
-    function reset(event) {
-        traceNative('reset', {reason:event?.type || 'manual'});
+    function reset() {
         cancelDrag();
         track?.classList.remove('is-dragging');
         if (track) track.style.transform = '';
@@ -282,7 +269,6 @@ const Tabs = (() => {
             // Restore all three snap points only after the queued destination
             // is aligned, so an old native snap cannot replay the middle tab.
             clearNativeGesture();
-            traceNative('native-observed', {index});
             if (names[index] !== current) show(names[index], {fromScroll:true});
             return;
         }
@@ -293,7 +279,6 @@ const Tabs = (() => {
         // settles the track; CSS snapping must not replay a previous target.
         const index = nativeSwipes > 0 ? nativeTarget :
             Math.max(min, Math.min(max, Math.round(track.scrollLeft / width)));
-        traceNative('settle', {index});
         nativeOrigin = null;
         nativeSteps = 0;
         nativeGesture = null;
@@ -303,14 +288,12 @@ const Tabs = (() => {
         // Recover only once scrolling has stopped, never fight live momentum or
         // rubber-banding from the per-scroll handler.
         if (Math.abs(track.scrollLeft - index * width) > 1) {
-            traceNative('repair', {index});
             track.scrollTo({left:index * width, behavior:'instant'});
         }
         if (names[index] !== current) show(names[index], {fromScroll: true});
     }
 
     function nativeScrollEnded() {
-        traceNative('scrollend');
         // An interrupted scroll can queue its old scrollend after a new one
         // starts. Confirm two frames without scroll events before repairing it.
         cancelAnimationFrame(settleFrame);
@@ -335,13 +318,6 @@ const Tabs = (() => {
         track = views.querySelector('.views-track');
         nav = document.querySelector('.bottom-nav');
         if (native) {
-            for (const kind of ['touchstart','touchend','touchcancel','pointerdown','pointerup','pointercancel']) {
-                window.addEventListener(kind, event => {
-                    const edge = event.target.closest?.('.swipe-edge-guard');
-                    if (!views.contains(event.target) && !nativeTouching && !edge) return;
-                    traceNative(kind, {surface:edge?.className || event.target.closest?.('.view')?.dataset.view || event.target.id || event.target.tagName});
-                }, {passive:true, capture:true});
-            }
             window.addEventListener('touchstart', event => {
                 // The Back guard is outside views. A follow-up touch on it
                 // still belongs to an unfinished tab swipe, while its own
@@ -404,8 +380,6 @@ const Tabs = (() => {
                     const passed = originalNative ? Math.abs(dx) >= 8 :
                         Math.abs(dx) >= nativeGesture.width * .25 ||
                         Math.abs(dx) >= 30 && velocity > .35;
-                    traceNative('release-path', {axis:nativeGesture.axis, dx:Math.round(dx),
-                        endDx:Math.round(endDx), endDy:Math.round(dy)});
                     if ((originalNative ? nativeGesture.axis === 'x' : Math.abs(dx) > Math.abs(dy) * 1.2) &&
                         passed) {
                         const target = Math.max(0, Math.min(names.length - 1, nativeTarget + (dx < 0 ? 1 : -1)));
@@ -414,7 +388,6 @@ const Tabs = (() => {
                         if (originalNative && limitedSwipe) clickBlockedUntil = performance.now() + 400;
                         if (!originalNative || target !== nativeTarget) ++nativeSwipes;
                         nativeTarget = target;
-                        traceNative('release-target');
                     }
                     // A short drag returns smoothly too; a tap during an
                     // unfinished transition resumes the existing destination.
