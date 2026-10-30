@@ -84,11 +84,13 @@ const Tabs = (() => {
 
     function recoverNativeOvershoot() {
         if (!originalNative || nativeTouching || nativeCompleting ||
-            nativeSwipes !== 1 || nativeTarget !== 1) return false;
+            nativeSteps !== 1 || nativeSwipes !== 1 || nativeTarget !== 1) return false;
         const direction = Math.sign(nativeTarget - nativeOrigin);
         if (direction * (track.scrollLeft - nativeTarget * track.clientWidth) <= 1) return false;
         // Repair a skipped snap only after native scrolling stops. Retargeting
         // live momentum can lock out the next touch on iOS.
+        // A second touch invalidates the single-swipe assumption even when its
+        // native flick is shorter than our recognised-swipe threshold.
         traceNative('single-overshoot');
         continueNativeChain(true);
         return true;
