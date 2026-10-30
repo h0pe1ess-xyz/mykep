@@ -777,8 +777,8 @@ html[data-swipe-blur="off"] .view .credits-block {
 .advanced-settings > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: calc(44px + var(--advanced-inset)); line-height: 1.4; font-weight: 500; cursor: pointer; list-style: none; }
 .advanced-settings > summary::-webkit-details-marker { display: none; }
 .advanced-settings > summary::marker { content: ''; }
-.advanced-settings > summary::after { content: ''; flex: 0 0 auto; width: 8px; height: 8px; margin-right: 3px; border-right: 2px solid var(--text-muted); border-bottom: 2px solid var(--text-muted); transform: rotate(45deg); }
-.advanced-settings[open] > summary::after { transform: rotate(225deg); }
+.advanced-settings > summary::after { content: ''; flex: 0 0 auto; width: 8px; height: 8px; margin-right: 3px; border-right: 2px solid var(--text-muted); border-bottom: 2px solid var(--text-muted); transform: rotate(45deg); transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.advanced-settings[open] > summary::after { transform: rotate(-135deg); }
 .advanced-settings > summary:focus-visible { outline: 2px solid var(--accent-orange); outline-offset: 4px; border-radius: 4px; }
 .advanced-settings-body { padding-bottom: var(--advanced-inset); }
 @media (max-width: 375px) { .advanced-settings { --advanced-inset: 16px; } }
