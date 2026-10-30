@@ -96,6 +96,18 @@ const Tabs = (() => {
         return true;
     }
 
+    function sampleNativeGesture(point) {
+        if (!originalNative || !nativeGesture || point.identifier !== nativeGesture.id) return;
+        const dx = point.clientX - nativeGesture.x;
+        const dy = point.clientY - nativeGesture.y;
+        if (!nativeGesture.axis && Math.max(Math.abs(dx), Math.abs(dy)) >= 8) {
+            nativeGesture.axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
+        }
+        if (nativeGesture.axis === 'x' && Math.abs(dx) > Math.abs(nativeGesture.dx)) {
+            nativeGesture.dx = dx;
+        }
+    }
+
     function show(tab, { historyMode = 'push', focus = false, fromScroll = false, immediate = false } = {}) {
         if (!names.includes(tab)) return;
         traceNative('show', {tab, fromScroll, immediate});
@@ -368,9 +380,13 @@ const Tabs = (() => {
                 if (!isBlocked() && !ownsHorizontalScroll(event.target, track)) {
                     const point = event.touches[0];
                     nativeGesture = {id:point.identifier, x:point.clientX, y:point.clientY,
-                        time:event.timeStamp, width:track.clientWidth, left:track.getBoundingClientRect().left};
+                        time:event.timeStamp, width:track.clientWidth, left:track.getBoundingClientRect().left,
+                        axis:null, dx:0};
                 }
             }, {passive: true, capture: true});
+            views.addEventListener('touchmove', event => {
+                if (event.touches.length === 1) sampleNativeGesture(event.touches[0]);
+            }, {passive:true, capture:true});
             const releaseNative = event => {
                 if (!nativeTouching) return;
                 nativeTouching = event.touches.length > 0;
@@ -378,7 +394,12 @@ const Tabs = (() => {
                 let limitedSwipe = false;
                 const point = nativeGesture && Array.from(event.changedTouches || []).find(touch => touch.identifier === nativeGesture.id);
                 if (!nativeTouching && event.type === 'touchend' && point) {
-                    const dx = point.clientX - nativeGesture.x;
+                    sampleNativeGesture(point);
+                    const endDx = point.clientX - nativeGesture.x;
+                    // A native pan may end close to its starting coordinate.
+                    // Preserve its observed movement instead of dropping a
+                    // second swipe and later undoing the browser's destination.
+                    const dx = originalNative && Math.abs(endDx) < 8 ? nativeGesture.dx : endDx;
                     const dy = point.clientY - nativeGesture.y;
                     const velocity = Math.abs(dx) / Math.max(event.timeStamp - nativeGesture.time, 1);
                     // Native scrolling can accept a short flick that does not
@@ -389,7 +410,9 @@ const Tabs = (() => {
                     const passed = originalNative ? Math.abs(dx) >= 8 :
                         Math.abs(dx) >= nativeGesture.width * .25 ||
                         Math.abs(dx) >= 30 && velocity > .35;
-                    if (Math.abs(dx) > Math.abs(dy) * 1.2 &&
+                    traceNative('release-path', {axis:nativeGesture.axis, dx:Math.round(dx),
+                        endDx:Math.round(endDx), endDy:Math.round(dy)});
+                    if ((originalNative ? nativeGesture.axis === 'x' : Math.abs(dx) > Math.abs(dy) * 1.2) &&
                         passed) {
                         const target = Math.max(0, Math.min(names.length - 1, nativeTarget + (dx < 0 ? 1 : -1)));
                         limitedSwipe = room <= 48 && target !== nativeTarget;

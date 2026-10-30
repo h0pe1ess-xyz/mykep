@@ -75,13 +75,15 @@ function initSupportReport() {
     if (!link || !copy || !toggle || !preview || !status) return;
     const destination = link.href;
     const device = supportDeviceInfo = getSupportDevice();
-    function refresh() {
+    function refresh(includeNavigation = false) {
         const report = buildSupportReport(device);
-        preview.value = report;
+        const navigation = includeNavigation === true && typeof Tabs !== 'undefined' ? Tabs.diagnostics() : null;
+        const diagnostic = navigation?.events.length ? `\n\nПерелистування вкладок: ${JSON.stringify(navigation)}` : '';
+        preview.value = report + diagnostic;
         if (link.dataset.supportDraft === 'true') {
             link.href = createSupportTelegramURL(report, destination);
         }
-        return report;
+        return preview.value;
     }
     refresh();
     // Information stays on this device until the person copies it or opens Telegram.
@@ -89,7 +91,7 @@ function initSupportReport() {
     link.addEventListener('click', refresh);
     link.addEventListener('focus', refresh);
     toggle.addEventListener('click', () => {
-        refresh();
+        refresh(true);
         preview.hidden = !preview.hidden;
         toggle.setAttribute('aria-expanded', String(!preview.hidden));
         toggle.textContent = preview.hidden ? 'Показати дані' : 'Сховати дані';
@@ -99,7 +101,7 @@ function initSupportReport() {
         copy.disabled = true;
         status.textContent = 'Готуємо дані…';
         await ready;
-        const report = refresh();
+        const report = refresh(true);
         try {
             if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
             await navigator.clipboard.writeText(report);
