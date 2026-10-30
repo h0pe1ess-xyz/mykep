@@ -13,13 +13,10 @@ const Tabs = (() => {
     let frame = 0;
     let clickBlockedUntil = 0;
     const listeners = new Set();
-    const composited = document.documentElement.dataset.swipe === 'native' &&
-        document.documentElement.classList.contains('ios-standalone');
-    const native = document.documentElement.dataset.swipe === 'native' && !composited;
+    const native = document.documentElement.dataset.swipe === 'native';
     const originalNative = native && document.documentElement.dataset.nativeFlow === 'original';
     const pointer = document.documentElement.dataset.swipe === 'pointer';
-    const replaceTabHistory = (native || pointer || composited) && document.documentElement.classList.contains('ios-standalone');
-    let compositeTarget = null;
+    const replaceTabHistory = (native || pointer) && document.documentElement.classList.contains('ios-standalone');
     let settleTimer = 0;
     let nativeTouching = false;
     let nativeOrigin = null;
@@ -30,13 +27,12 @@ const Tabs = (() => {
     let nativeSwipes = 0;
     let nativeChainFrame = 0;
     let nativeCompleting = false;
-    let nativePanner = null;
     let settleFrame = 0;
     let scrollRevision = 0;
     const nativeTrace = [];
 
     function traceNative(kind, details = {}) {
-        if ((!native && !composited) || !track) return;
+        if (!native || !track) return;
         if (nativeTrace.length === 120) nativeTrace.shift();
         nativeTrace.push({time:Math.round(performance.now()), kind, current,
             left:Math.round(track.scrollLeft), width:track.clientWidth,
@@ -47,7 +43,7 @@ const Tabs = (() => {
     function diagnostics() {
         return {version:document.querySelector('meta[name="mykep-build"]')?.content,
             mode:document.documentElement.dataset.swipeChoice || document.documentElement.dataset.swipe,
-            engine:composited ? 'composited' : native ? 'native' : 'legacy', userAgent:navigator.userAgent,
+            engine:native ? 'native' : 'legacy', userAgent:navigator.userAgent,
             snap:track && getComputedStyle(track).scrollSnapType,
             current, events:nativeTrace.slice()};
     }
@@ -61,7 +57,6 @@ const Tabs = (() => {
     function clearNativeGesture() {
         cancelAnimationFrame(nativeChainFrame);
         nativeChainFrame = 0;
-        restoreNativePanner();
         nativeCompleting = false;
         track?.style.removeProperty('scroll-snap-type');
         nativeOrigin = null;
@@ -71,49 +66,20 @@ const Tabs = (() => {
         nativeSwipes = 0;
     }
 
-    function restoreNativePanner() {
-        if (!nativePanner) return;
-        const {left, overflow, transform} = nativePanner;
-        nativePanner = null;
-        track.style.overflow = overflow;
-        track.style.transform = transform;
-        track.scrollTo({left, behavior:'instant'});
-    }
-
-    function continueNativeChain(forceDestination = false, stopMomentum = false) {
-        // Native smooth completion replaces outer-page momentum at release.
-        // A new touch can retarget it before the previous destination arrives.
+    function continueNativeChain(forceDestination = false) {
+        // Complete interrupted series and limited edge swipes.
+        // Ordinary single swipes retain browser-owned snapping.
         if (!originalNative || nativeTarget === null ||
             (!nativeCompleting && nativeSwipes < 2 && !forceDestination)) return;
         nativeCompleting = true;
         track.style.scrollSnapType = 'none';
-        if (stopMomentum) {
-            restoreNativePanner();
-            const left = track.scrollLeft;
-            nativePanner = {left, overflow:track.style.overflow, transform:track.style.transform};
-            // Hidden overflow is still a scrolling box and can keep flinging.
-            // Hold the entire strip as one layer while retiring its panner.
-            // The previous per-page hold showed overlapping overflow tiles on
-            // iOS. Keep the page-local compositing layers untouched.
-            track.style.transform = `translate3d(${-left}px, 0, 0)`;
-            track.style.overflow = 'visible';
-            track.getBoundingClientRect();
-        }
         const target = nativeTarget;
         cancelAnimationFrame(nativeChainFrame);
         nativeChainFrame = requestAnimationFrame(() => {
             nativeChainFrame = 0;
-            if (nativeTouching || isBlocked() || nativeTarget !== target) {
-                restoreNativePanner();
-                return;
-            }
-            nativeChainFrame = requestAnimationFrame(() => {
-                nativeChainFrame = 0;
-                restoreNativePanner();
-                if (nativeTouching || isBlocked() || nativeTarget !== target) return;
-                track.scrollTo({left:target * track.clientWidth,
-                    behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
-            });
+            if (nativeTouching || isBlocked() || nativeTarget !== target) return;
+            track.scrollTo({left:target * track.clientWidth,
+                behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
         });
     }
 
@@ -132,19 +98,6 @@ const Tabs = (() => {
     function show(tab, { historyMode = 'push', focus = false, fromScroll = false, immediate = false } = {}) {
         if (!names.includes(tab)) return;
         traceNative('show', {tab, fromScroll, immediate});
-        if (composited && !fromScroll) {
-            cancelDrag();
-            track.classList.remove('is-dragging');
-            if (!immediate) {
-                compositeTarget = tab;
-                document.documentElement.dataset.tab = tab;
-                track.style.transform = '';
-                requestAnimationFrame(settleComposited);
-                return;
-            }
-            compositeTarget = null;
-            track.style.transition = 'none';
-        }
         if (native && !fromScroll) {
             nativeNavigation = null;
             clearNativeGesture();
@@ -195,19 +148,6 @@ const Tabs = (() => {
             track.scrollTo({left: names.indexOf(tab) * track.clientWidth,
                 behavior: immediate || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
         }
-        if (composited && immediate) {
-            track.getBoundingClientRect();
-            track.style.removeProperty('transition');
-        }
-    }
-
-    function settleComposited() {
-        if (!composited || gesture || !compositeTarget) return;
-        const tab = compositeTarget;
-        const left = new DOMMatrixReadOnly(getComputedStyle(track).transform).m41;
-        if (Math.abs(left + names.indexOf(tab) * views.clientWidth) > 1) return;
-        compositeTarget = null;
-        show(tab, {fromScroll:true});
     }
 
     function cancelDrag() {
@@ -222,10 +162,6 @@ const Tabs = (() => {
         track?.classList.remove('is-dragging');
         if (track) track.style.transform = '';
         resetScroll();
-        if (composited && track) {
-            show(compositeTarget || current, {immediate:true});
-            return;
-        }
         if (native && track) {
             const destination = nativeNavigation ||
                 (originalNative && nativeCompleting ? names[nativeTarget] : null);
@@ -279,14 +215,12 @@ const Tabs = (() => {
         if (event.touches.length !== 1 || isBlocked() || ownsHorizontalScroll(event.target)) return;
         const point = event.touches[0];
         const width = document.documentElement.clientWidth;
-        if (!composited && (point.clientX <= 20 || point.clientX >= width - 20)) return;
+        if (point.clientX <= 20 || point.clientX >= width - 20) return;
         const viewWidth = views.clientWidth;
         if (!viewWidth) return;
         gesture = { id: point.identifier, x: point.clientX, y: point.clientY,
-            index: names.indexOf(composited ? compositeTarget || current : current), width: viewWidth, axis: null,
-            left:composited ? views.getBoundingClientRect().left : 0,
+            index: names.indexOf(current), width: viewWidth, axis: null,
             origin: 0, position: 0, samples: [[event.timeStamp, point.clientX]] };
-        if (composited) traceNative('drag-start', {index:gesture.index});
     }
 
     function move(event) {
@@ -298,19 +232,10 @@ const Tabs = (() => {
         if (point.identifier !== gesture.id) { reset(); return; }
         const dx = point.clientX - gesture.x;
         const dy = point.clientY - gesture.y;
-        if (gesture.axis === 'edge') {
-            if (event.cancelable) event.preventDefault();
-            return;
-        }
         if (!gesture.axis) {
             if (Math.max(Math.abs(dx), Math.abs(dy)) < 10) return;
             if (Math.abs(dx) <= Math.abs(dy) * 1.2) { reset(); return; }
             if (isBlocked()) { reset(); return; }
-            if (composited && (gesture.index === 0 && dx > 0 || gesture.index === names.length - 1 && dx < 0)) {
-                gesture.axis = 'edge';
-                event.preventDefault();
-                return;
-            }
             gesture.axis = 'x';
             gesture.origin = new DOMMatrixReadOnly(getComputedStyle(track).transform).m41;
             track.style.transform = `translate3d(${gesture.origin}px, 0, 0)`;
@@ -327,15 +252,7 @@ const Tabs = (() => {
     }
 
     function end(event) {
-        if (!gesture || gesture.axis !== 'x') {
-            if (composited) {
-                cancelDrag();
-                track.classList.remove('is-dragging');
-                track.style.transform = '';
-                requestAnimationFrame(settleComposited);
-            } else reset();
-            return;
-        }
+        if (!gesture || gesture.axis !== 'x') { reset(); return; }
         if (isBlocked()) { reset(); return; }
         const { width, samples, index } = gesture;
         const point = [...event.changedTouches].find(touch => touch.identifier === gesture.id);
@@ -344,19 +261,15 @@ const Tabs = (() => {
         const first = samples[0];
         const velocity = (point.clientX - first[1]) / Math.max(event.timeStamp - first[0], 1);
         clickBlockedUntil = performance.now() + 400;
-        const room = dx > 0 ? gesture.left + width - gesture.x : gesture.x - gesture.left;
-        const threshold = composited ? Math.min(30, Math.max(8, room * .5)) : 30;
         const passed = Math.abs(dx) >= width * 0.25 ||
-            Math.abs(dx) >= threshold && (composited && room <= 48 ||
-                Math.abs(velocity) > 0.35 && Math.sign(velocity) === Math.sign(dx));
+            Math.abs(dx) >= 30 && Math.abs(velocity) > 0.35 && Math.sign(velocity) === Math.sign(dx);
         const target = names[index + (dx < 0 ? 1 : -1)];
-        traceNative('drag-release', {index, dx:Math.round(dx), passed});
-        show(passed && target ? target : composited ? names[index] : current);
+        show(passed && target ? target : current);
     }
 
     function settleNative() {
         clearTimeout(settleTimer);
-        if (nativeTouching || nativePanner || !track.clientWidth) return;
+        if (nativeTouching || !track.clientWidth) return;
         if (isBlocked()) { reset(); return; }
         if (originalNative) {
             if (nativeCompleting && Math.abs(track.scrollLeft - nativeTarget * track.clientWidth) > 1) {
@@ -421,15 +334,6 @@ const Tabs = (() => {
         views = document.getElementById('views');
         track = views.querySelector('.views-track');
         nav = document.querySelector('.bottom-nav');
-        if (composited) {
-            document.documentElement.dataset.nativeRender = 'composited';
-            track.scrollLeft = 0;
-            for (const kind of ['transitionend', 'transitioncancel']) {
-                track.addEventListener(kind, event => {
-                    if (event.target === track && event.propertyName === 'transform') settleComposited();
-                });
-            }
-        }
         if (native) {
             for (const kind of ['touchstart','touchend','touchcancel','pointerdown','pointerup','pointercancel']) {
                 window.addEventListener(kind, event => {
@@ -450,7 +354,6 @@ const Tabs = (() => {
                 cancelAnimationFrame(settleFrame);
                 settleFrame = 0;
                 nativeTouching = true;
-                restoreNativePanner();
                 nativeGesture = null;
                 cancelAnimationFrame(nativeChainFrame);
                 nativeChainFrame = 0;
@@ -482,6 +385,7 @@ const Tabs = (() => {
                 nativeTouching = event.touches.length > 0;
                 if (originalNative && event.type === 'touchcancel') clearNativeGesture();
                 let limitedSwipe = false;
+                let changedTarget = false;
                 const point = nativeGesture && Array.from(event.changedTouches || []).find(touch => touch.identifier === nativeGesture.id);
                 if (!nativeTouching && event.type === 'touchend' && point) {
                     sampleNativeGesture(point);
@@ -505,7 +409,8 @@ const Tabs = (() => {
                     if ((originalNative ? nativeGesture.axis === 'x' : Math.abs(dx) > Math.abs(dy) * 1.2) &&
                         passed) {
                         const target = Math.max(0, Math.min(names.length - 1, nativeTarget + (dx < 0 ? 1 : -1)));
-                        limitedSwipe = room <= 48 && target !== nativeTarget;
+                        changedTarget = target !== nativeTarget;
+                        limitedSwipe = room <= 48 && changedTarget;
                         if (originalNative && limitedSwipe) clickBlockedUntil = performance.now() + 400;
                         if (!originalNative || target !== nativeTarget) ++nativeSwipes;
                         nativeTarget = target;
@@ -516,13 +421,10 @@ const Tabs = (() => {
                     if (!originalNative) track.scrollTo({left:nativeTarget * track.clientWidth,
                         behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
                 }
-                if (originalNative && !nativeTouching) {
-                    // Bound the first leg before native inertia can skip the
-                    // middle page. Repairing it after arrival also undoes iOS
-                    // follow-up swipes whose DOM touch events were suppressed.
-                    const adjacentMiddle = nativeSwipes === 1 && nativeTarget === 1 && nativeOrigin !== 1;
-                    if (adjacentMiddle) traceNative('release-adjacent');
-                    continueNativeChain(limitedSwipe || adjacentMiddle, true);
+                if (originalNative && !nativeTouching && changedTarget) {
+                    // Further outward contacts must not restart the same
+                    // completion and hold a fast swipe series between pages.
+                    continueNativeChain(limitedSwipe);
                 }
                 nativeGesture = null;
                 clearTimeout(settleTimer);
@@ -571,11 +473,8 @@ const Tabs = (() => {
                 if (event.target === views && gesture) reset();
             });
         } else {
-            const surface = composited ? window : views;
-            surface.addEventListener('touchstart', event => {
-                if (!composited || views.contains(event.target) || event.target.closest?.('.swipe-edge-left')) start(event);
-            }, { passive: true, capture:composited });
-            surface.addEventListener('touchmove', move, { passive: false, capture:composited });
+            views.addEventListener('touchstart', start, { passive: true });
+            views.addEventListener('touchmove', move, { passive: false });
             window.addEventListener('touchend', end, { passive: true });
             document.addEventListener('touchcancel', reset, { passive: true, capture: true });
         }
@@ -602,13 +501,13 @@ const Tabs = (() => {
         window.addEventListener('blur', reset);
         document.addEventListener('visibilitychange', reset);
         show(current, { historyMode: 'none', immediate: true });
-        if (document.documentElement.classList.contains('ios-standalone') && (native || pointer || composited)) {
+        if (document.documentElement.classList.contains('ios-standalone') && (native || pointer)) {
             // Keep cancelable Back protection off the native scroller. The
             // historical pointer mode retains its original pair of guards.
             for (const side of ['left', 'right']) {
                 // iOS Back starts at the left edge. A right-edge overlay also
                 // blocks native outward tab swipes and their interruption.
-                if ((originalNative || composited) && side === 'right') continue;
+                if (originalNative && side === 'right') continue;
                 const edge = document.createElement('div');
                 edge.className = `swipe-edge-guard swipe-edge-${side}`;
                 edge.setAttribute('aria-hidden', 'true');
