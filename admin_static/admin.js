@@ -472,6 +472,27 @@
             type: 'button', class: state.range === key ? 'active' : '', text: label, aria: { pressed: String(state.range === key) }, data: { control: 'range-' + key },
             on: { click: () => { state.range = key; load(true); } } })));
     }
+    function usageCards(u) {
+        if (!u) return [];
+        const table = (title, headers, rows) => h('table', {class:'usage-table',aria:{label:title}},[
+            h('thead',{},[h('tr',{},headers.map(text=>h('th',{text})))]),
+            h('tbody',{},rows.map(row=>h('tr',{},row.map(text=>h('td',{text})))))
+        ]);
+        return [
+            card('Сторінки застосунку',table('Сторінки застосунку',['Сторінка','Браузери','Відкриття'],
+                u.pages.map(row=>[row.label,fmt(row.users),fmt(row.views)])),
+                {sub:'Унікальні UID за обраний період. Повторні відкриття протягом 2 с об’єднуються'}),
+            card('Налаштування користувачів',[
+                h('p',{class:'muted small',text:`Останній отриманий вибір активних браузерів за період: ${fmt(u.users)}. Один UID відповідає профілю браузера, а не фізичній людині.`}),
+                table('Тривалість пар',['Тривалість','Перша зміна','Друга зміна'],
+                    [60,80].map(n=>[`${n} хв`,fmt(u.duration1[n]),fmt(u.duration2[n])])),
+                table('Перелистування вкладок',['Перелистування','Браузери'],[
+                    ['Нова версія',fmt(u.swipes.native)],['Стара версія',fmt(u.swipes.baseline)]]),
+                h('p',{class:'muted small',text:'Нові показники збираються з версії 2.9.28. Старі версії та офлайн-відкриття не враховані'})
+            ])
+        ];
+    }
+
     function renderStats(d) {
         state.lastData.stats = d;
         const page = $('page-stats');
@@ -518,7 +539,8 @@
                 card('Курси', courses, { sub: 'За роком вступу в назві групи' }),
                 card('Режим запуску', modes, { sub: 'PWA з головного екрана чи браузер' }),
                 card('Платформи', plat, { sub: 'Унікальні користувачі' }),
-                card('Браузери', brow, { sub: 'Унікальні користувачі' })
+                card('Браузери', brow, { sub: 'Унікальні користувачі' }),
+                d.usage && h('div',{class:'grid span-3 usage-grid'},usageCards(d.usage))
             ])
         );
         after(() => {

@@ -78,7 +78,9 @@ const BellSchedule = (() => {
     }
 
     function show(nextMode) {
+        const changed = mode !== nextMode;
         mode = nextMode;
+        if (changed && Tabs.current === 'schedule') recordUsage(mode === 'bells' ? 'bells' : 'schedule');
         ++renderToken;
         view.dataset.scheduleMode = mode;
         const bells = mode === 'bells';
@@ -124,5 +126,5 @@ const BellSchedule = (() => {
         window.addEventListener('pageshow', () => render());
         setInterval(() => { if (!document.hidden) render(); }, 30000);
     });
-    return { render };
+    return { render, get mode() { return mode; } };
 })();

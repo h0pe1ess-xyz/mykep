@@ -138,6 +138,7 @@ const App = (() => {
 
     function enter(tab, userAction = false) {
         if (!started) return;
+        if (userAction) recordUsage(tab);
         updateHeaderDisplays();
         if (tab === 'settings') {
             if (!settingsReady) { initSettings(); settingsReady = true; }
@@ -206,12 +207,16 @@ const App = (() => {
         prepareTabs();
         enter(Tabs.current,true);
         setInterval(resume, 10000);
-        document.addEventListener('visibilitychange', () => resume(true));
+        document.addEventListener('visibilitychange', () => {
+            resume(true);
+            if (!document.hidden) recordUsage(Tabs.current);
+        });
         window.addEventListener('pageshow', event => {
             if (event.persisted) {
                 setScheduleWeekSelection('auto');
                 weekSelect.value = 'auto';
                 resume(true);
+                recordUsage(Tabs.current);
             }
         });
         window.addEventListener('online', () => resume(true));

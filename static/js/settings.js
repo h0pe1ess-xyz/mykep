@@ -24,6 +24,7 @@ function initSettings() {
     }
     function refreshSettings() {
         renderSettings();
+        recordUsage();
         document.querySelectorAll('.modal-overlay.active').forEach(modal => modal.classList.remove('active'));
         App.reload();
     }
