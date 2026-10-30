@@ -351,11 +351,18 @@ const Tabs = (() => {
         if (native) {
             for (const kind of ['touchstart','touchend','touchcancel','pointerdown','pointerup','pointercancel']) {
                 window.addEventListener(kind, event => {
-                    if (!views.contains(event.target) && !nativeTouching) return;
-                    traceNative(kind, {surface:event.target.closest?.('.view')?.dataset.view || event.target.id || event.target.tagName});
+                    const edge = event.target.closest?.('.swipe-edge-guard');
+                    if (!views.contains(event.target) && !nativeTouching && !edge) return;
+                    traceNative(kind, {surface:edge?.className || event.target.closest?.('.view')?.dataset.view || event.target.id || event.target.tagName});
                 }, {passive:true, capture:true});
             }
-            views.addEventListener('touchstart', event => {
+            window.addEventListener('touchstart', event => {
+                // The Back guard is outside views. A follow-up touch on it
+                // still belongs to an unfinished tab swipe, while its own
+                // preventDefault continues to block browser Back.
+                const edgeContinuation = originalNative && nativeOrigin !== null && nativeSwipes > 0 &&
+                    event.target.closest?.('.swipe-edge-left');
+                if (!views.contains(event.target) && !edgeContinuation) return;
                 nativeNavigation = null;
                 clearTimeout(settleTimer);
                 cancelAnimationFrame(settleFrame);
@@ -384,7 +391,7 @@ const Tabs = (() => {
                         axis:null, dx:0};
                 }
             }, {passive: true, capture: true});
-            views.addEventListener('touchmove', event => {
+            window.addEventListener('touchmove', event => {
                 if (event.touches.length === 1) sampleNativeGesture(event.touches[0]);
             }, {passive:true, capture:true});
             const releaseNative = event => {
