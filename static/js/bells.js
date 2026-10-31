@@ -104,7 +104,8 @@ const BellSchedule = (() => {
             if (schedulePickerState) {
                 const day = document.querySelector('.day-picker .active');
                 const picker = document.querySelector('.day-picker');
-                if (day) picker.scrollTo({left:day.offsetLeft + day.clientWidth / 2 - picker.clientWidth / 2,behavior:'auto'});
+                if (day && schedulePickerState.centerDay) schedulePickerState.centerDay(day.dataset.day, false);
+                else if (day) picker.scrollTo({left:day.offsetLeft + day.clientWidth / 2 - picker.clientWidth / 2,behavior:'auto'});
             }
         }
     }

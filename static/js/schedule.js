@@ -45,6 +45,147 @@ function renderScheduleList(schedule) {
 
 let schedulePageData = null;
 let schedulePickerState = null;
+function needsLegacyDayPicker(nav = navigator) {
+    const version = (nav.userAgent || '').match(/(?:iPhone OS|CPU OS) (\d+)[_.]/);
+    return !!version && Number(version[1]) < 16;
+}
+
+function initLegacyDayPicker(picker, items, state, renderForDay, requestArc) {
+    // iOS 15's nested native scroller remains stuck on the physical 7 Plus.
+    // Move only this short day strip, without using its native scroll range.
+    const track = document.createElement('div');
+    track.className = 'day-picker-track';
+    track.append(...items);
+    picker.replaceChildren(track);
+    picker.dataset.scrollEngine = 'legacy';
+    state.legacy = {offset:0};
+    let width = 0, maximum = 0, animation = 0, gesture = null, blockedUntil = 0;
+    const removers = [];
+    function listen(node, name, handler, options) {
+        node.addEventListener(name, handler, options);
+        removers.push(() => node.removeEventListener(name, handler, options));
+    }
+    function stopAnimation() {
+        cancelAnimationFrame(animation);
+        animation = 0;
+    }
+    function move(offset) {
+        state.legacy.offset = Math.max(0, Math.min(maximum, offset));
+        track.style.transform = `translate3d(${-state.legacy.offset}px, 0, 0)`;
+        if (picker.scrollLeft) picker.scrollLeft = 0;
+        requestArc();
+    }
+    function measure() {
+        width = picker.clientWidth;
+        if (!width) return;
+        const sizes = items.map(item => item.clientWidth);
+        const start = Math.max(0, (width - sizes[0]) / 2);
+        const end = Math.max(0, (width - sizes[sizes.length - 1]) / 2);
+        track.style.paddingLeft = `${start}px`;
+        track.style.paddingRight = `${end}px`;
+        track.style.width = `${start + end + sizes.reduce((sum, size) => sum + size, 0) + 16 * (items.length - 1)}px`;
+        const last = items[items.length - 1];
+        maximum = Math.max(0, last.offsetLeft + last.clientWidth / 2 - width / 2);
+    }
+    function center(day, animate = true) {
+        stopAnimation();
+        measure();
+        const item = items.find(item => item.dataset.day === day);
+        if (!item || !width) return;
+        const target = Math.max(0, Math.min(maximum, item.offsetLeft + item.clientWidth / 2 - width / 2));
+        const start = state.legacy.offset;
+        if (!animate || matchMedia('(prefers-reduced-motion: reduce)').matches) { move(target); return; }
+        const began = performance.now();
+        function tick(now) {
+            const progress = Math.min(1, (now - began) / 200);
+            move(start + (target - start) * (1 - Math.pow(1 - progress, 3)));
+            animation = progress < 1 ? requestAnimationFrame(tick) : 0;
+        }
+        animation = requestAnimationFrame(tick);
+    }
+    function settle() {
+        clearTimeout(state.scrollTimeout);
+        if (gesture || picker.hidden || !picker.clientWidth) return;
+        const middle = state.legacy.offset + picker.clientWidth / 2;
+        const closest = items.reduce((best, item) =>
+            Math.abs(item.offsetLeft + item.clientWidth / 2 - middle) <
+            Math.abs(best.offsetLeft + best.clientWidth / 2 - middle) ? item : best);
+        renderForDay(closest.dataset.day, true);
+        center(closest.dataset.day);
+    }
+    function cancel() {
+        gesture = null;
+        clearTimeout(state.scrollTimeout);
+        center(state.activeDay, false);
+    }
+    listen(picker, 'touchstart', event => {
+        if (event.touches.length !== 1) { cancel(); return; }
+        blockedUntil = 0;
+        stopAnimation();
+        clearTimeout(state.scrollTimeout);
+        measure();
+        const point = event.touches[0];
+        gesture = {id:point.identifier, x:point.clientX, y:point.clientY, offset:state.legacy.offset, axis:null};
+    }, {passive:true});
+    listen(picker, 'touchmove', event => {
+        if (!gesture) return;
+        if (event.touches.length !== 1) { cancel(); return; }
+        const point = event.touches[0];
+        if (point.identifier !== gesture.id) return;
+        const dx = point.clientX - gesture.x, dy = point.clientY - gesture.y;
+        if (!gesture.axis && Math.max(Math.abs(dx), Math.abs(dy)) >= 8) {
+            gesture.axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
+        }
+        if (gesture.axis !== 'x') return;
+        if (!event.cancelable) { cancel(); return; }
+        event.preventDefault();
+        move(gesture.offset - dx);
+    }, {passive:false});
+    listen(picker, 'touchend', event => {
+        if (!gesture) return;
+        if (event.touches.length || !Array.from(event.changedTouches).some(point => point.identifier === gesture.id)) {
+            cancel(); return;
+        }
+        const dragged = gesture.axis === 'x';
+        gesture = null;
+        if (dragged) { blockedUntil = performance.now() + 350; settle(); }
+    }, {passive:true});
+    listen(picker, 'touchcancel', cancel, {passive:true});
+    listen(picker, 'wheel', event => {
+        if (Math.abs(event.deltaX) <= Math.abs(event.deltaY) || !event.cancelable) return;
+        event.preventDefault();
+        stopAnimation();
+        measure();
+        move(state.legacy.offset + event.deltaX);
+        clearTimeout(state.scrollTimeout);
+        state.scrollTimeout = setTimeout(settle, 150);
+    }, {passive:false});
+    listen(picker, 'keydown', event => {
+        blockedUntil = 0;
+        if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+        event.preventDefault();
+        const index = items.findIndex(item => item.dataset.day === state.activeDay);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 :
+            Math.max(0, Math.min(items.length - 1, index + (event.key === 'ArrowRight' ? 1 : -1)));
+        renderForDay(items[next].dataset.day, true);
+        items[next].focus({preventScroll:true});
+        center(items[next].dataset.day);
+    });
+    listen(picker, 'scroll', () => { if (picker.scrollLeft) picker.scrollLeft = 0; }, {passive:true});
+    listen(window, 'blur', cancel);
+    listen(window, 'pageshow', cancel);
+    const resize = new ResizeObserver(() => { if (width !== picker.clientWidth) cancel(); });
+    resize.observe(picker);
+    items.forEach(item => {
+        item.onclick = () => {
+            if (performance.now() < blockedUntil) return;
+            renderForDay(item.dataset.day, true);
+            center(item.dataset.day);
+        };
+    });
+    state.centerDay = center;
+    state.dispose = () => { stopAnimation(); resize.disconnect(); removers.forEach(remove => remove()); };
+}
 function setSchedulePending() {
     schedulePageData = null;
     renderedScheduleList = null;
@@ -80,10 +221,11 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
     const containsToday=calendar?.monday === dateKey(calendarMonday());
     const preferredDay = sameCalendar ? schedulePickerState?.activeDay : containsToday || !calendar?.monday ? todayMap[getKyivNow().getDay()] : 'понеділок';
     if (schedulePickerState) {
+        schedulePickerState.dispose?.();
         cancelAnimationFrame(schedulePickerState.frame);
         clearTimeout(schedulePickerState.scrollTimeout);
     }
-    const state = { signature, monday:calendar?.monday, activeDay: null, frame: 0, scrollTimeout: 0, programmatic: false };
+    const state = { signature, monday:calendar?.monday, activeDay: null, frame: 0, scrollTimeout: 0, programmatic: false, touching: false };
     schedulePickerState = state;
     picker.innerHTML = days.map((day,i) => {
         const date = calendar?.monday ? parseLocalDate(calendar.monday) : null;
@@ -117,7 +259,7 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
         state.frame = 0;
         const width = picker.clientWidth;
         if (!width) return;
-        const center = picker.scrollLeft + width / 2;
+        const center = (state.legacy ? state.legacy.offset : picker.scrollLeft) + width / 2;
         // Batch all layout reads before writing styles.
         const positions = items.map(item => ({ item,
             distance: Math.abs(item.offsetLeft + item.clientWidth / 2 - center) }));
@@ -133,13 +275,31 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
     function requestArc() {
         if (!state.frame) state.frame = requestAnimationFrame(updateArc);
     }
+    if (needsLegacyDayPicker()) {
+        initLegacyDayPicker(picker, items, state, renderForDay, requestArc);
+        const initial = items.find(item => item.dataset.day === preferredDay) || items[0];
+        if (initial) {
+            renderForDay(initial.dataset.day);
+            state.centerDay(initial.dataset.day, false);
+        }
+        return;
+    }
+    picker.dataset.scrollEngine = 'native';
     function finishScroll() {
         clearTimeout(state.scrollTimeout);
-        if (picker.hidden) return;
-        state.programmatic = false;
+        if (picker.hidden || state.touching) return;
         cancelAnimationFrame(state.frame);
         updateArc();
-        if (state.closestDay) renderForDay(state.closestDay, true);
+        // A tap is an explicit selection. Delayed or clamped native scrolling
+        // must not replace it; only a new user scroll can choose another day.
+        if (!state.programmatic && state.closestDay) renderForDay(state.closestDay, true);
+        // Keep native finger movement and momentum, then center the chosen day.
+        // Animated arc transforms must not feed native CSS snap retargeting.
+        const selected = items.find(item => item.dataset.day === state.activeDay);
+        if (!selected || !picker.clientWidth) return;
+        const left = Math.max(0, Math.min(picker.scrollWidth - picker.clientWidth,
+            selected.offsetLeft + selected.clientWidth / 2 - picker.clientWidth / 2));
+        if (Math.abs(picker.scrollLeft - left) > 1) picker.scrollTo({left, behavior:'auto'});
     }
     picker.onscroll = () => {
         requestArc();
@@ -147,6 +307,26 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
         state.scrollTimeout = setTimeout(finishScroll, 150);
     };
     picker.onscrollend = finishScroll;
+    const startUserScroll = event => {
+        state.programmatic = false;
+        if (event.type === 'touchstart') {
+            state.touching = true;
+            clearTimeout(state.scrollTimeout);
+        }
+    };
+    picker.ontouchstart = startUserScroll;
+    picker.onpointerdown = startUserScroll;
+    picker.onwheel = startUserScroll;
+    picker.onkeydown = startUserScroll;
+    const endUserScroll = event => {
+        state.touching = event.touches.length > 0;
+        if (!state.touching) {
+            clearTimeout(state.scrollTimeout);
+            state.scrollTimeout = setTimeout(finishScroll, 150);
+        }
+    };
+    picker.ontouchend = endUserScroll;
+    picker.ontouchcancel = endUserScroll;
     items.forEach(item => {
         item.onclick = () => {
             state.programmatic = true;
@@ -154,7 +334,7 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
             picker.scrollTo({ left: item.offsetLeft + item.clientWidth / 2 - picker.clientWidth / 2,
                 behavior: reducedMotion ? 'auto' : 'smooth' });
             renderForDay(item.dataset.day, true);
-            // Also release the guard when tapping an already centered item.
+            // Refresh the arc even when tapping an already centered item.
             clearTimeout(state.scrollTimeout);
             state.scrollTimeout = setTimeout(finishScroll, 200);
         };
