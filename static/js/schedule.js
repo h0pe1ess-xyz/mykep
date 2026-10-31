@@ -83,7 +83,7 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
         cancelAnimationFrame(schedulePickerState.frame);
         clearTimeout(schedulePickerState.scrollTimeout);
     }
-    const state = { signature, monday:calendar?.monday, activeDay: null, frame: 0, scrollTimeout: 0, programmatic: false };
+    const state = { signature, monday:calendar?.monday, activeDay: null, frame: 0, scrollTimeout: 0, programmatic: false, touching: false };
     schedulePickerState = state;
     picker.innerHTML = days.map((day,i) => {
         const date = calendar?.monday ? parseLocalDate(calendar.monday) : null;
@@ -135,12 +135,19 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
     }
     function finishScroll() {
         clearTimeout(state.scrollTimeout);
-        if (picker.hidden) return;
+        if (picker.hidden || state.touching) return;
         cancelAnimationFrame(state.frame);
         updateArc();
         // A tap is an explicit selection. Delayed or clamped native scrolling
         // must not replace it; only a new user scroll can choose another day.
         if (!state.programmatic && state.closestDay) renderForDay(state.closestDay, true);
+        // Keep native finger movement and momentum, then center the chosen day.
+        // Animated arc transforms must not feed native CSS snap retargeting.
+        const selected = items.find(item => item.dataset.day === state.activeDay);
+        if (!selected || !picker.clientWidth) return;
+        const left = Math.max(0, Math.min(picker.scrollWidth - picker.clientWidth,
+            selected.offsetLeft + selected.clientWidth / 2 - picker.clientWidth / 2));
+        if (Math.abs(picker.scrollLeft - left) > 1) picker.scrollTo({left, behavior:'auto'});
     }
     picker.onscroll = () => {
         requestArc();
@@ -148,11 +155,26 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
         state.scrollTimeout = setTimeout(finishScroll, 150);
     };
     picker.onscrollend = finishScroll;
-    const startUserScroll = () => { state.programmatic = false; };
+    const startUserScroll = event => {
+        state.programmatic = false;
+        if (event.type === 'touchstart') {
+            state.touching = true;
+            clearTimeout(state.scrollTimeout);
+        }
+    };
     picker.ontouchstart = startUserScroll;
     picker.onpointerdown = startUserScroll;
     picker.onwheel = startUserScroll;
     picker.onkeydown = startUserScroll;
+    const endUserScroll = event => {
+        state.touching = event.touches.length > 0;
+        if (!state.touching) {
+            clearTimeout(state.scrollTimeout);
+            state.scrollTimeout = setTimeout(finishScroll, 150);
+        }
+    };
+    picker.ontouchend = endUserScroll;
+    picker.ontouchcancel = endUserScroll;
     items.forEach(item => {
         item.onclick = () => {
             state.programmatic = true;
