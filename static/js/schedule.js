@@ -136,10 +136,11 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
     function finishScroll() {
         clearTimeout(state.scrollTimeout);
         if (picker.hidden) return;
-        state.programmatic = false;
         cancelAnimationFrame(state.frame);
         updateArc();
-        if (state.closestDay) renderForDay(state.closestDay, true);
+        // A tap is an explicit selection. Delayed or clamped native scrolling
+        // must not replace it; only a new user scroll can choose another day.
+        if (!state.programmatic && state.closestDay) renderForDay(state.closestDay, true);
     }
     picker.onscroll = () => {
         requestArc();
@@ -147,6 +148,11 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
         state.scrollTimeout = setTimeout(finishScroll, 150);
     };
     picker.onscrollend = finishScroll;
+    const startUserScroll = () => { state.programmatic = false; };
+    picker.ontouchstart = startUserScroll;
+    picker.onpointerdown = startUserScroll;
+    picker.onwheel = startUserScroll;
+    picker.onkeydown = startUserScroll;
     items.forEach(item => {
         item.onclick = () => {
             state.programmatic = true;
@@ -154,7 +160,7 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
             picker.scrollTo({ left: item.offsetLeft + item.clientWidth / 2 - picker.clientWidth / 2,
                 behavior: reducedMotion ? 'auto' : 'smooth' });
             renderForDay(item.dataset.day, true);
-            // Also release the guard when tapping an already centered item.
+            // Refresh the arc even when tapping an already centered item.
             clearTimeout(state.scrollTimeout);
             state.scrollTimeout = setTimeout(finishScroll, 200);
         };
