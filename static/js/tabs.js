@@ -14,6 +14,7 @@ const Tabs = (() => {
     let clickBlockedUntil = 0;
     const listeners = new Set();
     const native = document.documentElement.dataset.swipe === 'native';
+    const androidNative = native && /Android/i.test(navigator.userAgent || '');
     const originalNative = native && document.documentElement.dataset.nativeFlow === 'original';
     const pointer = document.documentElement.dataset.swipe === 'pointer';
     const replaceTabHistory = (native || pointer) && document.documentElement.classList.contains('ios-standalone');
@@ -58,7 +59,7 @@ const Tabs = (() => {
     function continueNativeChain(forceDestination = false) {
         // Complete interrupted series and limited edge swipes.
         // Ordinary single swipes retain browser-owned snapping.
-        if (!originalNative || nativeTarget === null ||
+        if (androidNative || !originalNative || nativeTarget === null ||
             (!nativeCompleting && nativeSwipes < 2 && !forceDestination)) return;
         nativeCompleting = true;
         track.style.scrollSnapType = 'none';
@@ -265,6 +266,13 @@ const Tabs = (() => {
             }
             const index = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
             if (nativeNavigation && names[index] !== nativeNavigation) return;
+            // Chromium can leave a cancelled pan between snap points. Repair
+            // only after idle, using the nearest visible tab, never a stale queue.
+            if (androidNative && Math.abs(track.scrollLeft - index * track.clientWidth) > 1) {
+                track.scrollTo({left:index * track.clientWidth,
+                    behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+                return;
+            }
             nativeNavigation = null;
             // Restore all three snap points only after the queued destination
             // is aligned, so an old native snap cannot replay the middle tab.
@@ -337,6 +345,10 @@ const Tabs = (() => {
                     if (originalNative) clearNativeGesture();
                     return;
                 }
+                // Chromium owns fling interruption and snap selection on Android.
+                // The iOS chain workaround disables snapping and restarts smooth
+                // scrolling after rapid contacts, competing with that native pan.
+                if (androidNative) return;
                 // Each new gesture before settlement earns another tab step.
                 // Rounding the still-moving position can otherwise treat the
                 // second swipe as the first one and bounce back to the middle.
@@ -468,7 +480,9 @@ const Tabs = (() => {
             document.querySelectorAll('.modal-overlay.active').forEach(modal => modal.classList.remove('active'));
             restoreHistory();
         });
-        window.addEventListener('resize', reset);
+        // Android height-only viewport events must not rewind an active pan.
+        // The native track's ResizeObserver already resets on width changes.
+        if (!androidNative) window.addEventListener('resize', reset);
         window.addEventListener('pagehide', reset);
         window.addEventListener('pageshow', restoreHistory);
         window.addEventListener('blur', reset);
