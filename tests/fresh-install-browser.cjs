@@ -43,7 +43,10 @@ async function run(){
                             text:ctx.measureText(n.selectedOptions[0].textContent).width,
                             room:n.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)};
                     });
-                    assert.ok(Math.abs(label.width-Math.min(140,width*.42))<1);
+                    const expectedWidth=platform==='iPhone'?Math.min(150,width*.46):Math.min(140,width*.42);
+                    assert.ok(Math.abs(label.width-expectedWidth)<1);
+                    const layout=await page.evaluate(()=>({right:document.querySelector('.schedule-mode-switch').getBoundingClientRect().right,left:document.querySelector('.week-control').getBoundingClientRect().left,overflow:document.documentElement.scrollWidth>innerWidth}));
+                    assert.ok(layout.left>layout.right&&!layout.overflow,'toolbar controls must fit without overlap');
                     // Native WebKit controls can exceed the CSS minimum height.
                     assert.ok(label.height>=44);
                     assert.equal(label.font,platform==='iPhone'?16:14);
