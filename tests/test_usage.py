@@ -90,12 +90,6 @@ class UsageTests(unittest.IsolatedAsyncioTestCase):
         row=next(p for p in stats['pages'] if p['page']=='dashboard')
         self.assertEqual((row['users'],row['views']),(100,1000))
         print(f'Usage synthetic batch: 1000 receipts, 100 profiles, {elapsed:.3f}s; daily rows={len(await analytics._rows("SELECT uid FROM usage_daily"))}')
-        # Save only synthetic aggregates for the real admin renderer test.
-        admin_stats._cache.clear()
-        result=await admin_stats._stats('7')
-        target=Path('.mykep-local/usage-admin-fixture.json')
-        target.parent.mkdir(exist_ok=True)
-        target.write_text(json.dumps(result,ensure_ascii=False),encoding='utf-8')
 
     async def test_delayed_writer_and_clock_fold_keep_newest_received_state(self):
         stamp=datetime.now(KYIV).strftime('%Y-%m-%d %H:%M:%S')

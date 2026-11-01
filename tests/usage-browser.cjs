@@ -4,9 +4,10 @@ const {chromium,webkit}=require('playwright');
 const {startFixtureServer}=require('./fixture-server.cjs');
 async function flush(page){await page.waitForFunction(()=>!usageReceipts.sending&&!usageReceipts.scheduled&&!usageReceipts.pending.length);}
 async function run(){
+ fs.mkdirSync('.mykep-local/screens',{recursive:true});
  const server=await startFixtureServer();
  try {for(const [name,type] of [['chromium',chromium],['webkit',webkit]]){
-  const browser=await type.launch(name==='chromium'?{channel:'chrome'}:{});
+  const browser=await type.launch();
   try {
    const context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});
    await context.addInitScript(()=>{localStorage.setItem('mykep_onboarded','true');localStorage.setItem('mykep_group','ПІ-24-02');sessionStorage.setItem('mykep_browser_session','yes');});
@@ -44,7 +45,7 @@ async function run(){
     if(!allowed.includes(file))return route.abort();
     return route.fulfill({contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html',body:fs.readFileSync(path.resolve('admin_static',file))});
    });
-   const stats=JSON.parse(fs.readFileSync('.mykep-local/usage-admin-fixture.json','utf8'));
+   const stats=require('./fixtures/usage-stats.json');
    await p.route('**/api/admin/**',route=>{
     const url=route.request().url();let data={};
     if(url.includes('/me'))data={csrf:'synthetic',user:{id:1,name:'QA',username:'qa'}};
