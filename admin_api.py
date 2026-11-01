@@ -113,8 +113,8 @@ def _clear_cookie(response):
     response.delete_cookie(auth.COOKIE_NAME, path='/', secure=ADMIN_COOKIE_SECURE, httponly=True, samesite='strict')
 
 
-async def _login_response(request, user, method):
-    token = await auth.create_session(user['id'], user.get('name'), user.get('username'), method,
+async def _login_response(request, user, method, token=None):
+    token = token or await auth.create_session(user['id'], user.get('name'), user.get('username'), method,
                                       client_ip(request), request.headers.get('user-agent', ''))
     await auth.audit('login', user['id'], client_ip(request), method)
     response = JSONResponse({'status': 'success'})
@@ -158,11 +158,11 @@ async def auth_code(request: Request):
         raise AdminError(429, 'Забагато спроб. Зачекайте 10 хвилин.',
                          {'Retry-After': str(max(auth.code_ip_limiter.retry_after(ip), 60))})
     data = await _json_body(request)
-    user = await auth.consume_login_code(data.get('code'))
+    user = await auth.consume_login_code(data.get('code'), ip, request.headers.get('user-agent', ''))
     if not user:
         await auth.audit('login_bad_code', None, ip)
         raise AdminError(401, 'Код недійсний або прострочений.')
-    return await _login_response(request, user, 'code')
+    return await _login_response(request, user, 'code', token=user['token'])
 
 
 @router.post('/logout')
@@ -314,7 +314,10 @@ async def login_code(request: Request):
     s = await require_session(request, mutating=True)
     if not auth.action_limiter.check(s['sid']):
         raise AdminError(429, 'Зачекайте хвилину.')
-    code, ttl = await auth.create_login_code(s)
+    try:
+        code, ttl = await auth.create_login_code(s)
+    except PermissionError:
+        raise AdminError(401, 'Сесію завершено. Увійдіть знову.')
     await auth.audit('login_code_created', s['user_id'], client_ip(request))
     return {'status': 'success', 'data': {'code': code, 'expires_in': ttl}}
 
@@ -338,7 +341,7 @@ async def analytics_daily(request: Request, limit: int = Query(90, ge=1, le=366)
 
 
 @router.get('/analytics/details')
-async def analytics_details(request: Request, before: Optional[int] = Query(None, ge=1), limit: int = Query(50, ge=1, le=100)):
+async def analytics_details(request: Request, before: Optional[int] = Query(None, ge=1, le=9223372036854775807), limit: int = Query(50, ge=1, le=100)):
     await require_session(request)
     return {'status': 'success', 'data': await admin_stats.detail_rows(before, limit)}
 

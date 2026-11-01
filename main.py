@@ -130,6 +130,8 @@ async def response_headers(request: Request, call_next):
         h['Cache-Control'] = 'no-store'
         h['X-Robots-Tag'] = 'noindex'
         h['Content-Security-Policy'] = API_CSP
+    elif path in ('/sw.js', '/admin/sw.js'):
+        h['Cache-Control'] = 'no-store'
     elif path.endswith(('.html', '.js', '.css', '.json', '.txt', '.xml', '.webmanifest')) or path in ('/', '/admin/'):
         h['Cache-Control'] = 'no-cache'
     if is_admin:

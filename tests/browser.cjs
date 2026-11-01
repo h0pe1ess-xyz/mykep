@@ -473,22 +473,33 @@ async function run() {
                 console.log(`${engine}: Kyiv midnight and Sunday-to-Monday week change without restart passed`);
                 if (engine==='chromium') {
                     await context.setOffline(false);
-                    await page.waitForFunction(async()=>Boolean((await navigator.serviceWorker.ready).active));
+                    await page.evaluate(()=>navigator.serviceWorker.ready.then(registration=>Boolean(registration.active)));
                     await page.reload();
                     await page.waitForFunction(()=>Boolean(navigator.serviceWorker.controller));
                     const old=await page.evaluate(async()=> (await caches.keys()).find(n=>n.startsWith('mykep-cache-')));
                     server.setBuild('test-upgrade');
                     server.edgeHTML(true);
+                    // Wait for activation and the application's controller-change reload,
+                    // not just creation of a cache while installation is still pending.
+                    const upgraded = page.waitForEvent('load');
                     await page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();await r.update();});
-                    await page.waitForFunction(async()=> (await caches.keys()).includes('mykep-cache-vtest-upgrade'));
-                    await page.waitForFunction(async old=>!(await caches.keys()).includes(old),old);
+                    await upgraded;
+                    const upgradedCaches = await page.evaluate(()=>caches.keys());
+                    assert.ok(upgradedCaches.includes('mykep-cache-vtest-upgrade'));
+                    assert.ok(!upgradedCaches.includes(old));
                     await context.setOffline(true);await page.reload();
                     await page.locator('#main-app').waitFor({state:'attached'});
                     assert.ok(await page.locator('#main-app').count());
                     await context.setOffline(false);
                     server.setBuild('broken-upgrade');server.breakAsset(true);
-                    await page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();await r.update();});
-                    await page.waitForFunction(async()=>{const r=await navigator.serviceWorker.getRegistration();return !r.installing;});
+                    await page.evaluate(async()=>{
+                        const r=await navigator.serviceWorker.getRegistration();
+                        await r.update();
+                        const worker=r.installing;
+                        if(worker && worker.state!=='redundant') await new Promise(resolve=>{
+                            worker.addEventListener('statechange',()=>{if(worker.state==='redundant') resolve();});
+                        });
+                    });
                     assert.ok(await page.evaluate(async()=> (await caches.keys()).includes('mykep-cache-vtest-upgrade')));
                     console.log('chromium: real worker upgrade, old cache eviction, offline reload and failed-shell fallback passed');
                     server.setBuild('');server.breakAsset(false);server.edgeHTML(false);

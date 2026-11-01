@@ -147,6 +147,70 @@ class AdminSecurityTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(auth, 'ADMIN_IDS', frozenset()):
             self.assertIsNone(await auth.get_session(token))
 
+    async def test_revocation_also_invalidates_outstanding_login_codes(self):
+        token = await auth.create_session(ADMIN_ID, 'Test', '', 'telegram', '', '')
+        session = await auth.get_session(token)
+        code, _ = await auth.create_login_code(session)
+        await auth.revoke_session(session['sid'])
+        self.assertIsNone(await auth.consume_login_code(code))
+        with self.assertRaises(PermissionError):
+            await auth.create_login_code(session)
+
+    async def test_revoke_all_invalidates_cli_codes_too(self):
+        import admin_cli
+        code, _ = await auth.create_login_code_for_cli(ADMIN_ID)
+        with patch('builtins.print'):
+            await admin_cli.main(['admin_cli.py', 'revoke-all'])
+        self.assertIsNone(await auth.consume_login_code(code))
+
+    async def test_other_sessions_revocation_and_logout_invalidate_codes(self):
+        keep = await auth.create_session(ADMIN_ID, 'Keep', '', 'telegram', '', '')
+        other = await auth.create_session(ADMIN_ID, 'Other', '', 'telegram', '', '')
+        code, _ = await auth.create_login_code(await auth.get_session(other))
+        self.assertEqual(await auth.revoke_other_sessions((await auth.get_session(keep))['sid']), 1)
+        self.assertIsNone(await auth.consume_login_code(code))
+        kept = await auth.get_session(keep)
+        self.assertIsNotNone(kept)
+        code, _ = await auth.create_login_code(kept)
+        await auth.delete_session(kept['token_hash'])
+        self.assertIsNone(await auth.consume_login_code(code))
+
+    async def test_code_exchange_failure_rolls_back_consumption(self):
+        code, _ = await auth.create_login_code_for_cli(ADMIN_ID)
+        with patch.object(auth, '_insert_session', AsyncMock(side_effect=RuntimeError('fixture'))):
+            with self.assertRaises(RuntimeError):
+                await auth.consume_login_code(code)
+        self.assertIsNotNone(await auth.consume_login_code(code))
+        self.assertIsNone(await auth.consume_login_code(code))
+
+    async def test_session_cap_keeps_newest_session_when_timestamps_tie(self):
+        with patch.object(auth, '_now', return_value=int(time.time())):
+            tokens = [await auth.create_session(ADMIN_ID, 'Test', '', 'telegram', '', '')
+                      for _ in range(auth.MAX_SESSIONS_PER_USER + 1)]
+            self.assertIsNotNone(await auth.get_session(tokens[-1]))
+            self.assertIsNone(await auth.get_session(tokens[0]))
+
+    async def test_code_exchange_serializes_with_revoke_all(self):
+        import admin_cli
+        for _ in range(5):
+            code, _ = await auth.create_login_code_for_cli(ADMIN_ID)
+            with patch('builtins.print'):
+                await asyncio.gather(auth.consume_login_code(code), admin_cli.main(['admin_cli.py', 'revoke-all']))
+            async with database.connect() as db:
+                self.assertEqual(await db.execute_fetchall('SELECT COUNT(*) FROM admin_sessions'), [(0,)])
+                self.assertEqual(await db.execute_fetchall('SELECT COUNT(*) FROM admin_login_codes'), [(0,)])
+
+    async def test_code_login_issues_exactly_one_session_and_limits_cursor(self):
+        code, _ = await auth.create_login_code_for_cli(ADMIN_ID)
+        response = await self.client.post('/api/admin/auth/code', json={'code': code})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'status': 'success'})
+        self.assertEqual((await self.client.get('/api/admin/me')).status_code, 200)
+        async with database.connect() as db:
+            self.assertEqual(await db.execute_fetchall('SELECT COUNT(*) FROM admin_sessions'), [(1,)])
+        response = await self.client.get('/api/admin/analytics/details', params={'before': str(2**63)})
+        self.assertEqual(response.status_code, 422)
+
     async def test_origin_and_body_limits(self):
         for origin in ('null', 'https://localhost/evil', 'https://localhost?x=1', 'http://localhost'):
             response = await self.client.post('/api/admin/auth/telegram', json={}, headers={'Origin': origin})
@@ -162,6 +226,13 @@ class AdminSecurityTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_service_worker_scripts_cannot_be_stored_by_http_caches(self):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url='https://localhost') as client:
+            for path in ('/sw.js', '/admin/sw.js'):
+                response = await client.get(path)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.headers['cache-control'], 'no-store')
+
     async def test_server_failures_keep_private_headers_and_hide_details(self):
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url='https://localhost') as client:
             with patch.object(main.schedule, 'metadata', side_effect=RuntimeError('private fixture detail')):

@@ -18,6 +18,7 @@ import secrets
 import time
 from collections import OrderedDict, deque
 from datetime import datetime
+from aiosqlite import Connection
 
 from config import (ADMIN_COOKIE_SECURE, ADMIN_IDLE_HOURS, ADMIN_IDS,
                     ADMIN_SESSION_HOURS, KYIV, TELEGRAM_BOT_TOKEN)
@@ -191,20 +192,27 @@ async def consume_auth_hash(auth_hash):
         await db.commit()
         return cur.rowcount == 1
 
-async def create_session(user_id, display_name, username, method, ip, user_agent):
+async def _insert_session(db: Connection, user_id: int, display_name: str | None,
+                          username: str | None, method: str, ip: str | None,
+                          user_agent: str | None) -> str:
     if user_id not in ADMIN_IDS:
         raise PermissionError('not an admin')
     token = secrets.token_urlsafe(32)
     now = _now()
+    await db.execute('INSERT INTO admin_sessions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (
+        _sha256(token), secrets.token_urlsafe(9), user_id, (display_name or '')[:64], (username or '')[:64],
+        secrets.token_urlsafe(32), method, now, now, now + ADMIN_SESSION_HOURS * 3600,
+        (ip or '')[:64], (user_agent or '')[:200]))
+    # Keep at most N newest sessions per admin.
+    await db.execute('''DELETE FROM admin_sessions WHERE user_id = ? AND token_hash NOT IN (
+        SELECT token_hash FROM admin_sessions WHERE user_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?)''',
+                     (user_id, user_id, MAX_SESSIONS_PER_USER))
+    return token
+
+
+async def create_session(user_id, display_name, username, method, ip, user_agent):
     async with connect() as db:
-        await db.execute('INSERT INTO admin_sessions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (
-            _sha256(token), secrets.token_urlsafe(9), user_id, (display_name or '')[:64], (username or '')[:64],
-            secrets.token_urlsafe(32), method, now, now, now + ADMIN_SESSION_HOURS * 3600,
-            (ip or '')[:64], (user_agent or '')[:200]))
-        # Keep at most N newest sessions per admin.
-        await db.execute('''DELETE FROM admin_sessions WHERE user_id = ? AND token_hash NOT IN (
-            SELECT token_hash FROM admin_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?)''',
-                         (user_id, user_id, MAX_SESSIONS_PER_USER))
+        token = await _insert_session(db, user_id, display_name, username, method, ip, user_agent)
         await db.commit()
     return token
 
@@ -234,6 +242,8 @@ async def get_session(token):
 
 async def delete_session(token_hash):
     async with connect() as db:
+        await db.execute('DELETE FROM admin_login_codes WHERE user_id IN '
+                         '(SELECT user_id FROM admin_sessions WHERE token_hash = ?)', (token_hash,))
         await db.execute('DELETE FROM admin_sessions WHERE token_hash = ?', (token_hash,))
         await db.commit()
 
@@ -250,6 +260,8 @@ async def list_sessions(current_sid):
 
 async def revoke_session(sid):
     async with connect() as db:
+        await db.execute('DELETE FROM admin_login_codes WHERE user_id IN '
+                         '(SELECT user_id FROM admin_sessions WHERE sid = ?)', (str(sid)[:32],))
         cur = await db.execute('DELETE FROM admin_sessions WHERE sid = ?', (str(sid)[:32],))
         await db.commit()
         return cur.rowcount
@@ -257,6 +269,8 @@ async def revoke_session(sid):
 
 async def revoke_other_sessions(current_sid):
     async with connect() as db:
+        await db.execute('DELETE FROM admin_login_codes WHERE user_id IN '
+                         '(SELECT user_id FROM admin_sessions WHERE sid != ?)', (current_sid,))
         cur = await db.execute('DELETE FROM admin_sessions WHERE sid != ?', (current_sid,))
         await db.commit()
         return cur.rowcount
@@ -282,36 +296,47 @@ async def create_login_code(session):
     code = ''.join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
     now = _now()
     async with connect() as db:
+        # Recheck under the write lock: revocation may finish after the API's
+        # session check but before this operation reaches SQLite.
+        await db.execute('BEGIN IMMEDIATE')
+        if 'token_hash' in session:
+            live = await db.execute_fetchall(
+                'SELECT 1 FROM admin_sessions WHERE token_hash = ? AND user_id = ? '
+                'AND expires_at > ? AND last_seen > ?',
+                (session['token_hash'], session['user_id'], now, now - ADMIN_IDLE_HOURS * 3600))
+            if not live:
+                raise PermissionError('session revoked or expired')
         # At most 3 live codes per admin.
         await db.execute('''DELETE FROM admin_login_codes WHERE user_id = ? AND code_hash NOT IN (
             SELECT code_hash FROM admin_login_codes WHERE user_id = ? AND expires_at > ?
-            ORDER BY created_at DESC LIMIT 2)''', (session['user_id'], session['user_id'], now))
+            ORDER BY created_at DESC, rowid DESC LIMIT 2)''', (session['user_id'], session['user_id'], now))
         await db.execute('INSERT INTO admin_login_codes VALUES (?, ?, ?, ?, ?, ?)', (
             _sha256(code), session['user_id'], session['name'], session['username'], now, now + CODE_TTL_SECONDS))
         await db.commit()
     return f'{code[:4]}-{code[4:]}', CODE_TTL_SECONDS
 
 
-async def consume_login_code(raw_code):
+async def consume_login_code(raw_code: str, ip: str = '', user_agent: str = '') -> dict | None:
     code = normalize_code(raw_code)
     if len(code) != CODE_LENGTH or any(c not in CODE_ALPHABET for c in code):
         return None
     async with connect() as db:
+        # Consumption and session creation must serialize with revocation.
+        # Otherwise a consumed code could create a new session after revoke-all.
+        await db.execute('BEGIN IMMEDIATE')
         rows = await db.execute_fetchall(
             'SELECT user_id, display_name, username, expires_at FROM admin_login_codes WHERE code_hash = ?',
             (_sha256(code),))
         if not rows:
             return None
-        # Single use: only the request whose DELETE actually removed the row
-        # wins, so two parallel requests with the same code cannot both log in.
-        cur = await db.execute('DELETE FROM admin_login_codes WHERE code_hash = ?', (_sha256(code),))
-        await db.commit()
-        if cur.rowcount != 1:
+        await db.execute('DELETE FROM admin_login_codes WHERE code_hash = ?', (_sha256(code),))
+        user_id, name, username, expires = rows[0]
+        if expires <= _now() or user_id not in ADMIN_IDS:
+            await db.commit()
             return None
-    user_id, name, username, expires = rows[0]
-    if expires <= _now() or user_id not in ADMIN_IDS:
-        return None
-    return {'id': user_id, 'name': name, 'username': username}
+        token = await _insert_session(db, user_id, name, username, 'code', ip, user_agent)
+        await db.commit()
+    return {'id': user_id, 'name': name, 'username': username, 'token': token}
 
 
 async def create_login_code_for_cli(user_id):

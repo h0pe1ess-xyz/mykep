@@ -232,9 +232,10 @@ const App = (() => {
 
 if ('serviceWorker' in navigator) {
     let refreshing = false;
-    const hadController = Boolean(navigator.serviceWorker.controller);
+    let hadController = Boolean(navigator.serviceWorker.controller);
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (hadController && !refreshing) { refreshing = true; window.location.reload(); }
+        if (hadController && navigator.serviceWorker.controller && !refreshing) { refreshing = true; window.location.reload(); }
+        hadController = Boolean(navigator.serviceWorker.controller);
     });
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(error => {
