@@ -25,7 +25,7 @@ function initSettings() {
     function refreshSettings() {
         renderSettings();
         recordUsage();
-        document.querySelectorAll('.modal-overlay.active').forEach(modal => modal.classList.remove('active'));
+        document.querySelectorAll('.modal-overlay.active').forEach(modal => Dialogs.close(modal));
         App.reload();
     }
     renderSettings();
@@ -61,7 +61,6 @@ function initSettings() {
     const confirmModalDesc = document.getElementById('confirm-modal-desc');
     const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
     const confirmOkBtn = document.getElementById('confirm-ok-btn');
-    const mainApp = document.getElementById('main-app');
     let pendingCallback = null;
     function closeConfirmModal() {
         Dialogs.close(confirmModal);

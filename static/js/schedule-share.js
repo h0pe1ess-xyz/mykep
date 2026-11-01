@@ -207,7 +207,9 @@ async function createSchedulePNG(data) {
     const now = getKyivNow();
     const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     draw([`Створено ${scheduleExportDateLabel(now)} · ${time}`], fonts.footer, colors.muted, 32, 40);
-    return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('PNG unavailable')), 'image/png'));
+    return new Promise((resolve, reject) => {
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('PNG unavailable')), 'image/png');
+    });
 }
 
 function scheduleShareSnapshot() {

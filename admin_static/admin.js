@@ -8,7 +8,7 @@
     const REFRESH_MS = { overview: 30000, server: 15000, stats: 120000, security: 60000 };
     const TITLES = { overview: 'Огляд', stats: 'Статистика', server: 'Сервер', security: 'Безпека' };
     const RANGE_LABELS = [['1', 'Сьогодні'], ['7', '7 днів'], ['14', '14 днів'], ['30', '30 днів'], ['90', '90 днів'], ['all', 'Весь час']];
-    const state = { config: null, me: null, csrf: null, view: 'overview', range: '14', timer: null, loading: false,
+    const state = { config: null, me: null, csrf: null, view: 'overview', range: '14', timer: null,
         groupQuery: '', groupSort: 'views', groupsExpanded: false, dailyMetric: 'both', codeTimer: null, lastData: {} };
     let loadSequence = 0;
     const $ = id => document.getElementById(id);
@@ -92,17 +92,18 @@
         }
         let response;
         const controller = new AbortController();
-        const timeout = method === 'GET' ? setTimeout(() => controller.abort(), 15000) : null;
+        const timeoutMs = method === 'GET' ? 15000 : 45000;
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        let json = null;
         try {
             response = await fetch('/api/admin' + path, { method, headers, signal: controller.signal, credentials: 'same-origin', cache: 'no-store',
                 redirect: 'error', referrerPolicy: 'no-referrer', ...(method !== 'GET' && body !== undefined ? { body: JSON.stringify(body) } : {}) });
+            json = await response.json();
         } catch {
             if ($('offline-banner')) $('offline-banner').hidden = false;
-            throw new ApiError(0, controller.signal.aborted ? 'Сервер не відповів за 15 секунд. Спробуйте ще раз.' : "Немає з'єднання з сервером.");
+            throw new ApiError(0, controller.signal.aborted ? 'Час очікування вичерпано. Перевірте стан операції перед повторною спробою.' : "Немає з'єднання з сервером.");
         } finally { clearTimeout(timeout); }
         if ($('offline-banner')) $('offline-banner').hidden = true;
-        let json = null;
-        try { json = await response.json(); } catch { /* non-JSON */ }
         if (response.status === 401 && !path.startsWith('/auth') && path !== '/me') {
             showLogin('Сесія завершилась. Увійдіть знову.');
             throw new ApiError(401, 'Потрібен вхід.');
@@ -125,7 +126,8 @@
     function registerSW() {
         if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
         const url = ttPolicy ? ttPolicy.createScriptURL('/admin/sw.js') : '/admin/sw.js';
-        navigator.serviceWorker.register(url, { scope: '/admin/' }).catch(() => {});
+        navigator.serviceWorker.register(url, { scope: '/admin/', updateViaCache: 'none' })
+            .catch(error => console.warn('Admin offline shell unavailable:', error.name));
     }
 
     /* -------------------------------------------------------------- login */
@@ -167,6 +169,13 @@
     function showLogin(message) {
         stopTimer();
         state.me = null; state.csrf = null;
+        clearInterval(state.codeTimer);
+        state.codeTimer = null;
+        document.querySelectorAll('.page').forEach(page => { C.dispose(page); page.replaceChildren(); });
+        state.lastData = {};
+        $('status-pill').hidden = true;
+        $('side-user').replaceChildren();
+        $('updated-at').textContent = '';
         loadSequence++;
         $('boot').hidden = true;
         $('app').hidden = true;
@@ -181,20 +190,10 @@
             $('tg-missing').hidden = true;
         } else {
             tg.hidden = true;
-            $('tg-missing').hidden = !!cfg.dev_login;
+            $('tg-missing').hidden = false;
         }
         if (isIOSStandalone()) { $('ios-hint').hidden = false; $('code-box').open = true; }
-        const devBox = $('dev-box');
-        devBox.hidden = !cfg.dev_login;
-        if (cfg.dev_login) {
-            $('dev-buttons').replaceChildren(...(cfg.dev_admin_ids || []).map(id => h('button', {
-                type: 'button', class: 'btn btn-ghost', text: `Увійти як ${id}`, on: { click: () => devLogin(id) } })));
-        }
         loginError(message);
-    }
-    async function devLogin(id) {
-        try { await api('/auth/dev', { method: 'POST', body: { user_id: id } }); await enterApp(); }
-        catch (e) { loginError(e.message); }
     }
     $('code-form').addEventListener('submit', async ev => {
         ev.preventDefault();
@@ -251,8 +250,13 @@
     }
     async function logout() {
         if (!confirm('Вийти з адмін-панелі на цьому пристрої?')) return;
-        try { await api('/logout', { method: 'POST', body: {} }); } catch { /* ignore */ }
-        showLogin();
+        try {
+            await api('/logout', { method: 'POST', body: {} });
+            showLogin();
+        } catch (error) {
+            if (error.status === 401) showLogin();
+            else toast('Не вдалося завершити сесію. Перевірте з’єднання та повторіть вихід.', 'error');
+        }
     }
 
     /* ------------------------------------------------------------ routing */
@@ -261,6 +265,8 @@
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.me) load(false); });
 
     function setView(view) {
+        clearInterval(state.codeTimer);
+        state.codeTimer = null;
         state.view = view;
         history.replaceState(null, '', '/admin/#/' + view);
         document.querySelectorAll('[data-view]').forEach(b => {
@@ -728,8 +734,6 @@
                     ['Підрахунок підсумків', w.rollup_error || !w.rollup_running ? 'помилка або зупинено' : 'працює', w.rollup_error || !w.rollup_running ? 'warning' : null],
                     ['Останній успішний підрахунок', w.last_rollup_success ? fmtDateTime(w.last_rollup_success) : 'ще не було']
                 ])),
-                card('Telegram-бот', [kv([['Режим', d.bot.mode === 'disabled' ? 'вимкнено' : d.bot.mode], ['Стан', String(d.bot.state)]]),
-                    h('p', { class: 'muted small', text: 'Статистика тепер в адмінці. Бота можна увімкнути назад через BOT_MODE=embedded у .env.' })]),
                 card('Останні помилки 5xx', rq.recent_errors.length ? h('div', { class: 'list' }, rq.recent_errors.slice(0, 12).map(e =>
                     h('div', { class: 'list-row' }, [h('span', { class: 'badge b-critical', text: e.status }), h('span', { text: e.path }), h('span', { class: 'muted small', text: fmtDateTime(e.time) })])))
                     : h('p', { class: 'muted', text: 'Помилок 5xx не зафіксовано' }), { span: 2 })
@@ -771,15 +775,16 @@
         login_bad_signature: ['Невалідний підпис Telegram', 'warning'], login_replay: ['Повторне використання входу', 'critical'],
         login_bad_code: ['Невірний код входу', 'warning'], login_code_created: ['Створено код входу', null],
         refresh_schedule: ['Ручне оновлення розкладу', null], rollback_schedule: ['Відновлення попереднього розкладу', 'warning'], revoke_sessions: ['Завершення сесій', null], export: ['Експорт CSV', null] };
-    const METHODS = { telegram: 'Telegram', code: 'Код', dev: 'Dev (локально)' };
+    const METHODS = { telegram: 'Telegram', code: 'Код' };
     function renderSecurity([sessions, audit, server]) {
+        clearInterval(state.codeTimer);
+        state.codeTimer = null;
         const me = state.me, sec = server.security;
         const codeBox = h('div', { class: 'code-display', hidden: true });
         const codeBtn = h('button', { type: 'button', class: 'btn', text: 'Створити код входу', on: { click: () => createCode(codeBox, codeBtn) } });
         const checks = [
             ['HTTPS', sec.https, 'З’єднання зашифроване', 'Сайт відкрито без HTTPS (нормально лише локально)'],
             ['Secure-cookie', sec.secure_cookie, 'Кука сесії лише через HTTPS', 'ADMIN_COOKIE_SECURE=0: тільки для локального тесту'],
-            ['Dev-вхід вимкнено', !sec.dev_login_enabled, 'Вхід без пароля вимкнено', 'ADMIN_DEV_LOGIN=1: вимкніть на сервері!'],
             ['Telegram Login', sec.telegram_login_configured, 'Токен бота налаштовано', 'Немає TELEGRAM_BOT_TOKEN'],
             ['Адміністратори', true, `${sec.admins} акаунти в жорсткому allowlist`, '']
         ];

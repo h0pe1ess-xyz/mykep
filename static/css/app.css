@@ -758,8 +758,8 @@ html[data-swipe="native"] .views-track {
     scrollbar-width: none;
 }
 html[data-swipe="native"] .views-track::-webkit-scrollbar { display: none; }
-html[data-swipe="native"][data-native-flow="original"] .views-track { scroll-snap-type: x mandatory; }
-html[data-swipe="native"][data-native-flow="original"] .view { scroll-snap-align: start; scroll-snap-stop: always; }
+html[data-swipe="native"] .views-track { scroll-snap-type: x mandatory; }
+html[data-swipe="native"] .view { scroll-snap-align: start; scroll-snap-stop: always; }
 html[data-swipe="native"] .day-picker { overscroll-behavior-x: contain; }
 /* Create the iOS touch scroller only when its tab is interactive. Keeping an
    inert overflow scroller alive can leave native hit-testing stale on reveal.
@@ -771,8 +771,6 @@ html[data-swipe="native"] .view .bells-panel { overscroll-behavior-x: auto; }
 html[data-swipe="native"] .view input,
 html[data-swipe="native"] .view textarea,
 html[data-swipe="native"] .view select { touch-action: pan-y; }
-html[data-swipe="pointer"] .view > .app-header,
-html[data-swipe="pointer"] .view > main { touch-action: pan-y; }
 html[data-swipe-blur="off"] .view .lesson-card,
 html[data-swipe-blur="off"] .view .lesson-card-detailed,
 html[data-swipe-blur="off"] .view .settings-card,
@@ -805,7 +803,6 @@ html[data-swipe-blur="off"] .view .credits-block {
 .swipe-version-form [role="status"]:empty { display: none; }
 .swipe-edge-guard { position: fixed; top: 0; bottom: 0; width: 20px; z-index: 900; touch-action: pan-y; }
 .swipe-edge-left { left: 0; }
-.swipe-edge-right { right: 0; }
 
 /* Date labels keep the existing decorative day picker. */
 .day-date { display: block; font-size: 11px; white-space: nowrap; margin-top: 4px; color: #e4d9d1; }

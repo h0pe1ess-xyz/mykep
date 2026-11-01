@@ -14,7 +14,7 @@ def generate(check: bool = False) -> None:
         raise ValueError('Invalid VERSION')
     calendar = json.loads((ROOT / 'static/data/calendar.json').read_text(encoding='utf-8'))
     generated = {'static/js/calendar-config.js': 'window.MYKEP_CALENDAR_CONFIG = ' + json.dumps(calendar, ensure_ascii=False, sort_keys=True) + ';\n'}
-    for name in ('static/index.html', 'static/about.html', 'static/js/teacher-hints.js', 'static/js/boot.js', 'admin_static/sw.js'):
+    for name in ('static/index.html', 'static/about.html', 'static/js/teacher-hints.js', 'static/js/boot.js', 'admin_static/sw.js', 'admin_static/index.html'):
         path = ROOT / name
         text = path.read_text(encoding='utf-8')
         text = re.sub(r'\?v=[\w.-]+', '?v=' + version, text)
