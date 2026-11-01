@@ -8,6 +8,7 @@ let scheduleShareSignature = '';
 let scheduleSharePreparing = false;
 let scheduleShareInFlight = false;
 let scheduleShareStatusTimer = null;
+let scheduleShareLogoPromise = null;
 
 function scheduleExportDateLabel(date) {
     return `${date.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })} ${date.getFullYear()}`;
@@ -20,6 +21,24 @@ function scheduleExportDayLabel(day, week, now = getKyivNow()) {
     const date = new Date(now);
     date.setDate(date.getDate() - ((date.getDay() + 6) % 7) + ((names.indexOf(day) + 6) % 7));
     return `${name} · ${scheduleExportDateLabel(date)}`;
+}
+
+function loadScheduleShareLogo() {
+    if (scheduleShareLogoPromise) return scheduleShareLogoPromise;
+    scheduleShareLogoPromise = new Promise((resolve, reject) => {
+        const logo = new Image();
+        const timeout = setTimeout(() => { logo.src = ''; finish(new Error('Logo loading timed out')); }, 8000);
+        function finish(error) {
+            clearTimeout(timeout);
+            logo.onload = logo.onerror = null;
+            if (error) { scheduleShareLogoPromise = null; reject(error); }
+            else resolve(logo);
+        }
+        logo.onload = () => finish();
+        logo.onerror = () => finish(new Error('Logo unavailable'));
+        logo.src = '/icons/icon-192.png';
+    });
+    return scheduleShareLogoPromise;
 }
 
 function updateScheduleShareButton() {
@@ -52,6 +71,7 @@ function setScheduleShareData(lessons, day) {
 
 async function createSchedulePNG(data) {
     if (!Array.isArray(data.lessons) || data.lessons.length > 32) throw new Error('Schedule too large');
+    const logo = await loadScheduleShareLogo();
     const canvas = document.createElement('canvas');
     canvas.width = 900;
     const ctx = canvas.getContext('2d');
@@ -86,14 +106,16 @@ async function createSchedulePNG(data) {
         if (line) result.push(line.trimEnd());
         return result;
     }
-    const group = lines(data.group, `500 30px ${family}`, 790);
+    const group = lines(data.group, `500 30px ${family}`, 668);
     const label = lines(scheduleExportDayLabel(data.day, data.week, data.date), `500 30px ${family}`, 790);
     const cards = data.lessons.map(lesson => {
         const heading = lines(`${lesson.lesson}-${getLessonSuffix(lesson.lesson)} пара   ${lesson.time || 'Час не вказано'}`, fonts.small, 520);
         const subject = lines(lesson.subject || 'Заняття', fonts.title, 520);
         const teacher = lines(teacherDisplayName(String(lesson.teacher || '')), fonts.small, 482);
-        const roomFont = /[а-яіїєґa-z]/i.test(lesson.room || '') ? `500 26px ${family}` : `600 40px ${family}`;
-        const roomLineHeight = /[а-яіїєґa-z]/i.test(lesson.room || '') ? 34 : 48;
+        ctx.font = `600 48px ${family}`;
+        const compactRoom = ctx.measureText(lesson.room || 'Не вказано').width > 166;
+        const roomFont = compactRoom ? `500 32px ${family}` : `600 48px ${family}`;
+        const roomLineHeight = compactRoom ? 42 : 58;
         const room = lines(lesson.room || 'Не вказано', roomFont, 166);
         const leftHeight = heading.length * 36 + 20 + subject.length * 46 + 32 + teacher.length * 34;
         return { heading, subject, teacher, room, roomFont, roomLineHeight, height: Math.max(leftHeight, 42 + room.length * roomLineHeight) + 72 };
@@ -101,7 +123,7 @@ async function createSchedulePNG(data) {
     const notice = lines(data.notice || '', fonts.footer, 790);
     const headerHeight = 200 + group.length * 40 + label.length * 40;
     const height = headerHeight + (cards.length ? cards.reduce((sum, card) => sum + card.height + 24, 0) : 130)
-        + notice.length * 32 + 160;
+        + notice.length * 32 + 184;
     if (height > 16000) throw new Error('Image too large');
     canvas.height = height;
     ctx.fillStyle = colors.background;
@@ -126,8 +148,19 @@ async function createSchedulePNG(data) {
         ctx.lineWidth = 2;
         ctx.stroke();
     }
-    draw(['MyKep'], `500 52px ${family}`, colors.text, 48, 44, 64);
-    let y = draw(group, `500 30px ${family}`, colors.muted, 48, 124, 40);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(72, 44);
+    ctx.arcTo(160, 44, 160, 156, 24);
+    ctx.arcTo(160, 156, 48, 156, 24);
+    ctx.arcTo(48, 156, 48, 44, 24);
+    ctx.arcTo(48, 44, 160, 44, 24);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(logo, 48, 44, 112, 112);
+    ctx.restore();
+    draw(['MyKep'], `700 72px ${family}`, colors.accent, 184, 40, 84);
+    let y = draw(group, `500 30px ${family}`, colors.muted, 184, 128, 40);
     y = draw(label, `500 30px ${family}`, colors.text, 48, y + 28, 40) + 48;
     for (const card of cards) {
         const top = y;
@@ -174,10 +207,10 @@ async function createSchedulePNG(data) {
     y = draw(notice, fonts.footer, colors.muted, 48, y, 32) + 20;
     rule(48, y, 852, y);
     y += 26;
-    draw(['mykep.pp.ua'], `500 30px ${family}`, colors.accent, 48, y, 40);
+    draw(['mykep.pp.ua'], `600 46px ${family}`, colors.accent, 48, y, 56);
     const now = getKyivNow();
     const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    draw([`Створено ${scheduleExportDateLabel(now)} · ${time}`], `400 22px ${family}`, colors.muted, 48, y + 48, 30);
+    draw([`Створено ${scheduleExportDateLabel(now)} · ${time}`], `400 22px ${family}`, colors.muted, 48, y + 64, 30);
     return new Promise((resolve, reject) => {
         canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('PNG unavailable')), 'image/png');
     });
