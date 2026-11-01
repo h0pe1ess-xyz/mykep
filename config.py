@@ -13,9 +13,6 @@ REFRESH_SECONDS = max(60, int(os.getenv('SCHEDULE_REFRESH_SECONDS', '1800')))
 RETRY_SECONDS = max(5, int(os.getenv('SCHEDULE_RETRY_SECONDS', '30')))
 APP_VERSION = (BASE_DIR / 'VERSION').read_text(encoding='utf-8').strip()
 
-# The statistics bot is superseded by the web admin panel. It stays in the
-# repository and can be re-enabled with BOT_MODE=embedded or external.
-BOT_MODE = os.getenv('BOT_MODE', 'disabled').strip().lower()
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
 
 
@@ -36,17 +33,13 @@ HARD_ADMIN_IDS = frozenset({1125085502, 1320649428})
 def _admin_ids():
     raw = os.getenv('ADMIN_TELEGRAM_IDS') or os.getenv('TELEGRAM_ADMIN_IDS') or ''
     ids = {int(v) for v in (x.strip() for x in raw.split(',')) if v.isdigit()}
-    return frozenset(ids & HARD_ADMIN_IDS) if ids else HARD_ADMIN_IDS
+    return frozenset(ids & HARD_ADMIN_IDS) if raw.strip() else HARD_ADMIN_IDS
 
 
 ADMIN_IDS = _admin_ids()
 # Secure cookies are mandatory in production (HTTPS). Only set
 # ADMIN_COOKIE_SECURE=0 for local http://localhost testing.
 ADMIN_COOKIE_SECURE = os.getenv('ADMIN_COOKIE_SECURE', '1').strip() != '0'
-# Local-only passwordless login for testing without Telegram. Works only when
-# the request comes from 127.0.0.1/::1 directly (no proxy) to localhost.
-# It is additionally refused while Secure cookies are on (i.e. production).
-ADMIN_DEV_LOGIN = os.getenv('ADMIN_DEV_LOGIN', '0').strip() == '1' and not ADMIN_COOKIE_SECURE
 ADMIN_SESSION_HOURS = _int_env('ADMIN_SESSION_HOURS', 168, 1, 720)     # absolute lifetime
 ADMIN_IDLE_HOURS = _int_env('ADMIN_IDLE_HOURS', 72, 1, 720)            # inactivity timeout
 # Optional, e.g. https://mykep.pp.ua. When set, only this Origin is accepted

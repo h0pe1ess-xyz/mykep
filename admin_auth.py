@@ -17,7 +17,7 @@ import re
 import secrets
 import time
 from collections import OrderedDict, deque
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from config import (ADMIN_COOKIE_SECURE, ADMIN_IDLE_HOURS, ADMIN_IDS,
                     ADMIN_SESSION_HOURS, KYIV, TELEGRAM_BOT_TOKEN)
@@ -29,7 +29,7 @@ COOKIE_NAME = '__Host-mykep_admin' if ADMIN_COOKIE_SECURE else 'mykep_admin_dev'
 AUTH_MAX_AGE_SECONDS = 300
 CODE_TTL_SECONDS = 180
 CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'  # no 0/O/1/I/L
-CODE_LENGTH = 8                                     # 31^8 ≈ 8.5e11 combinations
+CODE_LENGTH = 8
 MAX_SESSIONS_PER_USER = 10
 _TG_FIELD = re.compile(r'^[a-z_]{1,32}$')
 
@@ -70,10 +70,14 @@ class RateLimiter:
         now = time.monotonic()
         q = self._prune(key, now)
         if q is None:
+            if len(self.hits) >= self.max_keys:
+                expired = [k for k, hits in self.hits.items() if hits[-1] <= now - self.window]
+                for expired_key in expired:
+                    del self.hits[expired_key]
+                if len(self.hits) >= self.max_keys:
+                    return False
             q = deque()
             self.hits[key] = q
-            while len(self.hits) > self.max_keys:
-                self.hits.popitem(last=False)
         self.hits.move_to_end(key)
         if len(q) >= self.limit:
             return False
@@ -83,10 +87,11 @@ class RateLimiter:
     def retry_after(self, key):
         q = self.hits.get(key)
         if not q:
-            return 0
+            return int(self.window)
         return max(1, int(self.window - (time.monotonic() - q[0])) + 1)
 
 
+login_global_limiter = RateLimiter(120, 600)
 login_ip_limiter = RateLimiter(10, 600)          # Telegram login attempts per IP
 code_ip_limiter = RateLimiter(5, 600)            # login-code guesses per IP
 code_global_limiter = RateLimiter(40, 600)       # all login-code guesses (anti-botnet)
@@ -216,7 +221,7 @@ async def get_session(token):
         if not rows:
             return None
         sid, user_id, name, username, csrf, method, created, last_seen, expires = rows[0]
-        if expires < now or last_seen < now - ADMIN_IDLE_HOURS * 3600 or user_id not in ADMIN_IDS:
+        if expires <= now or last_seen <= now - ADMIN_IDLE_HOURS * 3600 or user_id not in ADMIN_IDS:
             await db.execute('DELETE FROM admin_sessions WHERE token_hash = ?', (token_hash,))
             await db.commit()
             return None
@@ -272,6 +277,8 @@ def normalize_code(value):
 
 
 async def create_login_code(session):
+    if session['user_id'] not in ADMIN_IDS:
+        raise PermissionError('not an admin')
     code = ''.join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
     now = _now()
     async with connect() as db:
@@ -302,7 +309,7 @@ async def consume_login_code(raw_code):
         if cur.rowcount != 1:
             return None
     user_id, name, username, expires = rows[0]
-    if expires < _now() or user_id not in ADMIN_IDS:
+    if expires <= _now() or user_id not in ADMIN_IDS:
         return None
     return {'id': user_id, 'name': name, 'username': username}
 

@@ -2,7 +2,7 @@
 of the admin panel. It never touches the real schedule.db.
 
     python scripts/seed_demo_analytics.py demo.db --days 21 --users 350
-    MYKEP_DB_PATH=demo.db ADMIN_DEV_LOGIN=1 ADMIN_COOKIE_SECURE=0 python main.py
+    MYKEP_DB_PATH=demo.db python main.py
 """
 import argparse
 import random
@@ -35,8 +35,11 @@ def main():
     ap.add_argument('--seed', type=int, default=7)
     args = ap.parse_args()
     target = Path(args.path).resolve()
-    if target.name == 'schedule.db':
-        sys.exit('Refusing to write into schedule.db - use a separate demo file, e.g. demo.db')
+    if target.exists() or target.name == 'schedule.db':
+        sys.exit('Use a new demo database path; existing files are never modified')
+    if not 1 <= args.days <= 366 or not 1 <= args.users <= 5000:
+        ap.error('Use 1..366 days and 1..5000 users')
+    target.touch(exist_ok=False)
     rnd = random.Random(args.seed)
     kyiv = ZoneInfo('Europe/Kyiv')
     now = datetime.now(kyiv).replace(tzinfo=None)

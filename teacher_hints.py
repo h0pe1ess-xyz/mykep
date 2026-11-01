@@ -6,6 +6,7 @@ import time
 
 from config import BASE_DIR
 from database import connect
+from upstream import fetch_college
 
 URL = 'https://kep.nung.edu.ua/api/exam-hints'
 logger = logging.getLogger(__name__)
@@ -25,13 +26,7 @@ def validate_teachers(payload):
 
 
 def fetch_teachers_sync():
-    import cloudscraper
-    with cloudscraper.create_scraper() as client:
-        response = client.get(URL, timeout=(5, 15))
-        response.raise_for_status()
-        if len(response.content) > 2_000_000:
-            raise ValueError('Teacher response too large')
-        return validate_teachers(response.json())
+    return validate_teachers(json.loads(fetch_college(URL, 2_000_000)))
 
 
 class TeacherHintsService:

@@ -15,18 +15,12 @@ import admin_auth as auth
 import admin_stats
 import analytics
 import server_metrics
-from config import (ADMIN_COOKIE_SECURE, ADMIN_DEV_LOGIN, ADMIN_IDS, ADMIN_PUBLIC_ORIGIN,
-                    ADMIN_SESSION_HOURS, APP_VERSION, BOT_MODE, TELEGRAM_BOT_TOKEN)
+from config import (ADMIN_COOKIE_SECURE, ADMIN_IDS, ADMIN_PUBLIC_ORIGIN,
+                    ADMIN_SESSION_HOURS, APP_VERSION, TELEGRAM_BOT_TOKEN)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix='/api/admin', include_in_schema=False)
 MAX_BODY = 4096
-_schedule = None   # injected by main.py
-
-
-def bind(schedule_service):
-    global _schedule
-    _schedule = schedule_service
 
 
 class AdminError(Exception):
@@ -53,12 +47,13 @@ def _origin_allowed(request: Request, origin: str):
     except ValueError:
         return False
     host = request.headers.get('host', '').lower()
-    if not host or parts.netloc.lower() != host or parts.path not in ('', '/'):
+    if (not host or parts.netloc.lower() != host or parts.path or parts.query or parts.fragment
+            or parts.username or parts.password):
         return False
     if parts.scheme == 'https':
         return True
     # Plain http is accepted only for local development.
-    return parts.scheme == 'http' and ((parts.hostname or '') in ('localhost', '127.0.0.1') or not ADMIN_COOKIE_SECURE)
+    return parts.scheme == 'http' and not ADMIN_COOKIE_SECURE and (parts.hostname or '') in ('localhost', '127.0.0.1')
 
 
 def _check_same_origin(request: Request, require=True):
@@ -104,7 +99,7 @@ async def require_session(request: Request, mutating=False):
         raise AdminError(429, 'Забагато запитів.', {'Retry-After': str(auth.api_session_limiter.retry_after(session['sid']))})
     if mutating:
         token = request.headers.get('x-csrf-token', '')
-        if not token or not hmac.compare_digest(token, session['csrf']):
+        if not token or not hmac.compare_digest(token.encode('utf-8'), session['csrf'].encode('utf-8')):
             raise AdminError(403, 'Недійсний CSRF-токен. Оновіть сторінку.')
     return session
 
@@ -127,17 +122,10 @@ async def _login_response(request, user, method):
     return response
 
 
-def _is_direct_localhost(request: Request):
-    host = (urlsplit('//' + request.headers.get('host', '')).hostname or '').lower()
-    return (client_ip(request) in ('127.0.0.1', '::1') and host in ('localhost', '127.0.0.1')
-            and not request.headers.get('x-forwarded-for') and not request.headers.get('x-real-ip'))
-
 @router.get('/config')
 async def admin_config(request: Request):
     return {'status': 'success', 'data': {
         'bot_id': auth.bot_id(), 'telegram_login': bool(TELEGRAM_BOT_TOKEN and auth.bot_id()),
-        'dev_login': ADMIN_DEV_LOGIN and _is_direct_localhost(request),
-        'dev_admin_ids': sorted(ADMIN_IDS) if ADMIN_DEV_LOGIN and _is_direct_localhost(request) else [],
         'version': APP_VERSION}}
 
 
@@ -145,7 +133,7 @@ async def admin_config(request: Request):
 async def auth_telegram(request: Request):
     ip = client_ip(request)
     _check_same_origin(request)
-    if not auth.login_ip_limiter.check(ip):
+    if not auth.login_global_limiter.check('global') or not auth.login_ip_limiter.check(ip):
         raise AdminError(429, 'Забагато спроб входу. Зачекайте кілька хвилин.',
                          {'Retry-After': str(auth.login_ip_limiter.retry_after(ip))})
     data = await _json_body(request)
@@ -177,22 +165,6 @@ async def auth_code(request: Request):
     return await _login_response(request, user, 'code')
 
 
-@router.post('/auth/dev')
-async def auth_dev(request: Request):
-    if not ADMIN_DEV_LOGIN or not _is_direct_localhost(request):
-        raise AdminError(404, 'Not found')
-    _check_same_origin(request)
-    data = await _json_body(request)
-    try:
-        user_id = int(data.get('user_id'))
-    except (TypeError, ValueError):
-        raise AdminError(400, 'Некоректний ID.')
-    if user_id not in ADMIN_IDS:
-        raise AdminError(403, 'Не адмін.')
-    logger.warning('DEV LOGIN used for %s (local only)', user_id)
-    return await _login_response(request, {'id': user_id, 'name': f'Dev {user_id}', 'username': ''}, 'dev')
-
-
 @router.post('/logout')
 async def logout(request: Request):
     session = await require_session(request, mutating=True)
@@ -214,7 +186,7 @@ async def me(request: Request):
 @router.get('/overview')
 async def overview(request: Request):
     await require_session(request)
-    return {'status': 'success', 'data': {**await admin_stats.overview(), 'health': _health_summary()}}
+    return {'status': 'success', 'data': {**await admin_stats.overview(), 'health': _health_summary(request.app.state.schedule)}}
 
 
 @router.get('/stats')
@@ -223,18 +195,8 @@ async def stats(request: Request, range_key: str = Query('30', alias='range', ma
     return {'status': 'success', 'data': await admin_stats.stats(range_key if range_key in admin_stats.RANGES else '30')}
 
 
-def _bot_state():
-    if BOT_MODE != 'embedded':
-        return BOT_MODE
-    try:
-        import bot
-        return bot.BOT_STATE
-    except Exception:
-        return 'unknown'
-
-
-def _health_summary():
-    sched = _schedule.diagnostics() if _schedule else {'ready': False}
+def _health_summary(schedule=None):
+    sched = schedule.diagnostics() if schedule else {'ready': False}
     writer = analytics.writer_status()
     system = server_metrics.system_info()
     requests = server_metrics.request_summary(15)
@@ -283,15 +245,15 @@ def _health_summary():
 @router.get('/server')
 async def server(request: Request):
     await require_session(request)
+    schedule = request.app.state.schedule
     return {'status': 'success', 'data': {
-        'health': _health_summary(),
+        'health': _health_summary(request.app.state.schedule),
         'system': server_metrics.system_info(),
         'requests': server_metrics.request_summary(60),
-        'schedule': _schedule.diagnostics() if _schedule else None,
+        'schedule': schedule.diagnostics() if schedule else None,
         'analytics_writer': analytics.writer_status(),
         'analytics_storage': await analytics.storage_status(),
-        'bot': {'mode': BOT_MODE, 'state': _bot_state()},
-        'security': {'secure_cookie': ADMIN_COOKIE_SECURE, 'dev_login_enabled': ADMIN_DEV_LOGIN,
+        'security': {'secure_cookie': ADMIN_COOKIE_SECURE,
                      'telegram_login_configured': bool(TELEGRAM_BOT_TOKEN), 'admins': len(ADMIN_IDS),
                      'https': request.url.scheme == 'https'},
     }}
@@ -302,14 +264,15 @@ async def refresh_schedule(request: Request):
     s = await require_session(request, mutating=True)
     if not auth.action_limiter.check(s['sid']):
         raise AdminError(429, 'Зачекайте хвилину.')
-    diag = _schedule.diagnostics()
+    schedule = request.app.state.schedule
+    diag = schedule.diagnostics()
     if diag['retry_blocked_for']:
         return {'status': 'success', 'data': {'refreshed': False,
                 'message': f"Оновлення щойно запускалось, спробуйте через {diag['retry_blocked_for']} с."}}
-    ok = await _schedule.refresh()
+    ok = await schedule.refresh()
     await auth.audit('refresh_schedule', s['user_id'], client_ip(request), 'ok' if ok else 'failed')
     return {'status': 'success', 'data': {'refreshed': ok, 'message': 'Розклад оновлено.' if ok else
-            'Не вдалося оновити. Працює останній збережений розклад.', 'schedule': _schedule.diagnostics()}}
+            'Не вдалося оновити. Працює останній збережений розклад.', 'schedule': request.app.state.schedule.diagnostics()}}
 
 
 @router.post('/actions/rollback-schedule')
@@ -318,11 +281,11 @@ async def rollback_schedule(request: Request) -> dict:
     if not auth.action_limiter.check(session['sid']):
         raise AdminError(429, 'Зачекайте хвилину.')
     try:
-        await _schedule.rollback()
+        await request.app.state.schedule.rollback()
     except ValueError:
         raise AdminError(409, 'Немає іншого перевіреного знімка для відновлення.')
     await auth.audit('rollback_schedule', session['user_id'], client_ip(request))
-    return {'status': 'success', 'data': {'message': 'Попередній розклад відновлено.', 'schedule': _schedule.diagnostics()}}
+    return {'status': 'success', 'data': {'message': 'Попередній розклад відновлено.', 'schedule': request.app.state.schedule.diagnostics()}}
 
 
 @router.get('/sessions')
