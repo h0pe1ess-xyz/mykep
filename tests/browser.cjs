@@ -122,6 +122,7 @@ async function run() {
                     Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>true});
                     Object.defineProperty(navigator,'share',{configurable:true,value:async options=>{const f=options.files?.[0];window.testShares.push({keys:Object.keys(options),type:f?.type,size:f?.size,active:navigator.userActivation.isActive});}});
                 });
+                const shareReceipt=page.waitForResponse(response=>response.url().endsWith('/api/activity')&&response.request().postDataJSON()?.event==='share_photo');
                 await page.click('#schedule-share');
                 await page.waitForFunction(()=>window.testShares.length===1 || (scheduleExportFile && !scheduleShareInFlight)).catch(async error=>{
                     const state=await page.evaluate(()=>({status:document.getElementById('schedule-share-status').textContent,preparing:scheduleSharePreparing,inFlight:scheduleShareInFlight,tab:Tabs.current})).catch(()=>null);
@@ -129,8 +130,16 @@ async function run() {
                 });
                 if(!await page.evaluate(()=>window.testShares.length)) await page.click('#schedule-share');
                 await page.waitForFunction(()=>window.testShares.length===1);
+                await page.waitForFunction(()=>!scheduleShareInFlight);
+                assert.equal((await shareReceipt).status(),204);
+                const receipts=server.events.filter(event=>event==='share_photo').length;
+                assert.equal(receipts,engine==='chromium'?1:2);
                 const share=await page.evaluate(()=>testShares[0]);
                 assert.deepEqual(share.keys,['files']);assert.equal(share.type,'image/png');assert.ok(share.size>1000);
+                await page.evaluate(()=>Object.defineProperty(navigator,'share',{configurable:true,value:async()=>{throw new DOMException('Cancelled','AbortError');}}));
+                await page.click('#schedule-share');
+                await page.waitForFunction(()=>!scheduleShareInFlight);
+                assert.equal(server.events.filter(event=>event==='share_photo').length,receipts,'cancelled sharing must not count');
                 await page.screenshot({path:`.mykep-local/screens/${engine}-schedule.png`});
                 // Group modal: focus, background inertness, keyboard height and scroll.
                 await page.evaluate(()=>Tabs.show('settings'));

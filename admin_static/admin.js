@@ -523,6 +523,7 @@
                 kpi('Унікальних користувачів', fmt(t.users), { hint: `сер. DAU: ${fmt(t.avg_dau)}` }),
                 kpi('Нових користувачів', fmt(t.new_users), { hint: 'вперше за весь час' }),
                 kpi('Переглядів на людину', fmt(t.views_per_user), { hint: `сер. активних днів: ${fmt(r.avg_active_days)}` }),
+                d.sharing && kpi('Поширення фото', fmt(d.sharing.photos), { hint: `${fmt(d.sharing.users)} браузерів · після підтвердження меню поширення` }),
                 kpi('Пікова година', peakHourText, { hint: `пік 15 хв: ${p.quarter || '-'}` }),
                 kpi('Найактивніший день', p.weekday || '-', { hint: p.best_day ? `рекорд: ${fmt(p.best_day.views)} (${fmtDate(p.best_day.date)})` : '' }),
                 kpi('Повертаються', pct(r.returning_pct), { hint: 'заходили ≥ 2 днів' }),

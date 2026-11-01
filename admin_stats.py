@@ -283,7 +283,10 @@ async def _stats(range_key):
     retention = _retention(active, start, today)
     views_per_user = round(total_views / total_users, 1) if total_users else 0
 
+    shares = (await _rows("""SELECT COUNT(*), COUNT(DISTINCT NULLIF(uid,'')) FROM analytics
+        WHERE event_kind = 'share_photo' AND timestamp >= ? AND timestamp < ?""", (s0, s1)))[0]
     return {
+        'sharing': {'photos': shares[0], 'users': shares[1]},
         'semantics': 'До оновлення: успішні запити API (legacy_request). Нові view/interaction: відкриття та дії користувача. refresh: технічні перевірки, виключені з переглядів.',
         'range': range_key, 'start': s0, 'end': today.isoformat(), 'days': ndays,
         'usage': await usage_stats(s0, s1),

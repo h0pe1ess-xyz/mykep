@@ -63,7 +63,7 @@ window.mykepViewportReport = function() {
         const box = node.getBoundingClientRect();
         return {top:box.top,bottom:box.bottom};
     });
-    return { version: '2.10.2', mode: getMyKepDisplayMode(),
+    return { version: '2.10.3', mode: getMyKepDisplayMode(),
         iosFixActive: document.documentElement.classList.contains('ios-standalone'),
         screen: {width:window.screen.width,height:window.screen.height,
             availableHeight:window.screen.availHeight,pixelRatio:window.devicePixelRatio,

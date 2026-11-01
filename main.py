@@ -204,7 +204,7 @@ class ActivityEvent(BaseModel):
     uid: str = Field(min_length=8, max_length=128, pattern=r'^[A-Za-z0-9_-]+$')
     group: str = Field(min_length=2, max_length=64)
     mode: Literal['standalone', 'browser']
-    event: Literal['view', 'interaction']
+    event: Literal['view', 'interaction', 'share_photo']
 
 
 @app.post('/api/activity', status_code=204)

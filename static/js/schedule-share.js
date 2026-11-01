@@ -244,6 +244,7 @@ function initScheduleSharing() {
         // Day/data changes only invalidate the file. Rendering starts at the tap.
         refreshScheduleShareFile();
         const token = scheduleExportToken;
+        const sharedGroup = scheduleShareData.group;
         scheduleShareInFlight = true;
         updateScheduleShareButton();
         showScheduleShareStatus();
@@ -283,6 +284,7 @@ function initScheduleSharing() {
             }
             showScheduleShareStatus();
             await navigator.share({ files: [scheduleExportFile] });
+            recordScheduleAction('share_photo', sharedGroup);
         } catch (error) {
             if (token === scheduleExportToken && error.name !== 'AbortError') {
                 showScheduleShareStatus(generated && error.name === 'NotAllowedError' ?

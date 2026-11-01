@@ -5,6 +5,7 @@ import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
+from types import SimpleNamespace
 
 import httpx
 import analytics
@@ -79,6 +80,25 @@ class UsageTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(analytics,'record_usage',return_value=False):
             self.assertEqual((await self.client.post('/api/usage',json={**self.payload,'page':'bells'})).status_code,503)
         self.assertEqual((await self.client.post('/api/usage',json={**self.payload,'page':'bells'})).status_code,204)
+
+    async def test_photo_shares_are_deduplicated_and_not_schedule_views(self):
+        payload = {'uid': 'synthetic-share-user', 'group': 'ПІ-24-02',
+                   'mode': 'browser', 'event': 'share_photo'}
+        with patch.object(main, 'schedule', SimpleNamespace(groups=['ПІ-24-02'])), \
+             patch.object(main, 'activity_limits', ActivityLimits()):
+            for _ in range(2):
+                self.assertEqual((await self.client.post('/api/activity', json=payload)).status_code, 204)
+            other = {**payload, 'uid': 'another-share-user'}
+            self.assertEqual((await self.client.post('/api/activity', json=other)).status_code, 204)
+            self.assertEqual((await self.client.post('/api/activity', json={**payload, 'event': 'invented'})).status_code, 422)
+            self.assertEqual((await self.client.post('/api/activity', json=payload,
+                headers={'Origin': 'https://other.test'})).status_code, 403)
+        await analytics._queue.join()
+        stats = await admin_stats._stats('1')
+        self.assertEqual(stats['sharing'], {'photos': 2, 'users': 2})
+        self.assertEqual(stats['totals']['views'], 0)
+        row = (await analytics._rows("SELECT group_name FROM analytics WHERE event_kind='share_photo'"))[0]
+        self.assertEqual(row[0], payload['group'])
 
     async def test_batching_volume(self):
         started=time.perf_counter()

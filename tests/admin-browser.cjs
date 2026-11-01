@@ -45,6 +45,7 @@ async function run() {
                     await page.locator(`[data-view="${view}"]:visible`).click();
                     await page.locator(`#page-${view}[aria-busy="true"]`).waitFor({state:'detached'});
                     assert.ok(await page.locator(`#page-${view}`).textContent());
+                    if (view==='stats') await page.getByText('Поширення фото',{exact:true}).waitFor();
                 }
                 await page.setViewportSize({width:1440,height:900});
                 await page.screenshot({path:`.mykep-local/screens/${engine}-admin-desktop.png`,fullPage:true});
