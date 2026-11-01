@@ -2,7 +2,7 @@
 const {execFileSync,spawnSync}=require('node:child_process');
 
 const files=execFileSync('git',['ls-files','-z'],{encoding:'utf8'}).split('\0').filter(Boolean);
-const localOnly=files.filter(file=>/^(?:docs|tests)(?:\/|$)|^admin\.md$/i.test(file));
+const localOnly=files.filter(file=>/^(?:docs)(?:\/|$)|^admin\.md$/i.test(file));
 if(localOnly.length) {
     console.error('Local-only files must not be tracked:\n'+localOnly.join('\n'));
     process.exit(1);
@@ -14,5 +14,5 @@ for(const file of scripts) {
     if(result.error) console.error(result.error.message);
     if(result.status!==0) failed=true;
 }
-if(!failed) console.log(`${scripts.length} JavaScript files checked; local-only paths are not tracked`);
+if(!failed) console.log(`${scripts.length} JavaScript files checked; local-only documentation is not tracked`);
 process.exitCode=failed?1:0;
