@@ -50,3 +50,10 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:browser
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: failure()
+        with:
+          name: browser-failure-screens
+          path: .mykep-local/screens/
+          include-hidden-files: true
+          retention-days: 7

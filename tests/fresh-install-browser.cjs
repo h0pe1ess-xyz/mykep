@@ -47,7 +47,8 @@ async function run(){
                     // Native WebKit controls can exceed the CSS minimum height.
                     assert.ok(label.height>=44);
                     assert.equal(label.font,platform==='iPhone'?16:14);
-                    assert.ok(label.text+24<=label.room,'week label must leave room for the native arrow');
+                    if (label.text+24>label.room) await page.screenshot({path:`.mykep-local/screens/week-overflow-${engine}-${platform}-${width}.png`});
+                    assert.ok(label.text+24<=label.room,'week label must leave room for the native arrow: '+JSON.stringify({engine,platform,viewport:width,...label}));
                 }
                 await page.setViewportSize({width:320,height:568});
                 await page.screenshot({path:`.mykep-local/screens/fresh-${engine}-${platform}.png`});
