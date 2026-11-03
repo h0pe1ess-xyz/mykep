@@ -1,6 +1,7 @@
 """Aggregated statistics for the admin panel, computed from the existing
 `analytics` table (history is preserved, nothing is deleted or rewritten).
 Only aggregates leave this module: raw UIDs and User-Agents are never returned."""
+import asyncio
 import re
 import time
 from collections import Counter, defaultdict
@@ -14,6 +15,7 @@ from schedule_service import build_bell_times, CALENDAR_CONFIG
 RANGES = {'1': 1, '7': 7, '14': 14, '30': 30, '90': 90, 'all': None}
 WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
 _cache = {}
+_cache_lock = asyncio.Lock()
 CACHE_SECONDS = 20
 
 PLATFORM_SQL = """CASE
@@ -57,14 +59,15 @@ def _today():
 
 
 async def _cached(key, producer):
-    hit = _cache.get(key)
-    if hit and time.monotonic() - hit[0] < CACHE_SECONDS:
-        return hit[1]
-    value = await producer()
-    if len(_cache) > 64:
-        _cache.clear()
-    _cache[key] = (time.monotonic(), value)
-    return value
+    async with _cache_lock:
+        hit = _cache.get(key)
+        if hit and time.monotonic() - hit[0] < CACHE_SECONDS:
+            return hit[1]
+        value = await producer()
+        if len(_cache) > 64:
+            _cache.clear()
+        _cache[key] = (time.monotonic(), value)
+        return value
 
 
 def _days(start, end):
@@ -280,7 +283,10 @@ async def _stats(range_key):
     retention = _retention(active, start, today)
     views_per_user = round(total_views / total_users, 1) if total_users else 0
 
+    shares = (await _rows("""SELECT COUNT(*), COUNT(DISTINCT NULLIF(uid,'')) FROM analytics
+        WHERE event_kind = 'share_photo' AND timestamp >= ? AND timestamp < ?""", (s0, s1)))[0]
     return {
+        'sharing': {'photos': shares[0], 'users': shares[1]},
         'semantics': 'До оновлення: успішні запити API (legacy_request). Нові view/interaction: відкриття та дії користувача. refresh: технічні перевірки, виключені з переглядів.',
         'range': range_key, 'start': s0, 'end': today.isoformat(), 'days': ndays,
         'usage': await usage_stats(s0, s1),

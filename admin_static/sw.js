@@ -1,5 +1,5 @@
 /* MyKep Admin service worker: network-first app shell, never caches API data. */
-const CACHE_NAME = 'mykep-admin-v2.9.46';
+const CACHE_NAME = 'mykep-admin-v2.10.10';
 const SHELL = ['/admin/', '/admin/admin.css', '/admin/admin.js', '/admin/charts.js',
     '/admin/manifest.webmanifest', '/admin/icon-192.png', '/admin/apple-touch-icon.png'];
 
@@ -32,11 +32,13 @@ self.addEventListener('fetch', event => {
             const response = await fetch(request, { cache: 'no-store' });
             if (response.ok && response.type === 'basic' && url.pathname === key) {
                 const cache = await caches.open(CACHE_NAME);
-                await cache.put(key, response.clone());
+                try { await cache.put(key, response.clone()); }
+                catch (error) { console.warn('Admin shell cache unavailable:', error.name); }
             }
             return response;
         } catch (error) {
-            const cached = await caches.match(key);
+            const cache = await caches.open(CACHE_NAME);
+            const cached = await cache.match(key);
             if (cached) return cached;
             throw error;
         }

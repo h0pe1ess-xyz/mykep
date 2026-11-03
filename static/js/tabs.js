@@ -15,13 +15,10 @@ const Tabs = (() => {
     const listeners = new Set();
     const native = document.documentElement.dataset.swipe === 'native';
     const androidNative = native && /Android/i.test(navigator.userAgent || '');
-    const originalNative = native && document.documentElement.dataset.nativeFlow === 'original';
-    const pointer = document.documentElement.dataset.swipe === 'pointer';
-    const replaceTabHistory = (native || pointer) && document.documentElement.classList.contains('ios-standalone');
+    const replaceTabHistory = native && document.documentElement.classList.contains('ios-standalone');
     let settleTimer = 0;
     let nativeTouching = false;
     let nativeOrigin = null;
-    let nativeSteps = 0;
     let nativeGesture = null;
     let nativeTarget = null;
     let nativeNavigation = null;
@@ -50,7 +47,6 @@ const Tabs = (() => {
         nativeCompleting = false;
         track?.style.removeProperty('scroll-snap-type');
         nativeOrigin = null;
-        nativeSteps = 0;
         nativeGesture = null;
         nativeTarget = null;
         nativeSwipes = 0;
@@ -59,7 +55,7 @@ const Tabs = (() => {
     function continueNativeChain(forceDestination = false) {
         // Complete interrupted series and limited edge swipes.
         // Ordinary single swipes retain browser-owned snapping.
-        if (androidNative || !originalNative || nativeTarget === null ||
+        if (androidNative || !native || nativeTarget === null ||
             (!nativeCompleting && nativeSwipes < 2 && !forceDestination)) return;
         nativeCompleting = true;
         track.style.scrollSnapType = 'none';
@@ -74,7 +70,7 @@ const Tabs = (() => {
     }
 
     function sampleNativeGesture(point) {
-        if (!originalNative || !nativeGesture || point.identifier !== nativeGesture.id) return;
+        if (!native || !nativeGesture || point.identifier !== nativeGesture.id) return;
         const dx = point.clientX - nativeGesture.x;
         const dy = point.clientY - nativeGesture.y;
         if (!nativeGesture.axis && Math.max(Math.abs(dx), Math.abs(dy)) >= 8) {
@@ -95,7 +91,7 @@ const Tabs = (() => {
             cancelAnimationFrame(settleFrame);
             settleFrame = 0;
             if (!immediate) {
-                if (originalNative) nativeNavigation = tab;
+                nativeNavigation = tab;
                 track.scrollTo({left: names.indexOf(tab) * track.clientWidth,
                     behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
                 return;
@@ -152,7 +148,7 @@ const Tabs = (() => {
         resetScroll();
         if (native && track) {
             const destination = nativeNavigation ||
-                (originalNative && nativeCompleting ? names[nativeTarget] : null);
+                (nativeCompleting ? names[nativeTarget] : null);
             nativeTouching = false;
             clearNativeGesture();
             clearTimeout(settleTimer);
@@ -229,7 +225,7 @@ const Tabs = (() => {
             track.style.transform = `translate3d(${gesture.origin}px, 0, 0)`;
             track.classList.add('is-dragging');
         }
-        if (!pointer && event.cancelable) event.preventDefault();
+        if (event.cancelable) event.preventDefault();
         gesture.samples.push([event.timeStamp, point.clientX]);
         while (gesture.samples.length > 2 && gesture.samples[1][0] < event.timeStamp - 100) gesture.samples.shift();
         const { index, width, origin } = gesture;
@@ -259,46 +255,25 @@ const Tabs = (() => {
         clearTimeout(settleTimer);
         if (nativeTouching || !track.clientWidth) return;
         if (isBlocked()) { reset(); return; }
-        if (originalNative) {
-            if (nativeCompleting && Math.abs(track.scrollLeft - nativeTarget * track.clientWidth) > 1) {
-                continueNativeChain();
-                return;
-            }
-            const index = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
-            if (nativeNavigation && names[index] !== nativeNavigation) return;
-            // Chromium can leave a cancelled pan between snap points. Repair
-            // only after idle, using the nearest visible tab, never a stale queue.
-            if (androidNative && Math.abs(track.scrollLeft - index * track.clientWidth) > 1) {
-                track.scrollTo({left:index * track.clientWidth,
-                    behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
-                return;
-            }
-            nativeNavigation = null;
-            // Restore all three snap points only after the queued destination
-            // is aligned, so an old native snap cannot replay the middle tab.
-            clearNativeGesture();
-            if (names[index] !== current) show(names[index], {fromScroll:true});
+        if (nativeCompleting && Math.abs(track.scrollLeft - nativeTarget * track.clientWidth) > 1) {
+            continueNativeChain();
             return;
         }
-        const width = track.clientWidth;
-        const min = nativeOrigin === null ? 0 : Math.max(0, nativeOrigin - nativeSteps);
-        const max = nativeOrigin === null ? names.length - 1 : Math.min(names.length - 1, nativeOrigin + nativeSteps);
-        // Every recognised swipe has a queued destination. Only this controller
-        // settles the track; CSS snapping must not replay a previous target.
-        const index = nativeSwipes > 0 ? nativeTarget :
-            Math.max(min, Math.min(max, Math.round(track.scrollLeft / width)));
-        nativeOrigin = null;
-        nativeSteps = 0;
-        nativeGesture = null;
-        nativeTarget = null;
-        nativeSwipes = 0;
-        // A second touch can cancel the browser's snap at a fractional offset.
-        // Recover only once scrolling has stopped, never fight live momentum or
-        // rubber-banding from the per-scroll handler.
-        if (Math.abs(track.scrollLeft - index * width) > 1) {
-            track.scrollTo({left:index * width, behavior:'instant'});
+        const index = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
+        if (nativeNavigation && names[index] !== nativeNavigation) return;
+        // Chromium can leave a cancelled pan between snap points. Repair
+        // only after idle, using the nearest visible tab, never a stale queue.
+        if (androidNative && Math.abs(track.scrollLeft - index * track.clientWidth) > 1) {
+            track.scrollTo({left:index * track.clientWidth,
+                behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+            return;
         }
-        if (names[index] !== current) show(names[index], {fromScroll: true});
+        nativeNavigation = null;
+        // Restore all three snap points only after the queued destination
+        // is aligned, so an old native snap cannot replay the middle tab.
+        clearNativeGesture();
+        if (names[index] !== current) show(names[index], {fromScroll:true});
+        return;
     }
 
     function nativeScrollEnded() {
@@ -314,13 +289,6 @@ const Tabs = (() => {
         });
     }
 
-    function pointerEvent(event, ended = false) {
-        // Reuse touch recognition; CSS touch-action owns browser cancellation.
-        const point = {identifier: event.pointerId, clientX: event.clientX, clientY: event.clientY};
-        return {target: event.target, touches: ended ? [] : [point], changedTouches: [point],
-            timeStamp: event.timeStamp, cancelable: true};
-    }
-
     function init() {
         views = document.getElementById('views');
         track = views.querySelector('.views-track');
@@ -330,7 +298,7 @@ const Tabs = (() => {
                 // The Back guard is outside views. A follow-up touch on it
                 // still belongs to an unfinished tab swipe, while its own
                 // preventDefault continues to block browser Back.
-                const edgeContinuation = originalNative && nativeOrigin !== null && nativeSwipes > 0 &&
+                const edgeContinuation = native && nativeOrigin !== null && nativeSwipes > 0 &&
                     event.target.closest?.('.swipe-edge-left');
                 if (!views.contains(event.target) && !edgeContinuation) return;
                 nativeNavigation = null;
@@ -342,7 +310,7 @@ const Tabs = (() => {
                 cancelAnimationFrame(nativeChainFrame);
                 nativeChainFrame = 0;
                 if (event.touches.length !== 1) {
-                    if (originalNative) clearNativeGesture();
+                    clearNativeGesture();
                     return;
                 }
                 // Chromium owns fling interruption and snap selection on Android.
@@ -354,10 +322,9 @@ const Tabs = (() => {
                 // second swipe as the first one and bounce back to the middle.
                 if (nativeOrigin === null) {
                     nativeOrigin = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
-                    nativeSteps = 1;
                     nativeTarget = nativeOrigin;
                     nativeSwipes = 0;
-                } else nativeSteps = Math.min(names.length - 1, nativeSteps + 1);
+                }
                 if (!isBlocked() && !ownsHorizontalScroll(event.target, track)) {
                     const point = event.touches[0];
                     nativeGesture = {id:point.identifier, x:point.clientX, y:point.clientY,
@@ -371,7 +338,7 @@ const Tabs = (() => {
             const releaseNative = event => {
                 if (!nativeTouching) return;
                 nativeTouching = event.touches.length > 0;
-                if (originalNative && event.type === 'touchcancel') clearNativeGesture();
+                if (event.type === 'touchcancel') clearNativeGesture();
                 let limitedSwipe = false;
                 let changedTarget = false;
                 const point = nativeGesture && Array.from(event.changedTouches || []).find(touch => touch.identifier === nativeGesture.id);
@@ -381,32 +348,22 @@ const Tabs = (() => {
                     // A native pan may end close to its starting coordinate.
                     // Preserve its observed movement instead of dropping a
                     // second swipe and later undoing the browser's destination.
-                    const dx = originalNative && Math.abs(endDx) < 8 ? nativeGesture.dx : endDx;
-                    const dy = point.clientY - nativeGesture.y;
-                    const velocity = Math.abs(dx) / Math.max(event.timeStamp - nativeGesture.time, 1);
+                    const dx = Math.abs(endDx) < 8 ? nativeGesture.dx : endDx;
                     // Native scrolling can accept a short flick that does not
                     // meet the legacy 30px threshold. Count its horizontal
                     // intent without changing browser-owned single-swipe motion.
                     const room = dx > 0 ? nativeGesture.left + nativeGesture.width - nativeGesture.x :
                         nativeGesture.x - nativeGesture.left;
-                    const passed = originalNative ? Math.abs(dx) >= 8 :
-                        Math.abs(dx) >= nativeGesture.width * .25 ||
-                        Math.abs(dx) >= 30 && velocity > .35;
-                    if ((originalNative ? nativeGesture.axis === 'x' : Math.abs(dx) > Math.abs(dy) * 1.2) &&
-                        passed) {
+                    if (nativeGesture.axis === 'x' && Math.abs(dx) >= 8) {
                         const target = Math.max(0, Math.min(names.length - 1, nativeTarget + (dx < 0 ? 1 : -1)));
                         changedTarget = target !== nativeTarget;
                         limitedSwipe = room <= 48 && changedTarget;
-                        if (originalNative && limitedSwipe) clickBlockedUntil = performance.now() + 400;
-                        if (!originalNative || target !== nativeTarget) ++nativeSwipes;
+                        if (limitedSwipe) clickBlockedUntil = performance.now() + 400;
+                        if (target !== nativeTarget) ++nativeSwipes;
                         nativeTarget = target;
                     }
-                    // A short drag returns smoothly too; a tap during an
-                    // unfinished transition resumes the existing destination.
-                    if (!originalNative) track.scrollTo({left:nativeTarget * track.clientWidth,
-                        behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
                 }
-                if (originalNative && !nativeTouching && changedTarget) {
+                if (!nativeTouching && changedTarget) {
                     // Further outward contacts must not restart the same
                     // completion and hold a fast swipe series between pages.
                     continueNativeChain(limitedSwipe);
@@ -425,11 +382,11 @@ const Tabs = (() => {
             }, {passive: true});
             views.addEventListener('wheel', () => {
                 nativeNavigation = null;
-                if (originalNative) clearNativeGesture();
+                clearNativeGesture();
             }, {passive: true});
             views.addEventListener('pointerdown', event => {
                 nativeNavigation = null;
-                if (originalNative && event.pointerType !== 'touch') clearNativeGesture();
+                if (event.pointerType !== 'touch') clearNativeGesture();
             }, {passive: true});
             track.addEventListener('scrollend', nativeScrollEnded);
             // Late viewport/safe-area changes must not leave the wrong tab visible.
@@ -439,24 +396,6 @@ const Tabs = (() => {
                 width = track.clientWidth;
                 reset();
             }).observe(track);
-        } else if (pointer) {
-            views.addEventListener('pointerdown', event => {
-                if (!event.isPrimary) { reset(); return; }
-                if (event.pointerType === 'mouse' && event.button !== 0) return;
-                start(pointerEvent(event));
-            });
-            views.addEventListener('pointermove', event => {
-                if (!event.isPrimary) { reset(); return; }
-                move(pointerEvent(event));
-                if (gesture?.axis === 'x' && !views.hasPointerCapture(event.pointerId)) views.setPointerCapture(event.pointerId);
-            });
-            window.addEventListener('pointerup', event => end(pointerEvent(event, true)));
-            window.addEventListener('pointercancel', reset);
-            views.addEventListener('lostpointercapture', event => {
-                // Moving implicit touch capture from a child to views also emits
-                // this event on the child; it must not cancel the live drag.
-                if (event.target === views && gesture) reset();
-            });
         } else {
             views.addEventListener('touchstart', start, { passive: true });
             views.addEventListener('touchmove', move, { passive: false });
@@ -488,21 +427,15 @@ const Tabs = (() => {
         window.addEventListener('blur', reset);
         document.addEventListener('visibilitychange', reset);
         show(current, { historyMode: 'none', immediate: true });
-        if (document.documentElement.classList.contains('ios-standalone') && (native || pointer)) {
-            // Keep cancelable Back protection off the native scroller. The
-            // historical pointer mode retains its original pair of guards.
-            for (const side of ['left', 'right']) {
-                // iOS Back starts at the left edge. A right-edge overlay also
-                // blocks native outward tab swipes and their interruption.
-                if (originalNative && side === 'right') continue;
-                const edge = document.createElement('div');
-                edge.className = `swipe-edge-guard swipe-edge-${side}`;
-                edge.setAttribute('aria-hidden', 'true');
-                edge.addEventListener('touchstart', event => {
-                    if (event.cancelable) event.preventDefault();
-                }, {passive:false});
-                document.body.appendChild(edge);
-            }
+        if (document.documentElement.classList.contains('ios-standalone') && native) {
+            // Keep the iOS Back guard off the native scroller and right edge.
+            const edge = document.createElement('div');
+            edge.className = 'swipe-edge-guard swipe-edge-left';
+            edge.setAttribute('aria-hidden', 'true');
+            edge.addEventListener('touchstart', event => {
+                if (event.cancelable) event.preventDefault();
+            }, {passive:false});
+            document.body.appendChild(edge);
         }
     }
 

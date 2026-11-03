@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 async def run():
-    from database import init_database
+    from database import init_database, connect
     import analytics
     from schedule_service import ScheduleService
     await init_database()
@@ -26,7 +26,8 @@ async def run():
         for _ in range(10):
             group = f'ТЕСТ-{i:03}'
             data = service.build(group,80,60)
-            if data is None: errors += 1
+            if data is None:
+                errors += 1
             json.dumps({'status':'success','data':data,'meta':service.metadata()})
             analytics.record_request(f'test_{i}',group,'/api/schedule','Synthetic Android')
             await asyncio.sleep(0)
@@ -34,7 +35,9 @@ async def run():
     await asyncio.gather(*(visitor(i) for i in range(200)))
     await asyncio.wait_for(analytics._queue.join(),20)
     elapsed = time.perf_counter()-started
-    stats = await analytics.get_today_stats()
+    async with connect() as db:
+        row = (await db.execute_fetchall('SELECT COUNT(*), COUNT(DISTINCT uid) FROM analytics'))[0]
+    stats = {'total_requests': row[0], 'unique_users': row[1]}
     status = analytics.writer_status()
     await analytics.stop_writer()
     print(json.dumps({'scope':'synthetic service-layer + real temporary SQLite; no HTTP, upstream, Telegram or browser',

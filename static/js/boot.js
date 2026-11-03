@@ -8,8 +8,7 @@ document.documentElement.dataset.tab = location.pathname === '/schedule.html' ? 
         if (localStorage.getItem('mykep_swipe_blur') === 'off') blur = 'off';
     } catch { /* Unavailable storage keeps the default native carousel. */ }
     document.documentElement.dataset.swipeChoice = mode;
-    document.documentElement.dataset.swipe = mode === 'native-controlled' ? 'native' : mode;
-    document.documentElement.dataset.nativeFlow = mode === 'native-controlled' ? 'controlled' : 'original';
+    document.documentElement.dataset.swipe = mode;
     document.documentElement.dataset.swipeBlur = blur;
 })();
 /* Run in <head>: only installed iOS gets the viewport-anchored app shell.
@@ -64,7 +63,7 @@ window.mykepViewportReport = function() {
         const box = node.getBoundingClientRect();
         return {top:box.top,bottom:box.bottom};
     });
-    return { version: '2.9.46', mode: getMyKepDisplayMode(),
+    return { version: '2.10.10', mode: getMyKepDisplayMode(),
         iosFixActive: document.documentElement.classList.contains('ios-standalone'),
         screen: {width:window.screen.width,height:window.screen.height,
             availableHeight:window.screen.availHeight,pixelRatio:window.devicePixelRatio,

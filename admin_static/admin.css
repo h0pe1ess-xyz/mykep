@@ -79,8 +79,6 @@ button:disabled { opacity: .55; cursor: wait; }
 }
 .code-form input { flex: 1 1 150px; width: 100%; font-family: ui-monospace, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; }
 .code-form .btn { flex: 1 0 auto; }
-.dev-box { margin-top: 16px; }
-.dev-buttons { display: grid; gap: 8px; }
 .error { color: #ffb5b5; font-size: 14px; overflow-wrap: anywhere; }
 
 /* Explicit tracks prevent SVG intrinsic size from expanding a grid ancestor.
@@ -438,8 +436,6 @@ main { padding-top: 28px; }
 .code-box summary { color: #ffca9e; line-height: 1.6; }
 .login-foot { margin: 0; font-size: 12px; color: var(--faint); }
 .login-card .error { margin: 18px 0 0; padding: 14px; border: 1px solid #a96762; border-radius: 8px; background: #381c1b; color: #ffc4be; line-height: 1.65; }
-.dev-box { padding: 14px; background: #2e2417; border: 1px dashed #997645; border-radius: 8px; }
-.dev-box > p { margin-top: 0; }
 
 /* Security: event meanings have color and explicit text, never color alone. */
 .kv { gap: 16px; }

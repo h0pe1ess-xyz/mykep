@@ -45,20 +45,19 @@ function renderScheduleList(schedule) {
 
 let schedulePageData = null;
 let schedulePickerState = null;
-function needsLegacyDayPicker(nav = navigator) {
-    const version = (nav.userAgent || '').match(/(?:iPhone OS|CPU OS) (\d+)[_.]/);
-    return !!version && Number(version[1]) < 16;
+function needsControlledDayPicker(nav = navigator) {
+    const ua = nav.userAgent || '';
+    return /Android|iPad|iPhone|iPod/i.test(ua) || (/Macintosh/i.test(ua) && nav.maxTouchPoints > 1);
 }
 
-function initLegacyDayPicker(picker, items, state, renderForDay, requestArc) {
-    // iOS 15's nested native scroller remains stuck on the physical 7 Plus.
-    // Move only this short day strip, without using its native scroll range.
+function initControlledDayPicker(picker, items, state, renderForDay, requestArc) {
+    // Share the short, bounded day-strip motion across mobile platforms.
     const track = document.createElement('div');
     track.className = 'day-picker-track';
     track.append(...items);
     picker.replaceChildren(track);
-    picker.dataset.scrollEngine = 'legacy';
-    state.legacy = {offset:0};
+    picker.dataset.scrollEngine = 'controlled';
+    state.controlled = {offset:0};
     let width = 0, maximum = 0, animation = 0, gesture = null, blockedUntil = 0;
     const removers = [];
     function listen(node, name, handler, options) {
@@ -70,8 +69,8 @@ function initLegacyDayPicker(picker, items, state, renderForDay, requestArc) {
         animation = 0;
     }
     function move(offset) {
-        state.legacy.offset = Math.max(0, Math.min(maximum, offset));
-        track.style.transform = `translate3d(${-state.legacy.offset}px, 0, 0)`;
+        state.controlled.offset = Math.max(0, Math.min(maximum, offset));
+        track.style.transform = `translate3d(${-state.controlled.offset}px, 0, 0)`;
         if (picker.scrollLeft) picker.scrollLeft = 0;
         requestArc();
     }
@@ -89,33 +88,40 @@ function initLegacyDayPicker(picker, items, state, renderForDay, requestArc) {
     }
     function center(day, animate = true) {
         stopAnimation();
+        clearTimeout(state.scrollTimeout);
+        gesture = null;
         measure();
         const item = items.find(item => item.dataset.day === day);
         if (!item || !width) return;
         const target = Math.max(0, Math.min(maximum, item.offsetLeft + item.clientWidth / 2 - width / 2));
-        const start = state.legacy.offset;
+        const start = state.controlled.offset;
         if (!animate || matchMedia('(prefers-reduced-motion: reduce)').matches) { move(target); return; }
         const began = performance.now();
         function tick(now) {
-            const progress = Math.min(1, (now - began) / 200);
+            const progress = Math.min(1, (now - began) / 180);
             move(start + (target - start) * (1 - Math.pow(1 - progress, 3)));
             animation = progress < 1 ? requestAnimationFrame(tick) : 0;
         }
         animation = requestAnimationFrame(tick);
     }
-    function settle() {
+    function settle(velocity = 0) {
         clearTimeout(state.scrollTimeout);
         if (gesture || picker.hidden || !picker.clientWidth) return;
-        const middle = state.legacy.offset + picker.clientWidth / 2;
-        const closest = items.reduce((best, item) =>
-            Math.abs(item.offsetLeft + item.clientWidth / 2 - middle) <
-            Math.abs(best.offsetLeft + best.clientWidth / 2 - middle) ? item : best);
+        const step = items.length > 1 ? items[1].offsetLeft - items[0].offsetLeft : 0;
+        // A flick may add at most one day, never a platform-dependent long fling.
+        const projection = Math.max(-step, Math.min(step, velocity * 100));
+        const middle = state.controlled.offset + picker.clientWidth / 2;
+        const nearestTo = center => items.reduce((best, item) =>
+            Math.abs(item.offsetLeft + item.clientWidth / 2 - center) <
+            Math.abs(best.offsetLeft + best.clientWidth / 2 - center) ? item : best);
+        const origin = items.indexOf(nearestTo(middle));
+        const target = items.indexOf(nearestTo(middle + projection));
+        // Labels have different widths; bound by day index as well as pixels.
+        const closest = items[Math.max(origin - 1, Math.min(origin + 1, target))];
         renderForDay(closest.dataset.day, true);
         center(closest.dataset.day);
     }
     function cancel() {
-        gesture = null;
-        clearTimeout(state.scrollTimeout);
         center(state.activeDay, false);
     }
     listen(picker, 'touchstart', event => {
@@ -125,7 +131,7 @@ function initLegacyDayPicker(picker, items, state, renderForDay, requestArc) {
         clearTimeout(state.scrollTimeout);
         measure();
         const point = event.touches[0];
-        gesture = {id:point.identifier, x:point.clientX, y:point.clientY, offset:state.legacy.offset, axis:null};
+        gesture = {id:point.identifier, x:point.clientX, y:point.clientY, offset:state.controlled.offset, axis:null, lastX:point.clientX, lastTime:performance.now(), velocity:0};
     }, {passive:true});
     listen(picker, 'touchmove', event => {
         if (!gesture) return;
@@ -139,6 +145,11 @@ function initLegacyDayPicker(picker, items, state, renderForDay, requestArc) {
         if (gesture.axis !== 'x') return;
         if (!event.cancelable) { cancel(); return; }
         event.preventDefault();
+        const now = performance.now();
+        const elapsed = now - gesture.lastTime;
+        if (elapsed > 0) gesture.velocity = (gesture.lastX - point.clientX) / elapsed;
+        gesture.lastX = point.clientX;
+        gesture.lastTime = now;
         move(gesture.offset - dx);
     }, {passive:false});
     listen(picker, 'touchend', event => {
@@ -147,8 +158,10 @@ function initLegacyDayPicker(picker, items, state, renderForDay, requestArc) {
             cancel(); return;
         }
         const dragged = gesture.axis === 'x';
+        const velocity = performance.now() - gesture.lastTime <= 80 ? gesture.velocity : 0;
         gesture = null;
-        if (dragged) { blockedUntil = performance.now() + 350; settle(); }
+        if (dragged) { blockedUntil = performance.now() + 350; settle(velocity); }
+        else center(state.activeDay);
     }, {passive:true});
     listen(picker, 'touchcancel', cancel, {passive:true});
     listen(picker, 'wheel', event => {
@@ -156,7 +169,7 @@ function initLegacyDayPicker(picker, items, state, renderForDay, requestArc) {
         event.preventDefault();
         stopAnimation();
         measure();
-        move(state.legacy.offset + event.deltaX);
+        move(state.controlled.offset + event.deltaX);
         clearTimeout(state.scrollTimeout);
         state.scrollTimeout = setTimeout(settle, 150);
     }, {passive:false});
@@ -231,7 +244,7 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
         const date = calendar?.monday ? parseLocalDate(calendar.monday) : null;
         if (date) date.setDate(date.getDate()+i);
         const today = date && dateKey(date) === dateKey(getKyivNow());
-        day.dateLabel = date ? `${date.getDate()}.${String(date.getMonth()+1).padStart(2,'0')}` : '';
+        day.dateLabel = date ? `${String(date.getDate()).padStart(2,'0')}.${String(date.getMonth()+1).padStart(2,'0')}` : '';
         day.today = today;
         return `
         <button type="button" class="day-item" data-day="${escapeHTML(day.id)}" aria-label="${escapeHTML(day.name + (day.dateLabel ? ' ' + day.dateLabel : '') + (day.today ? ' · сьогодні' : ''))}" aria-pressed="false" ${day.today ? 'aria-current="date"' : ''}>
@@ -259,7 +272,7 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
         state.frame = 0;
         const width = picker.clientWidth;
         if (!width) return;
-        const center = (state.legacy ? state.legacy.offset : picker.scrollLeft) + width / 2;
+        const center = (state.controlled ? state.controlled.offset : picker.scrollLeft) + width / 2;
         // Batch all layout reads before writing styles.
         const positions = items.map(item => ({ item,
             distance: Math.abs(item.offsetLeft + item.clientWidth / 2 - center) }));
@@ -275,8 +288,8 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
     function requestArc() {
         if (!state.frame) state.frame = requestAnimationFrame(updateArc);
     }
-    if (needsLegacyDayPicker()) {
-        initLegacyDayPicker(picker, items, state, renderForDay, requestArc);
+    if (needsControlledDayPicker()) {
+        initControlledDayPicker(picker, items, state, renderForDay, requestArc);
         const initial = items.find(item => item.dataset.day === preferredDay) || items[0];
         if (initial) {
             renderForDay(initial.dataset.day);

@@ -201,15 +201,16 @@ a {
 .day-picker { display: flex; align-items: flex-start; gap: 16px; overflow-x: auto; padding: 10px 0 30px; margin: 0 -20px 20px -20px; -ms-overflow-style: none; scrollbar-width: none; }
 /* Flex items keep both ends reachable without relying on overflow padding. */
 .day-picker::before, .day-picker::after { content: ''; flex: 0 0 calc(50% - 38px); }
-.day-picker[data-scroll-engine="legacy"] { display: block; overflow: hidden; touch-action: pan-y; }
-.day-picker[data-scroll-engine="legacy"]::before,
-.day-picker[data-scroll-engine="legacy"]::after { content: none; }
+.day-picker[data-scroll-engine="controlled"] { display: block; overflow: hidden; touch-action: pan-y; }
+.day-picker[data-scroll-engine="controlled"]::before,
+.day-picker[data-scroll-engine="controlled"]::after { content: none; }
 .day-picker-track { position: relative; display: flex; align-items: flex-start; gap: 16px; will-change: transform; }
 .day-picker::-webkit-scrollbar { display: none; }
 .day-item { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; will-change: transform, opacity; padding: 0; background: transparent; }
 .day-num { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 500; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); transition: background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease, color 0.3s ease; color: var(--text-muted); }
 .day-item.active .day-num { border: 2px solid var(--accent-orange); background: rgba(255, 85, 0, 0.15); box-shadow: 0 0 12px rgba(255, 85, 0, 0.3); color: white; font-weight: 600; }
-.day-name { font-size: 11px; font-weight: 500; color: var(--text-muted); transition: color 0.3s ease, font-weight 0.3s ease; }
+/* Apply font metrics before measuring the selected day's centering target. */
+.day-name { font-size: 11px; font-weight: 500; color: var(--text-muted); transition: color 0.3s ease; }
 .day-item.active .day-name { color: white; font-weight: 600; }
 .day-item:hover { background: transparent; }
 
@@ -550,13 +551,13 @@ html, body, .app-container,
 .project-context-link { text-decoration: underline; text-decoration-color: var(--text-muted); text-underline-offset: 4px; }
 .support-card { padding: 18px; margin-bottom: 16px; }
 .support-title { font-size: 14px; font-weight: 600; line-height: 1.4; margin-bottom: 8px; }
-.support-caption { font-size: 13px; line-height: 1.5; color: #c5b8b0; margin-bottom: 14px; }
 .support-telegram, .telegram-channel-link { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; padding: 12px 16px; border-radius: 14px; background: var(--accent-orange); color: var(--bg-main); font-size: 16px; font-weight: 600; text-align: center; text-decoration: none; }
 .support-telegram:hover, .telegram-channel-link:hover { background: #e64d00; }
 .telegram-channel-card { padding: 20px; }
 .telegram-channel-card h3 { font-size: 18px; line-height: 1.35; margin-bottom: 8px; }
 .telegram-channel-card p { font-size: 14px; line-height: 1.5; color: #c5b8b0; margin-bottom: 16px; }
 .telegram-channel-link { gap: 10px; }
+.support-note { font-size: 12px; line-height: 1.5; color: #c5b8b0; margin-bottom: 14px; }
 .support-actions { display: flex; flex-wrap: wrap; gap: 0 12px; margin-top: 8px; }
 .support-action { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 0; background: none; color: #c5b8b0; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
 .support-action:disabled { cursor: progress; }
@@ -758,8 +759,8 @@ html[data-swipe="native"] .views-track {
     scrollbar-width: none;
 }
 html[data-swipe="native"] .views-track::-webkit-scrollbar { display: none; }
-html[data-swipe="native"][data-native-flow="original"] .views-track { scroll-snap-type: x mandatory; }
-html[data-swipe="native"][data-native-flow="original"] .view { scroll-snap-align: start; scroll-snap-stop: always; }
+html[data-swipe="native"] .views-track { scroll-snap-type: x mandatory; }
+html[data-swipe="native"] .view { scroll-snap-align: start; scroll-snap-stop: always; }
 html[data-swipe="native"] .day-picker { overscroll-behavior-x: contain; }
 /* Create the iOS touch scroller only when its tab is interactive. Keeping an
    inert overflow scroller alive can leave native hit-testing stale on reveal.
@@ -771,8 +772,6 @@ html[data-swipe="native"] .view .bells-panel { overscroll-behavior-x: auto; }
 html[data-swipe="native"] .view input,
 html[data-swipe="native"] .view textarea,
 html[data-swipe="native"] .view select { touch-action: pan-y; }
-html[data-swipe="pointer"] .view > .app-header,
-html[data-swipe="pointer"] .view > main { touch-action: pan-y; }
 html[data-swipe-blur="off"] .view .lesson-card,
 html[data-swipe-blur="off"] .view .lesson-card-detailed,
 html[data-swipe-blur="off"] .view .settings-card,
@@ -805,7 +804,6 @@ html[data-swipe-blur="off"] .view .credits-block {
 .swipe-version-form [role="status"]:empty { display: none; }
 .swipe-edge-guard { position: fixed; top: 0; bottom: 0; width: 20px; z-index: 900; touch-action: pan-y; }
 .swipe-edge-left { left: 0; }
-.swipe-edge-right { right: 0; }
 
 /* Date labels keep the existing decorative day picker. */
 .day-date { display: block; font-size: 11px; white-space: nowrap; margin-top: 4px; color: #e4d9d1; }
@@ -839,9 +837,12 @@ html[data-swipe-blur="off"] .view .credits-block {
 .schedule-toolbar .week-select { width: 140px; max-width: 42vw; min-width: 0; min-height: 44px; padding: 9px 10px; border: 1px solid rgba(255,255,255,.1); background: var(--bg-surface); color: var(--text-main); box-shadow: none; font-size: 12px; }
 /* The shared 16px input rule prevents iOS focus zoom. Android can use a
    smaller label here without changing the select's width or touch target. */
-html.android-viewport .schedule-toolbar .week-select { font-size: 14px !important; padding-inline: 8px; }
+html.android-viewport .schedule-toolbar .week-select { font-size: 14px !important; padding-inline: 4px; }
 /* Keep iOS's 16px focus-safe font while leaving room for the native arrow. */
-html.ios-standalone .schedule-toolbar .week-select { padding-inline: 4px; }
+html.ios-standalone .schedule-toolbar .week-select { width: 150px; max-width: 46vw; padding-inline: 4px; }
+@media (max-width: 360px) {
+    html.ios-standalone .schedule-mode-switch button { padding-inline: 8px; }
+}
 .schedule-toolbar .week-select:focus { outline: 2px solid var(--accent-orange); outline-offset: 0; }
 .view-schedule[data-schedule-mode="bells"] .schedule-notice,
 .view-schedule[data-schedule-mode="bells"] .schedule-share-status { display: none; }

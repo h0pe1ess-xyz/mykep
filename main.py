@@ -12,8 +12,9 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
+from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
-from config import ADMIN_COOKIE_SECURE, ADMIN_DEV_LOGIN, BASE_DIR, BOT_MODE, PUBLIC_CSP, TELEGRAM_BOT_TOKEN, KYIV
+from config import ADMIN_COOKIE_SECURE, BASE_DIR, PUBLIC_CSP, TELEGRAM_BOT_TOKEN, KYIV
 from database import init_database
 from schedule_service import ScheduleService, calendar_metadata, MIN_SCHEDULE_DATE, MAX_SCHEDULE_DATE, normalize_group
 from activity_limits import ActivityLimits
@@ -33,7 +34,7 @@ teachers = TeacherHintsService()
 activity_limits = ActivityLimits()
 usage_limits = ActivityLimits(client_burst=12, global_burst=120, global_rate=60,
                               daily_limit=50000, client_daily_limit=500, max_clients=10000)
-admin_api.bind(schedule)
+
 ADMIN_DIR = BASE_DIR / 'admin_static'
 
 
@@ -51,27 +52,21 @@ async def lifespan(app):
     await init_database()
     await analytics.init_analytics_db()
     await admin_auth.init_admin_db()
-    await analytics.start_writer()
-    server_metrics.start_background()
-    if ADMIN_DEV_LOGIN:
-        logger.warning('ADMIN_DEV_LOGIN=1: passwordless local admin login is ENABLED. Never use this in production!')
     if not ADMIN_COOKIE_SECURE:
         logger.warning('ADMIN_COOKIE_SECURE=0: admin cookie without Secure flag (local testing only).')
     if not TELEGRAM_BOT_TOKEN:
         logger.warning('TELEGRAM_BOT_TOKEN is not set: Telegram login to /admin is unavailable.')
-    tasks = [asyncio.create_task(_admin_housekeeping(), name='admin-housekeeping')]
+    tasks = []
     try:
+        await analytics.start_writer()
+        server_metrics.start_background()
+        tasks.append(asyncio.create_task(_admin_housekeeping(), name='admin-housekeeping'))
         await schedule.load()
         await teachers.load()
         tasks.append(asyncio.create_task(teachers.run(), name='teacher-refresh'))
         # Start serving immediately from last good data. A cold start returns 503
         # promptly rather than starting one upstream request for every visitor.
         tasks.append(asyncio.create_task(schedule.run(), name='schedule-refresh'))
-        # The statistics bot is disabled by default (replaced by /admin).
-        # Re-enable with BOT_MODE=embedded if needed.
-        if BOT_MODE == 'embedded' and TELEGRAM_BOT_TOKEN:
-            import bot
-            tasks.append(asyncio.create_task(bot.start_bot(TELEGRAM_BOT_TOKEN), name='telegram-bot'))
         yield
     finally:
         for task in tasks:
@@ -83,6 +78,8 @@ async def lifespan(app):
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(RequestBodyLimitMiddleware, max_body_size=4096)
+app.state.schedule = schedule
 app.include_router(admin_api.router)
 
 
@@ -115,9 +112,10 @@ async def response_headers(request: Request, call_next):
     path = request.url.path
     try:
         response = await call_next(request)
-    except Exception:
-        server_metrics.record(path, 500, (time.perf_counter() - started) * 1000)
-        raise
+    except Exception as exc:
+        logger.error('Request failed (%s)', type(exc).__name__)
+        response = JSONResponse(status_code=500, content={
+            'status': 'error', 'message': 'Тимчасова помилка сервера. Спробуйте пізніше.'})
     server_metrics.record(path, response.status_code, (time.perf_counter() - started) * 1000)
     h = response.headers
     h['X-Content-Type-Options'] = 'nosniff'
@@ -132,6 +130,8 @@ async def response_headers(request: Request, call_next):
         h['Cache-Control'] = 'no-store'
         h['X-Robots-Tag'] = 'noindex'
         h['Content-Security-Policy'] = API_CSP
+    elif path in ('/sw.js', '/admin/sw.js'):
+        h['Cache-Control'] = 'no-store'
     elif path.endswith(('.html', '.js', '.css', '.json', '.txt', '.xml', '.webmanifest')) or path in ('/', '/admin/'):
         h['Cache-Control'] = 'no-cache'
     if is_admin:
@@ -206,7 +206,7 @@ class ActivityEvent(BaseModel):
     uid: str = Field(min_length=8, max_length=128, pattern=r'^[A-Za-z0-9_-]+$')
     group: str = Field(min_length=2, max_length=64)
     mode: Literal['standalone', 'browser']
-    event: Literal['view', 'interaction']
+    event: Literal['view', 'interaction', 'share_photo']
 
 
 @app.post('/api/activity', status_code=204)
@@ -266,6 +266,8 @@ async def record_usage(request: Request):
         event.page = None
     if admission == 'limited':
         return Response(status_code=429, headers={'Retry-After': '60'})
+    if admission == 'duplicate':
+        return Response(status_code=204)
     if not analytics.record_usage(event.uid, event.duration1, event.duration2, event.swipe, event.page):
         usage_limits.forget(event.uid, '', kind)
         return Response(status_code=503, headers={'Retry-After': '30'})
@@ -277,7 +279,7 @@ async def get_groups():
     if not schedule.groups:
         return JSONResponse(status_code=503, headers={'Retry-After': '30'}, content={
             'status': 'error', 'message': 'Список груп тимчасово недоступний.'})
-    # Group pickers are not schedule views and must not inflate bot statistics.
+    # Group pickers are not schedule views and must not inflate statistics.
     return {'status': 'success', 'data': schedule.groups, 'meta': schedule.metadata()}
 
 # Explicit allowlist: no user input ever reaches the filesystem path.

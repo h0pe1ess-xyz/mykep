@@ -23,6 +23,7 @@ async def main(argv):
         print(f'One-time login code: {code} (valid {ttl // 60} min). Enter it at /admin -> "Увійти одноразовим кодом".')
     elif len(argv) == 2 and argv[1] == 'revoke-all':
         async with connect() as db:
+            await db.execute('DELETE FROM admin_login_codes')
             cur = await db.execute('DELETE FROM admin_sessions')
             await db.commit()
         print(f'Revoked {cur.rowcount} admin sessions.')

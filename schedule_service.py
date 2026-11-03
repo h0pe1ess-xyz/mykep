@@ -8,8 +8,9 @@ import time
 from datetime import datetime, timedelta, date
 from typing import Dict, Any, Optional
 
-from config import BASE_DIR, DB_PATH, KYIV, REFRESH_SECONDS, RETRY_SECONDS
+from config import BASE_DIR, KYIV, REFRESH_SECONDS, RETRY_SECONDS
 from database import connect
+from upstream import fetch_college
 
 logger = logging.getLogger(__name__)
 URL = "https://kep.nung.edu.ua/pages/education/schedule"
@@ -42,18 +43,14 @@ def split_groups(value):
 
 
 def fetch_schedule_sync():
-    # Lazy imports keep cache handling independent from the upstream parser.
-    import cloudscraper
     import chompjs
-    with cloudscraper.create_scraper(browser={"browser": "chrome", "platform": "windows", "desktop": True}) as scraper:
-        response = scraper.get(URL, timeout=(5, 20))
-        response.raise_for_status()
-        match = re.search(r"normalizeScheduleGroups\s*\(\s*\{", response.text)
-        if not match:
-            raise ValueError("Schedule data not found in source")
-        data = chompjs.parse_js_object(response.text[match.end() - 1:])
-        validate_snapshot(data)
-        return data
+    source = fetch_college(URL, 8_000_000)
+    match = re.search(r"normalizeScheduleGroups\s*\(\s*\{", source)
+    if not match:
+        raise ValueError('Schedule data not found in source')
+    data = chompjs.parse_js_object(source[match.end() - 1:])
+    validate_snapshot(data)
+    return data
 
 
 DAYS = ('понеділок', 'вівторок', 'середа', 'четвер', "п'ятниця", 'субота')
@@ -67,7 +64,7 @@ def parse_condition(value: str) -> tuple[frozenset[int], Optional[date]]:
     """The date is metadata, never part of the cycle-week list."""
     if not isinstance(value, str):
         raise ValueError('Week condition must be text')
-    text = value.lower().strip().replace('–', '-').replace('—', '-').replace('−', '-')
+    text = value.lower().strip().replace('–', '-').replace('\u2014', '-').replace('−', '-')
     start = None
     match = re.search(r'\s*\(\s*(?:з|від)\s+(\d{2}\.\d{2}\.\d{4})\s*\)\s*$', text)
     if match:
@@ -340,7 +337,8 @@ class ScheduleService:
 def get_academic_week(target_date: date) -> int:
     base_monday = CYCLE_START
     delta_days = (target_date - base_monday).days
-    if delta_days < 0: return 1
+    if delta_days < 0:
+        return 1
     return (delta_days // 7 % CALENDAR_CONFIG['cycle_weeks']) + 1
 
 def is_lesson_active(weeks_str: str, current_week: int, lesson_date: Optional[date] = None) -> bool:
@@ -432,7 +430,7 @@ def build_group_schedule(raw_schedule_data: dict, group_name: str, duration1: in
 def calendar_metadata(now: datetime, data: dict) -> dict:
     monday = now.date() - timedelta(days=now.weekday())
     saturday = data.get('субота', [])
-    end = max((l['time'].split(' - ')[1] for l in saturday), default='00:00')
+    end = max((lesson['time'].split(' - ')[1] for lesson in saturday), default='00:00')
     upcoming = now.weekday() == 6 or (now.weekday() == 5 and now.strftime('%H:%M') >= end)
     return {'config': CALENDAR_CONFIG, 'today': now.date().isoformat(), 'current_monday': monday.isoformat(),
             'default_monday': (monday + timedelta(days=7 if upcoming else 0)).isoformat(),

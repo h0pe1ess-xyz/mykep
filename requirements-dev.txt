@@ -1,0 +1,4 @@
+ruff==0.17.3
+pip-audit==2.10.1
+httpx==0.28.1
+httpcore==1.0.9

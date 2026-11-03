@@ -1,42 +1,41 @@
-const CACHE_NAME = 'mykep-cache-v2.9.46';
-const RELEASE_VERSION = '2.9.46';
+const CACHE_NAME = 'mykep-cache-v2.10.10';
+const RELEASE_VERSION = '2.10.10';
 const APP_SHELL = [
-    "/js/calendar-config.js?v=2.9.46",
-    "/js/bells.js?v=2.9.46",
-    "/data/bells.json?v=2.9.46",
-    "/js/dialogs.js?v=2.9.46",
+    "/js/calendar-config.js?v=2.10.10",
+    "/js/bells.js?v=2.10.10",
+    "/data/bells.json?v=2.10.10",
+    "/js/dialogs.js?v=2.10.10",
     "/",
     "/about.html",
-    "/css/about.css?v=2.9.46",
-    "/css/app.css?v=2.9.46",
+    "/css/about.css?v=2.10.10",
+    "/css/app.css?v=2.10.10",
     "/manifest.json",
     "/favicon.ico",
-    "/data/teacher-hints.json?v=2.9.46",
-    "/js/api.js?v=2.9.46",
-    "/js/app.js?v=2.9.46",
-    "/js/boot.js?v=2.9.46",
-    "/js/dashboard.js?v=2.9.46",
-    "/js/onboarding.js?v=2.9.46",
-    "/js/pwa.js?v=2.9.46",
-    "/js/schedule-share.js?v=2.9.46",
-    "/js/schedule.js?v=2.9.46",
-    "/js/settings.js?v=2.9.46",
-    "/js/support.js?v=2.9.46",
-    "/js/tabs.js?v=2.9.46",
-    "/js/teacher-hints.js?v=2.9.46",
-    "/js/utils.js?v=2.9.46",
+    "/data/teacher-hints.json?v=2.10.10",
+    "/js/api.js?v=2.10.10",
+    "/js/app.js?v=2.10.10",
+    "/js/boot.js?v=2.10.10",
+    "/js/dashboard.js?v=2.10.10",
+    "/js/onboarding.js?v=2.10.10",
+    "/js/pwa.js?v=2.10.10",
+    "/js/schedule-share.js?v=2.10.10",
+    "/js/schedule.js?v=2.10.10",
+    "/js/settings.js?v=2.10.10",
+    "/js/support.js?v=2.10.10",
+    "/js/tabs.js?v=2.10.10",
+    "/js/teacher-hints.js?v=2.10.10",
+    "/js/utils.js?v=2.10.10",
     "/icons/install-144.webp",
     "/icons/icon-192.png",
     "/icons/icon-512.png",
     "/icons/maskable-orange-512.png"
 ];
-const SHELL_HASHES = {"/": "06460c94f6ab571c86a4771ce6d2090ef4e4e7a9ced4ce8494cee9c728b73084", "/about.html": "d28b1f95bf595c004c6ddc14c58e1b623e47a3e89f2d1c269404c44d81f78d10", "/css/about.css?v=2.9.46": "63f9cb041b1dbb44e5d1bbcd99a0ea7b067221aaf0fcc5f2620d3081d1b2548b", "/css/app.css?v=2.9.46": "8485e77f831ce8e53f28679d7f0372e8685ed9bde2dbe8efb12d573571ba6ef1", "/data/bells.json?v=2.9.46": "e0077bddf3aa9777c690934eac5ece991ce6b8cd5674ed9bb5eab66f1080d82c", "/data/teacher-hints.json?v=2.9.46": "62925f89ce7b723ca830be198a8016d44f7c3c477ba9500ef3d201abe9555452", "/favicon.ico": "3fec7714d2adfa4acaadea48e6f7514939ad689ed026dd221aa58cd2d369d67b", "/icons/icon-192.png": "e470d3f6cf6976a2d12c35dfe249f0561ae0ad457f046bd3612a40568dc134bd", "/icons/icon-512.png": "e2d86fe6dd7d2571e5bd941129fc3aa88469cead4c53d381abcd33ffd514d40d", "/icons/install-144.webp": "e55475df6ab9a48853cc92e9a3059734d84f002c895fc0e704df8e906b595679", "/icons/maskable-orange-512.png": "4fc555360c7c3d0b0ff993540d30e599756a15a26418280dc583ebac28db8d86", "/js/api.js?v=2.9.46": "72b05c672e5ecc118c1ecd52e3c8a4d3207bb0943f4b9364c610dfc2d289e8f3", "/js/app.js?v=2.9.46": "1febbe32e30d9db54c508a6f599eb48424c1370473b8b08d4a25cae4761605a4", "/js/bells.js?v=2.9.46": "95b059b22ff8d9be1812f8d750fb42b5cf35943c4e930f5b385e5c0cf57fc04d", "/js/boot.js?v=2.9.46": "60282355788b2e96735410c4856b59eb9cad41d963be11a9409ebd72d071691f", "/js/calendar-config.js?v=2.9.46": "5f552e607f0a260c0b117da8cc21a41c1cb95e17de9de4fe18025a1e348109ed", "/js/dashboard.js?v=2.9.46": "24ce9fe4ca9dd0a54e619349513b862de89c7a0805bc3f933cd45e1a7840e826", "/js/dialogs.js?v=2.9.46": "16ccdb6f1bbb037b22089ee96f315006a3f6c9303af39b0c2dfb701212ae7e3a", "/js/onboarding.js?v=2.9.46": "582adc4f745626c6d1cc3aa738457798fd8a16ee33fac05f07803255fc61c54a", "/js/pwa.js?v=2.9.46": "eedf3a7f92c0533ee92a605ce4cc93fa2b7b05f5969f61972476a6066f86795a", "/js/schedule-share.js?v=2.9.46": "da698b39bb40d59928b22cf186826837e3bd881875a0fe021924782e702f9568", "/js/schedule.js?v=2.9.46": "603da2b7c4ca5267723e61954a88d3d18ed25e69f884f9ab0d9f1e361fc9b9ca", "/js/settings.js?v=2.9.46": "dbfcd78a739b4f0ce1216df184e42e43287cba744d921de21869441880248440", "/js/support.js?v=2.9.46": "b7a0d72202aef36e2ccb0ce0622852f165f2499e1d9fd0636a08722a68c49cbc", "/js/tabs.js?v=2.9.46": "5acdbb84160fd282bba59a55dc01a16bbdab43c78df20772319b5f66003413df", "/js/teacher-hints.js?v=2.9.46": "109fcf702e7fa1a5f27c6dbe1a1c28a5647e5b1c436c63558f02e4cdc3878490", "/js/utils.js?v=2.9.46": "d418cb50cc9e067c7d46751e94b4982e93127f54fb75eeca842a8135a27cee95", "/manifest.json": "1ca328a0070b66bdfb49fd6aa0b6ffca26d5239bddb8752dc328f5428f954ae4"};
+const SHELL_HASHES = {"/": "a0ad6042fa5287ed970e2bfe7cf5d20594e9311966c09453bf9d04f19b9657e9", "/about.html": "f1dc0ff6de96e87fa327c3877458b6f32aa4b666b184ece3a99817b647c093a1", "/css/about.css?v=2.10.10": "63f9cb041b1dbb44e5d1bbcd99a0ea7b067221aaf0fcc5f2620d3081d1b2548b", "/css/app.css?v=2.10.10": "fb24da6a69aa9b102aa759db69afece9ab3b7163e8baa6e3ff17cac9a8f47231", "/data/bells.json?v=2.10.10": "e0077bddf3aa9777c690934eac5ece991ce6b8cd5674ed9bb5eab66f1080d82c", "/data/teacher-hints.json?v=2.10.10": "62925f89ce7b723ca830be198a8016d44f7c3c477ba9500ef3d201abe9555452", "/favicon.ico": "3fec7714d2adfa4acaadea48e6f7514939ad689ed026dd221aa58cd2d369d67b", "/icons/icon-192.png": "e470d3f6cf6976a2d12c35dfe249f0561ae0ad457f046bd3612a40568dc134bd", "/icons/icon-512.png": "e2d86fe6dd7d2571e5bd941129fc3aa88469cead4c53d381abcd33ffd514d40d", "/icons/install-144.webp": "e55475df6ab9a48853cc92e9a3059734d84f002c895fc0e704df8e906b595679", "/icons/maskable-orange-512.png": "4fc555360c7c3d0b0ff993540d30e599756a15a26418280dc583ebac28db8d86", "/js/api.js?v=2.10.10": "72b05c672e5ecc118c1ecd52e3c8a4d3207bb0943f4b9364c610dfc2d289e8f3", "/js/app.js?v=2.10.10": "7afc09a14939cb2f26cb439ee7ee66d85250cda89c31c7840af402a2cfdf3654", "/js/bells.js?v=2.10.10": "95b059b22ff8d9be1812f8d750fb42b5cf35943c4e930f5b385e5c0cf57fc04d", "/js/boot.js?v=2.10.10": "3b5799889444bc4b8b2480d021aec538034e1a92c362b6350783e20072bf7ac6", "/js/calendar-config.js?v=2.10.10": "5f552e607f0a260c0b117da8cc21a41c1cb95e17de9de4fe18025a1e348109ed", "/js/dashboard.js?v=2.10.10": "24ce9fe4ca9dd0a54e619349513b862de89c7a0805bc3f933cd45e1a7840e826", "/js/dialogs.js?v=2.10.10": "16ccdb6f1bbb037b22089ee96f315006a3f6c9303af39b0c2dfb701212ae7e3a", "/js/onboarding.js?v=2.10.10": "582adc4f745626c6d1cc3aa738457798fd8a16ee33fac05f07803255fc61c54a", "/js/pwa.js?v=2.10.10": "eedf3a7f92c0533ee92a605ce4cc93fa2b7b05f5969f61972476a6066f86795a", "/js/schedule-share.js?v=2.10.10": "bef80fb123ed6e7180e69f07f5b1993ff1f32d16e0d7ec547460d694243a6e48", "/js/schedule.js?v=2.10.10": "e7134fec88aec821ceb97177a082f871b672a547e2fb9e282084ef1c5cb9acae", "/js/settings.js?v=2.10.10": "91d1d1a10829b972f7c76a18d3ed9be24e044c657239d98ef98d6796ba96aa15", "/js/support.js?v=2.10.10": "b7a0d72202aef36e2ccb0ce0622852f165f2499e1d9fd0636a08722a68c49cbc", "/js/tabs.js?v=2.10.10": "b1da39cd526947ff67c5ed4e56cc3bf9b1aaed4bf4f09ed0319d0db068a1edfb", "/js/teacher-hints.js?v=2.10.10": "7db323e47676bd529e92bcb94096cc7e6ce6dae200420574f2e0c12e12015f3b", "/js/utils.js?v=2.10.10": "d418cb50cc9e067c7d46751e94b4982e93127f54fb75eeca842a8135a27cee95", "/manifest.json": "1ca328a0070b66bdfb49fd6aa0b6ffca26d5239bddb8752dc328f5428f954ae4"};
 const OPTIONAL_ASSETS = ["/pfp/1-192.webp", "/pfp/2.webp"];
 const TAB_PATHS = new Set(['/', '/index.html', '/schedule.html', '/settings.html']);
 
 self.addEventListener('install', event => {
     event.waitUntil((async () => {
-        const cache = await caches.open(CACHE_NAME);
         // Reject a partial deployment before activating a mixed HTML/JS/CSS shell.
         const responses = await Promise.all(APP_SHELL.map(async url => {
             const response = await fetch(url, {cache:'reload'});
@@ -58,7 +57,14 @@ self.addEventListener('install', event => {
             if (hash !== SHELL_HASHES[url]) throw new Error('Shell build mismatch');
             return [url,response];
         }));
-        await Promise.all(responses.map(([url,response]) => cache.put(url,response)));
+        const cache = await caches.open(CACHE_NAME);
+        try {
+            for (const [url, response] of responses) await cache.put(url, response);
+        } catch (error) {
+            // Quota/write failures must not strand a partial release forever.
+            await caches.delete(CACHE_NAME);
+            throw error;
+        }
         await self.skipWaiting();
     })());
 });
