@@ -88,6 +88,8 @@ function initControlledDayPicker(picker, items, state, renderForDay, requestArc)
     }
     function center(day, animate = true) {
         stopAnimation();
+        clearTimeout(state.scrollTimeout);
+        gesture = null;
         measure();
         const item = items.find(item => item.dataset.day === day);
         if (!item || !width) return;
@@ -120,8 +122,6 @@ function initControlledDayPicker(picker, items, state, renderForDay, requestArc)
         center(closest.dataset.day);
     }
     function cancel() {
-        gesture = null;
-        clearTimeout(state.scrollTimeout);
         center(state.activeDay, false);
     }
     listen(picker, 'touchstart', event => {
@@ -161,6 +161,7 @@ function initControlledDayPicker(picker, items, state, renderForDay, requestArc)
         const velocity = performance.now() - gesture.lastTime <= 80 ? gesture.velocity : 0;
         gesture = null;
         if (dragged) { blockedUntil = performance.now() + 350; settle(velocity); }
+        else center(state.activeDay);
     }, {passive:true});
     listen(picker, 'touchcancel', cancel, {passive:true});
     listen(picker, 'wheel', event => {
