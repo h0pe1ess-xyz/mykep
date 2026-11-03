@@ -20,11 +20,14 @@ async function run() {
         for (const [engine, type] of [['chromium',chromium],['webkit',webkit]]) {
             const browser = await type.launch();
             try {
-                for (const ios of [15,18,26]) {
-                    const context = await browser.newContext({viewport:{width:ios === 15 ? 414 : ios === 26 ? 440 : 390,height:ios === 15 ? 736 : 956},isMobile:true,hasTouch:true,serviceWorkers:'block',
-                        userAgent:`Mozilla/5.0 (iPhone; CPU iPhone OS ${ios}_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1`});
+                for (const profile of [15,18,26,'Android 360','Android 393','Android 440']) {
+                    const android = typeof profile === 'string';
+                    const width = android ? Number(profile.split(' ')[1]) : profile === 15 ? 414 : profile === 26 ? 440 : 390;
+                    const context = await browser.newContext({viewport:{width,height:profile === 15 ? 736 : 956},isMobile:true,hasTouch:true,serviceWorkers:'block',
+                        userAgent:android ? 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36' : `Mozilla/5.0 (iPhone; CPU iPhone OS ${profile}_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1`});
                     const page = await context.newPage();
                     await page.clock.install({time:new Date('2026-11-03T10:00:00Z')});
+                    await page.clock.pauseAt(new Date('2026-11-03T10:00:01Z'));
                     await page.addInitScript(() => {
                         Object.defineProperty(navigator,'standalone',{value:true});
                         localStorage.setItem('mykep_onboarded','true');
@@ -70,13 +73,14 @@ async function run() {
                         return Math.abs(a.x+a.width/2-b.x-b.width/2);
                     });
                     assert.ok(centered<1,'selected day is centered');
-                    console.log(`${engine} iOS ${ios}: finger tracking, bounded flick, pause, cancel, keyboard and reduced motion passed`);
+                    console.log(`${engine} ${android ? profile : 'iOS ' + profile}: finger tracking, bounded flick, pause, cancel, keyboard and reduced motion passed`);
                     await context.close();
                 }
                 const page = await browser.newPage();
                 await page.goto(server.url);
-                assert.equal(await page.evaluate(() => needsControlledDayPicker({userAgent:'Android'})),false);
+                assert.equal(await page.evaluate(() => needsControlledDayPicker({userAgent:'Android'})),true);
                 assert.equal(await page.evaluate(() => needsControlledDayPicker({userAgent:'Macintosh',maxTouchPoints:5})),true);
+                assert.equal(await page.evaluate(() => needsControlledDayPicker({userAgent:'Windows',maxTouchPoints:0})),false);
             } finally { await browser.close(); }
         }
     } finally { await server.close(); }

@@ -47,11 +47,11 @@ let schedulePageData = null;
 let schedulePickerState = null;
 function needsControlledDayPicker(nav = navigator) {
     const ua = nav.userAgent || '';
-    return /iPad|iPhone|iPod/i.test(ua) || (/Macintosh/i.test(ua) && nav.maxTouchPoints > 1);
+    return /Android|iPad|iPhone|iPod/i.test(ua) || (/Macintosh/i.test(ua) && nav.maxTouchPoints > 1);
 }
 
 function initControlledDayPicker(picker, items, state, renderForDay, requestArc) {
-    // Share the short, bounded day-strip motion across iOS versions.
+    // Share the short, bounded day-strip motion across mobile platforms.
     const track = document.createElement('div');
     track.className = 'day-picker-track';
     track.append(...items);
@@ -108,10 +108,14 @@ function initControlledDayPicker(picker, items, state, renderForDay, requestArc)
         const step = items.length > 1 ? items[1].offsetLeft - items[0].offsetLeft : 0;
         // A flick may add at most one day, never a platform-dependent long fling.
         const projection = Math.max(-step, Math.min(step, velocity * 100));
-        const middle = state.controlled.offset + projection + picker.clientWidth / 2;
-        const closest = items.reduce((best, item) =>
-            Math.abs(item.offsetLeft + item.clientWidth / 2 - middle) <
-            Math.abs(best.offsetLeft + best.clientWidth / 2 - middle) ? item : best);
+        const middle = state.controlled.offset + picker.clientWidth / 2;
+        const nearestTo = center => items.reduce((best, item) =>
+            Math.abs(item.offsetLeft + item.clientWidth / 2 - center) <
+            Math.abs(best.offsetLeft + best.clientWidth / 2 - center) ? item : best);
+        const origin = items.indexOf(nearestTo(middle));
+        const target = items.indexOf(nearestTo(middle + projection));
+        // Labels have different widths; bound by day index as well as pixels.
+        const closest = items[Math.max(origin - 1, Math.min(origin + 1, target))];
         renderForDay(closest.dataset.day, true);
         center(closest.dataset.day);
     }
