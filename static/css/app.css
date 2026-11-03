@@ -201,9 +201,9 @@ a {
 .day-picker { display: flex; align-items: flex-start; gap: 16px; overflow-x: auto; padding: 10px 0 30px; margin: 0 -20px 20px -20px; -ms-overflow-style: none; scrollbar-width: none; }
 /* Flex items keep both ends reachable without relying on overflow padding. */
 .day-picker::before, .day-picker::after { content: ''; flex: 0 0 calc(50% - 38px); }
-.day-picker[data-scroll-engine="legacy"] { display: block; overflow: hidden; touch-action: pan-y; }
-.day-picker[data-scroll-engine="legacy"]::before,
-.day-picker[data-scroll-engine="legacy"]::after { content: none; }
+.day-picker[data-scroll-engine="controlled"] { display: block; overflow: hidden; touch-action: pan-y; }
+.day-picker[data-scroll-engine="controlled"]::before,
+.day-picker[data-scroll-engine="controlled"]::after { content: none; }
 .day-picker-track { position: relative; display: flex; align-items: flex-start; gap: 16px; will-change: transform; }
 .day-picker::-webkit-scrollbar { display: none; }
 .day-item { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; will-change: transform, opacity; padding: 0; background: transparent; }

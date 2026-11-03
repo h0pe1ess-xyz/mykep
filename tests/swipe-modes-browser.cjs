@@ -70,6 +70,10 @@ async function main() {
                     await page.locator('.bottom-nav [data-tab="schedule"]').click();
                     await aligned(page,'schedule');
                     const selectedDay = await page.locator('.day-picker .day-item').last().getAttribute('data-day');
+                    if (await page.locator('.day-picker').getAttribute('data-scroll-engine') === 'controlled') {
+                        // Reveal the offscreen day through the picker's keyboard control.
+                        await page.locator('.day-picker .day-item.active').press('End');
+                    }
                     await page.locator('.day-picker .day-item').last().click();
                     await page.waitForFunction(day=>document.querySelector(`.day-item[data-day="${day}"]`).getAttribute('aria-pressed')==='true',selectedDay);
                     assert.equal(await page.evaluate(()=>Tabs.current),'schedule');
