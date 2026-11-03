@@ -556,7 +556,7 @@ html, body, .app-container,
 .telegram-channel-card h3 { font-size: 18px; line-height: 1.35; margin-bottom: 8px; }
 .telegram-channel-card p { font-size: 14px; line-height: 1.5; color: #c5b8b0; margin-bottom: 16px; }
 .telegram-channel-link { gap: 10px; }
-.support-note { font-size: 12px; line-height: 1.5; color: #c5b8b0; margin-top: 8px; }
+.support-note { font-size: 12px; line-height: 1.5; color: #c5b8b0; margin-bottom: 14px; }
 .support-actions { display: flex; flex-wrap: wrap; gap: 0 12px; margin-top: 8px; }
 .support-action { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 0; background: none; color: #c5b8b0; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
 .support-action:disabled { cursor: progress; }
