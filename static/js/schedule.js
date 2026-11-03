@@ -231,7 +231,7 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
         const date = calendar?.monday ? parseLocalDate(calendar.monday) : null;
         if (date) date.setDate(date.getDate()+i);
         const today = date && dateKey(date) === dateKey(getKyivNow());
-        day.dateLabel = date ? `${date.getDate()}.${String(date.getMonth()+1).padStart(2,'0')}` : '';
+        day.dateLabel = date ? `${String(date.getDate()).padStart(2,'0')}.${String(date.getMonth()+1).padStart(2,'0')}` : '';
         day.today = today;
         return `
         <button type="button" class="day-item" data-day="${escapeHTML(day.id)}" aria-label="${escapeHTML(day.name + (day.dateLabel ? ' ' + day.dateLabel : '') + (day.today ? ' · сьогодні' : ''))}" aria-pressed="false" ${day.today ? 'aria-current="date"' : ''}>
