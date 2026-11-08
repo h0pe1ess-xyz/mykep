@@ -839,8 +839,9 @@ html[data-swipe-blur="off"] .view .credits-block {
    smaller label here without changing the select's width or touch target. */
 html.android-viewport .schedule-toolbar .week-select { font-size: 14px !important; padding-inline: 4px; }
 /* Keep iOS's 16px focus-safe font while leaving room for the native arrow. */
-html.ios-standalone .schedule-toolbar .week-select { width: 150px; max-width: 46vw; padding-left: 12px; }
+html.ios-standalone .schedule-toolbar .week-select { width: 158px; max-width: calc(46vw + 8px); padding-left: 12px; }
 @media (max-width: 360px) {
+    html.ios-standalone .schedule-toolbar { gap: 4px; }
     html.ios-standalone .schedule-mode-switch button { padding-inline: 8px; }
 }
 .schedule-toolbar .week-select:focus { outline: 2px solid var(--accent-orange); outline-offset: 0; }
