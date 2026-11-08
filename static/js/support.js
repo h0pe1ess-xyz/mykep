@@ -6,10 +6,10 @@ function getSupportDevice(nav = navigator) {
     const android = /Android/i.test(ua);
     const system = ios ? 'iOS' : android ? 'Android' : /Windows/i.test(ua) ? 'Windows'
         : /Macintosh/i.test(ua) ? 'macOS' : /Linux/i.test(ua) ? 'Linux' : 'Не визначено';
-    let model = 'Браузер не надає модель';
+    let model = 'Невідомо';
     if (ios) {
         const family = /iPad|Macintosh/i.test(ua) ? 'iPad' : /iPod/i.test(ua) ? 'iPod' : 'iPhone';
-        model = `${family} (точна модель недоступна)`;
+        model = family;
     }
     if (android) {
         const reported = ua.match(/Android[^;)]*;\s*(?:[a-z]{2}[-_][a-z]{2};\s*)?([^;)]+)/i)?.[1]
