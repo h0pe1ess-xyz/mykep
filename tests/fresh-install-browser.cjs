@@ -46,7 +46,7 @@ async function run(){
                             arrowGap:arrow.left-box.left-parseFloat(s.borderLeftWidth)-parseFloat(s.paddingLeft)-text,
                             arrowInset:box.right-arrow.right};
                     });
-                    const expectedWidth=platform==='iPhone'?Math.min(158,width*.46+8):Math.min(140,width*.42);
+                    const expectedWidth=platform==='iPhone'?Math.min(158,width*.46+8):Math.min(148,width*.42+8);
                     assert.ok(Math.abs(label.width-expectedWidth)<1);
                     const layout=await page.evaluate(()=>({right:document.querySelector('.schedule-mode-switch').getBoundingClientRect().right,left:document.querySelector('.week-control').getBoundingClientRect().left,overflow:document.documentElement.scrollWidth>innerWidth}));
                     assert.ok(layout.left>layout.right&&!layout.overflow,'toolbar controls must fit without overlap');

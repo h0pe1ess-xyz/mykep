@@ -19,20 +19,24 @@ async function run() {
                 await page.selectOption('#schedule-week','2');
                 await page.locator('[data-day="четвер"]').click();
                 const day=await page.evaluate(()=>schedulePickerState.activeDay);
+                const switchBounds=await page.locator('.schedule-mode-switch').boundingBox();
                 await page.locator('#schedule-lessons-tab').focus();
                 await page.keyboard.press('ArrowRight');
                 assert.equal(await page.locator('#schedule-bells-tab').evaluate(n=>n===document.activeElement),true);
                 await page.waitForFunction(()=>!document.getElementById('bells-table').hidden);
+                assert.deepEqual(await page.locator('.schedule-mode-switch').boundingBox(),switchBounds,'mode buttons stay in place when showing bells');
                 assert.deepEqual(await page.locator('.bells-duration').allTextContents(),['60 хв','60 хв']);
                 assert.equal(await page.locator('#bells-table .bell-start').nth(4).textContent(),'12:50');
                 assert.equal(await page.locator('#bells-table .bell-end').last().textContent(),'17:20');
                 assert.equal(await page.locator('#bells-table .bell-row').count(),8);
                 assert.deepEqual(await page.locator('.bells-shift-label > span:first-child').allTextContents(),['Перша зміна','Друга зміна']);
                 for (const selector of ['.day-picker','.schedule-header-actions','.schedule-toolbar .week-control','#dynamic-schedule-list','#schedule-notice','#schedule-share-status']) assert.equal(await page.locator(selector).isVisible(),false);
+                assert.equal(await page.locator('#schedule-week').evaluate(select=>{select.focus();return select===document.activeElement;}),false,'invisible week control cannot take focus');
                 assert.equal(await page.locator('.bottom-nav a').count(),3);
                 assert.equal(await page.locator('#bells-table [aria-current="time"] th').innerText(),'1 Зараз');
                 const bellsHeader=await page.locator('.view-schedule .app-header').evaluate(n=>n.getBoundingClientRect().height);
                 await page.keyboard.press('Home');
+                assert.deepEqual(await page.locator('.schedule-mode-switch').boundingBox(),switchBounds,'mode buttons stay in place when returning to lessons');
                 assert.equal(await page.evaluate(()=>schedulePickerState.activeDay),day);
                 assert.equal(await page.locator('.view-schedule .app-header').evaluate(n=>n.getBoundingClientRect().height),bellsHeader);
                 await page.locator('#schedule-bells-tab').click();
@@ -79,13 +83,16 @@ async function run() {
                 assert.equal(await page.evaluate(()=>schedulePickerState.activeDay),selected);
                 for (const [width,height] of [[320,568],[390,844],[1280,900]]) {
                     await page.setViewportSize({width,height});
+                    const bounds=await page.locator('.schedule-mode-switch').boundingBox();
                     await page.locator('#schedule-bells-tab').click();
+                    assert.deepEqual(await page.locator('.schedule-mode-switch').boundingBox(),bounds,'mode buttons retain their position at each viewport');
                     await page.screenshot({path:`.mykep-local/screens/${engine}-bells-${width}.png`});
                     assert.equal(await page.locator('.bells-panel').evaluate(n=>n.scrollWidth>n.clientWidth),false);
                     await page.locator('#bells-table .bell-row').last().scrollIntoViewIfNeeded();
                     const visible=await page.locator('#bells-table .bell-row').last().boundingBox();
                     assert.ok(visible.y+visible.height<=height);
                     await page.locator('#schedule-lessons-tab').click();
+                    assert.deepEqual(await page.locator('.schedule-mode-switch').boundingBox(),bounds,'returning to lessons retains the button position');
                     await page.screenshot({path:`.mykep-local/screens/${engine}-lessons-${width}.png`});
                 }
                 assert.deepEqual(errors,[]);
