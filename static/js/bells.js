@@ -56,7 +56,7 @@ const BellSchedule = (() => {
                     const i = shift * 4 + slot;
                     const [start, end] = times[i];
                     const current = minute >= timeToMins(start) && minute < timeToMins(end);
-                    return `<tr class="bell-row"${current ? ' aria-current="time"' : ''}><th scope="row"><span class="bell-number">${i + 1}</span>${current ? ' <span class="bell-current">Зараз</span>' : ''}</th><td><span class="bell-start">${start}</span><span class="bell-separator">–</span><span class="bell-end">${end}</span></td></tr>`;
+                    return `<tr class="bell-row"${current ? ' aria-current="time"' : ''}><th scope="row"><span class="bell-number">${i + 1}</span>${current ? ' <span class="bell-current">Зараз</span>' : ''}</th><td><span class="bell-start">${start}</span><span class="bell-separator">-</span><span class="bell-end">${end}</span></td></tr>`;
                 });
                 return `<tbody><tr class="bells-shift"><th colspan="2" scope="rowgroup"><span class="bells-shift-label"><span>${title}</span><span class="bells-duration">${duration} хв</span></span></th></tr>${rows.join('')}</tbody>`;
             });

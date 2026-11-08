@@ -39,19 +39,22 @@ async function run(){
                     await page.setViewportSize({width,height:568});
                     const label=await page.locator('#schedule-week').evaluate(n=>{
                         const s=getComputedStyle(n),canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font=s.font;
-                        return {width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height,font:parseFloat(s.fontSize),
-                            text:ctx.measureText(n.selectedOptions[0].textContent).width,
-                            room:n.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)};
+                        const box=n.getBoundingClientRect(),arrow=n.parentElement.querySelector('.select-chevron').getBoundingClientRect();
+                        const text=ctx.measureText(n.selectedOptions[0].textContent).width;
+                        return {width:box.width,height:box.height,font:parseFloat(s.fontSize),text,
+                            room:n.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight),appearance:s.appearance,
+                            arrowGap:arrow.left-box.left-parseFloat(s.borderLeftWidth)-parseFloat(s.paddingLeft)-text,
+                            arrowInset:box.right-arrow.right};
                     });
                     const expectedWidth=platform==='iPhone'?Math.min(150,width*.46):Math.min(140,width*.42);
                     assert.ok(Math.abs(label.width-expectedWidth)<1);
                     const layout=await page.evaluate(()=>({right:document.querySelector('.schedule-mode-switch').getBoundingClientRect().right,left:document.querySelector('.week-control').getBoundingClientRect().left,overflow:document.documentElement.scrollWidth>innerWidth}));
                     assert.ok(layout.left>layout.right&&!layout.overflow,'toolbar controls must fit without overlap');
-                    // Native WebKit controls can exceed the CSS minimum height.
-                    assert.ok(label.height>=44);
+                    assert.equal(label.height,52);
+                    assert.equal(label.appearance,'none');
                     assert.equal(label.font,platform==='iPhone'?16:14);
-                    if (label.text+24>label.room) await page.screenshot({path:`.mykep-local/screens/week-overflow-${engine}-${platform}-${width}.png`});
-                    assert.ok(label.text+24<=label.room,'week label must leave room for the native arrow: '+JSON.stringify({engine,platform,viewport:width,...label}));
+                    if (label.text>label.room || label.arrowGap<4) await page.screenshot({path:`.mykep-local/screens/week-overflow-${engine}-${platform}-${width}.png`});
+                    assert.ok(label.text<=label.room&&label.arrowGap>=4&&label.arrowInset>=4,'week label and chevron must fit without clipping or overlap: '+JSON.stringify({engine,platform,viewport:width,...label}));
                 }
                 await page.setViewportSize({width:320,height:568});
                 await page.screenshot({path:`.mykep-local/screens/fresh-${engine}-${platform}.png`});

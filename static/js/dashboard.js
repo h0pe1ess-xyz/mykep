@@ -47,7 +47,7 @@ function tomorrowLessonMessage(nextDay) {
     const date = parseLocalDate(nextDay.date).toLocaleDateString('uk-UA',{weekday:'long',day:'numeric',month:'long'});
     const starts = nextDay.lessons.map(l => l.time.split(' - ')[0]).sort();
     const ends = nextDay.lessons.map(l => l.time.split(' - ')[1]).sort();
-    return `${date.charAt(0).toUpperCase() + date.slice(1)}\n${starts[0]}–${ends.at(-1)}`;
+    return `${date.charAt(0).toUpperCase() + date.slice(1)}\n${starts[0]}-${ends.at(-1)}`;
 }
 function renderNextDayStatus(node, nextDay) {
     if (!node) return;
