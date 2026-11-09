@@ -379,7 +379,7 @@ function renderScheduleContext(calendar,group) {
         const sameMonth = monday.getMonth() === end.getMonth() && monday.getFullYear() === end.getFullYear();
         const startLabel = sameMonth ? monday.getDate() : monday.toLocaleDateString('uk-UA',{day:'numeric',month:'long'});
         const endLabel = end.toLocaleDateString('uk-UA',{day:'numeric',month:'long'});
-        description = `${startLabel}${sameMonth ? '–' : ' – '}${endLabel}`;
+        description = `${startLabel}${sameMonth ? '-' : ' - '}${endLabel}`;
     }
     const cycleLabel = `Тиждень ${calendar?.cycle || getScheduleWeekSelection()}`;
     if (label.dataset.description !== description || label.dataset.cycle !== cycleLabel) {

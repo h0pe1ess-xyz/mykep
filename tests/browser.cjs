@@ -34,7 +34,7 @@ async function run() {
                 assert.equal(await page.locator('#schedule-week').evaluate(n=>getComputedStyle(n).outlineWidth),'2px');
                 assert.equal(await page.locator('.week-control').evaluate(n=>getComputedStyle(n).boxShadow),'none');
                 await page.screenshot({path:`.mykep-local/screens/${engine}-week-focus.png`});
-                assert.match(await page.locator('#schedule-week-label').textContent(),/12–17 жовтня Тиждень 3/);
+                assert.match(await page.locator('#schedule-week-label').textContent(),/12-17 жовтня Тиждень 3/);
                 assert.equal(await page.locator('.schedule-context,#schedule-group,#subgroup-choices').count(),0);
                 assert.equal(await page.locator('#schedule-notice').isVisible(),false);
                 assert.ok((await page.locator('#schedule-data-time').textContent()).includes('Перевірено 14 жовтня о 10:00'));
@@ -45,8 +45,8 @@ async function run() {
                 assert.equal(await page.locator('.bottom-nav [aria-current=page]').count(),1);
                 assert.equal(await page.locator('.bottom-nav .active svg').evaluate(n=>getComputedStyle(n).color),'rgb(255, 85, 0)');
                 assert.equal(await page.locator('.schedule-toolbar .week-control-label').innerText(),'Тиждень');
-                const controls=await page.locator('.schedule-toolbar').evaluate(row=>{const tabs=row.querySelector('.schedule-mode-switch').getBoundingClientRect();const week=row.querySelector('.week-select').getBoundingClientRect();return {separate:tabs.right<=week.left,bottom:Math.abs(tabs.bottom-week.bottom),touch:week.height>=44};});
-                assert.deepEqual(controls,{separate:true,bottom:0,touch:true});
+                const controls=await page.locator('.schedule-toolbar').evaluate(row=>{const tabs=row.querySelector('.schedule-mode-switch').getBoundingClientRect();const select=row.querySelector('.week-select'),week=select.getBoundingClientRect();return {separate:tabs.right<=week.left,top:Math.abs(tabs.top-week.top),bottom:Math.abs(tabs.bottom-week.bottom),height:week.height,appearance:getComputedStyle(select).appearance};});
+                assert.deepEqual(controls,{separate:true,top:0,bottom:0,height:52,appearance:'none'});
                 await page.selectOption('#schedule-week','next');
                 await page.waitForFunction(()=>currentScheduleCalendar?.monday==='2026-10-19');
                 assert.equal(await page.locator('#schedule-week').inputValue(),'next');
@@ -274,6 +274,7 @@ async function run() {
                 await iosPage.click('#support-copy');
                 await iosPage.waitForFunction(()=>Boolean(window.copiedViewportSupport));
                 const copiedSupport=await iosPage.evaluate(()=>window.copiedViewportSupport);
+                assert.match(copiedSupport,/Режим: PWA\n/);
                 assert.ok(copiedSupport.length<650);
                 assert.ok(!copiedSupport.includes('Геометрія екрана:'));
                 assert.ok(!copiedSupport.includes('Перелистування вкладок:'));
@@ -447,12 +448,12 @@ async function run() {
                 await calendarPage.waitForFunction(()=>currentGlobalSchedule?.length===0);
                 assert.equal(await calendarPage.locator('.progress-section').isVisible(),false);
                 assert.equal(await calendarPage.locator('#dashboard-status-title').textContent(),'Найближчі пари');
-                assert.match(await calendarPage.locator('#status-text').innerText(),/Понеділок, 19 жовтня\n08:00–17:20/);
+                assert.match(await calendarPage.locator('#status-text').innerText(),/Понеділок, 19 жовтня\n08:00-17:20/);
                 await calendarPage.evaluate(()=>tickDashboard(true));
                 assert.equal(await calendarPage.locator('#status-text .next-day-time').count(),1);
                 await calendarPage.evaluate(()=>Tabs.show('schedule'));
                 await calendarPage.waitForFunction(()=>schedulePageData);
-                assert.equal(await calendarPage.locator('#schedule-week-label').textContent(),'19–24 жовтня Тиждень 4');
+                assert.equal(await calendarPage.locator('#schedule-week-label').textContent(),'19-24 жовтня Тиждень 4');
                 assert.equal(await calendarPage.locator('#schedule-week option[value=auto]').textContent(),'Автоматично');
                 assert.equal(await calendarPage.locator('#schedule-week option[value=current]').textContent(),'Цей тиждень');
                 await calendarPage.selectOption('#schedule-week','current');

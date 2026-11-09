@@ -170,7 +170,7 @@ async def get_schedule(request: Request,
     if duration1 not in (60, 80) or duration2 not in (60, 80):
         return JSONResponse(status_code=422, content={'status': 'error', 'message': 'Тривалість має бути 60 або 80 хвилин.'})
     if monday is not None and not MIN_SCHEDULE_DATE <= monday <= MAX_SCHEDULE_DATE:
-        return JSONResponse(status_code=422, content={'status': 'error', 'message': 'Дата має бути в межах 2000–2100 років.'})
+        return JSONResponse(status_code=422, content={'status': 'error', 'message': 'Дата має бути в межах 2000-2100 років.'})
     if not schedule.raw:
         return JSONResponse(status_code=503, headers={'Retry-After': '30'}, content={
             'status': 'error', 'message': 'Розклад тимчасово недоступний. Спробуйте за хвилину.'})

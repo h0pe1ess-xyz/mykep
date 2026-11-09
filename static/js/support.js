@@ -6,10 +6,10 @@ function getSupportDevice(nav = navigator) {
     const android = /Android/i.test(ua);
     const system = ios ? 'iOS' : android ? 'Android' : /Windows/i.test(ua) ? 'Windows'
         : /Macintosh/i.test(ua) ? 'macOS' : /Linux/i.test(ua) ? 'Linux' : 'Не визначено';
-    let model = 'Браузер не надає модель';
+    let model = 'Невідомо';
     if (ios) {
         const family = /iPad|Macintosh/i.test(ua) ? 'iPad' : /iPod/i.test(ua) ? 'iPod' : 'iPhone';
-        model = `${family} (точна модель недоступна)`;
+        model = family;
     }
     if (android) {
         const reported = ua.match(/Android[^;)]*;\s*(?:[a-z]{2}[-_][a-z]{2};\s*)?([^;)]+)/i)?.[1]
@@ -48,7 +48,7 @@ async function getSupportModel(nav = navigator) {
 
 function buildSupportReport(device) {
     const build = document.querySelector('meta[name="mykep-build"]')?.content || 'Не визначено';
-    const mode = isPWA() ? 'PWA (запущено як застосунок)' : 'Браузер';
+    const mode = isPWA() ? 'PWA' : 'Браузер';
     return `Повідомлення MyKep\n\nПроблема або ідея: [опишіть тут]\n\nДані застосунку:\nВерсія: ${build}\nСистема: ${device.system}\nМодель: ${device.model}\nБраузер: ${device.browser}\nРежим: ${mode}\nВікно: ${window.innerWidth} × ${window.innerHeight}`;
 }
 

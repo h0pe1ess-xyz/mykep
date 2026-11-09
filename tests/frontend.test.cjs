@@ -127,7 +127,7 @@ test('next classes separate the date and time without sentence clutter',()=>{
     const {run}=fixture();
     assert.equal(run(`tomorrowLessonMessage({date:'2026-10-26',lessons:[
         {...sampleLesson,time:'15:20 - 16:20'}, {...sampleLesson,time:'14:10 - 15:10'}
-    ]})`),'Понеділок, 26 жовтня\n14:10–16:20');
+    ]})`),'Понеділок, 26 жовтня\n14:10-16:20');
     assert.equal(run(`tomorrowLessonMessage(null)`),'Поки немає запланованих пар');
 });
 
