@@ -727,16 +727,12 @@ html .app-container { display: flex; flex-direction: column; }
 .views { flex: 1 1 0; min-height: 0; min-width: 0; overflow: hidden;
     overscroll-behavior-x: none;
     margin: 0 calc(-1 * var(--app-gutter)); }
-/* Tab positions belong to the transform, never to a second scroll offset. */
+/* Only the inner track scrolls; the viewport wrapper stays fixed. */
 @supports (overflow: clip) {
     .views { overflow: clip; }
 }
-.views-track { display: flex; height: 100%; width: 100%;
-    transform: translate3d(-100%, 0, 0); transition: transform 250ms ease;
-    will-change: transform; }
-html[data-tab="schedule"] .views-track { transform: translate3d(0, 0, 0); }
-html[data-tab="settings"] .views-track { transform: translate3d(-200%, 0, 0); }
-.views-track.is-dragging { transition: none; }
+.views-track { display: flex; height: 100%; width: 100%; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
+.views-track::-webkit-scrollbar { display: none; }
 .view { flex: 0 0 100%; min-width: 0; height: 100%; overflow: hidden;
     padding: 0 var(--app-gutter); display: grid;
     grid-template-rows: auto auto minmax(0, 1fr); }
@@ -764,39 +760,18 @@ html.android-viewport .bottom-nav::after {
     -webkit-backdrop-filter: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .views-track { transition: none; }
-}
-
-/* Dev comparison keeps the accepted shell and card geometry in every mode. */
-html[data-swipe="native"] .views-track {
-    transform: none; transition: none; will-change: auto;
-    overflow-x: auto; overflow-y: hidden;
-    /* Touch panning stays native. JS owns the destination after release so
-       iOS cannot replay a stale CSS snap point after an interrupted swipe. */
-    scroll-snap-type: none; overscroll-behavior-x: contain;
-    scrollbar-width: none;
-}
-html[data-swipe="native"] .views-track::-webkit-scrollbar { display: none; }
-html[data-swipe="native"] .views-track { scroll-snap-type: x mandatory; }
-html[data-swipe="native"] .view { scroll-snap-align: start; scroll-snap-stop: always; }
-html[data-swipe="native"] .day-picker { overscroll-behavior-x: contain; }
+.view { scroll-snap-align: start; scroll-snap-stop: always; }
+.day-picker { overscroll-behavior-x: contain; }
 /* Create the iOS touch scroller only when its tab is interactive. Keeping an
    inert overflow scroller alive can leave native hit-testing stale on reveal.
    Hidden overflow preserves the selected day's programmatic scroll position. */
 html.ios-standalone .view-schedule[inert] .day-picker { overflow-x: hidden; }
-html[data-swipe="native"] .view .main-content,
-html[data-swipe="native"] .view .schedule-list,
-html[data-swipe="native"] .view .bells-panel { overscroll-behavior-x: auto; }
-html[data-swipe="native"] .view input,
-html[data-swipe="native"] .view textarea,
-html[data-swipe="native"] .view select { touch-action: pan-y pinch-zoom; }
-html[data-swipe-blur="off"] .view .lesson-card,
-html[data-swipe-blur="off"] .view .lesson-card-detailed,
-html[data-swipe-blur="off"] .view .settings-card,
-html[data-swipe-blur="off"] .view .credits-block {
-    backdrop-filter: none; -webkit-backdrop-filter: none;
-}
+.view .main-content,
+.view .schedule-list,
+.view .bells-panel { overscroll-behavior-x: auto; }
+.view input,
+.view textarea,
+.view select { touch-action: pan-y pinch-zoom; }
 .advanced-settings { --advanced-inset: 20px; margin-bottom: calc(-1 * var(--advanced-inset)); }
 .advanced-settings > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: calc(44px + var(--advanced-inset)); line-height: 1.4; font-weight: 500; cursor: pointer; list-style: none; }
 .advanced-settings > summary::-webkit-details-marker { display: none; }
@@ -815,12 +790,6 @@ html[data-swipe-blur="off"] .view .credits-block {
 .advanced-duration .duration-options { --segment-radius: 10px; --segment-inset: 3px; gap: 2px; padding: var(--segment-inset); border: 1px solid var(--border-color); border-radius: var(--segment-radius); background: var(--bg-surface); }
 .advanced-duration .duration-choice span { min-width: 54px; min-height: 44px; padding: 6px 8px; border-color: transparent; border-radius: calc(var(--segment-radius) - var(--segment-inset) - 1px); background: transparent; font-size: 13px; }
 .advanced-duration .duration-choice.is-selected span { border-color: var(--accent-orange); background: #503120; }
-.swipe-version-form { display: grid; gap: 12px; margin-top: 20px; padding-top: 24px; border-top: 1px solid var(--border-color); }
-.swipe-version-form > .settings-title { font-size: 14px; font-weight: 600; }
-.swipe-version-form .native-select-wrapper { display: flex; min-width: 0; }
-.swipe-version-form select { width: 100%; min-height: 44px; }
-.swipe-version-form .help-text { margin: 0; }
-.swipe-version-form [role="status"]:empty { display: none; }
 .swipe-edge-guard { position: fixed; top: 0; bottom: 0; width: 20px; z-index: 900; touch-action: pan-y pinch-zoom; }
 .swipe-edge-left { left: 0; }
 

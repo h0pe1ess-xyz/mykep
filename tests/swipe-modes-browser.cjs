@@ -22,24 +22,25 @@ async function main() {
             const browser = await type.launch(engine === 'chromium' && process.env.PLAYWRIGHT_BROWSER_CHANNEL
                 ? {channel:process.env.PLAYWRIGHT_BROWSER_CHANNEL} : {});
             try {
-                for (const platform of ['Android','iPhone']) for (const mode of ['baseline','native']) {
+                for (const platform of ['Android','iPhone']) for (const savedMode of [null,'baseline']) {
                     const context = await browser.newContext({viewport:{width:390,height:844},hasTouch:true,isMobile:true,
                         serviceWorkers:'block',userAgent:platform === 'Android'
                             ? 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36'
                             : 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile Safari/604.1'});
-                    await context.addInitScript(mode => {
+                    await context.addInitScript(savedMode => {
                         localStorage.setItem('mykep_onboarded','true');
                         sessionStorage.setItem('mykep_browser_session','yes');
-                        if (!localStorage.getItem('mykep_swipe_test')) localStorage.setItem('mykep_swipe_test',mode);
+                        if (savedMode) localStorage.setItem('mykep_swipe_test',savedMode);
+                        localStorage.setItem('mykep_swipe_blur','off');
                         Object.defineProperty(navigator,'standalone',{value:true});
-                    }, mode);
+                    }, savedMode);
                     const page = await context.newPage(), errors = [];
                     page.on('pageerror',e=>errors.push(e.message));
                     await page.goto(server.url);
                     await page.waitForFunction(()=>typeof currentGlobalSchedule!=='undefined' && currentGlobalSchedule);
                     await aligned(page,'dashboard');
-                    assert.equal(await page.locator('html').getAttribute('data-swipe'),mode);
-                    if(mode==='native') {
+                    assert.equal(await page.locator('html').getAttribute('data-swipe'),'native');
+                    {
                         assert.equal(await page.locator('.views-track').evaluate(n=>getComputedStyle(n).scrollSnapType),'x mandatory');
                         assert.equal(await page.locator('.view').evaluateAll(nodes=>nodes.filter(n=>getComputedStyle(n).scrollSnapAlign==='start').length),3);
                     }
@@ -54,7 +55,7 @@ async function main() {
                         await aligned(page,tab);
                         assert.equal(await page.locator('.bottom-nav [aria-current="page"]').getAttribute('data-tab'),tab);
                     }
-                    if(platform==='iPhone' && mode!=='baseline') {
+                    if(platform==='iPhone') {
                         assert.equal(await page.evaluate(()=>history.length),historyLength,'iOS PWA tab changes do not create snapshot history');
                         // Actual history traversal remains supported, without a trap.
                         await page.evaluate(()=>history.pushState(null,'','/'));
@@ -79,10 +80,30 @@ async function main() {
                     assert.equal(await page.evaluate(()=>Tabs.current),'schedule');
                     await page.locator('.bottom-nav [data-tab="dashboard"]').click();
                     await aligned(page,'dashboard');
+                    // Browser-owned zoom must not activate the tab gesture controller.
+                    const zoom=await page.evaluate(()=>{
+                        const target=document.querySelector('.view-dashboard .app-title');
+                        const before=Tabs.current, prevented=[];
+                        for(const touches of [
+                            [{identifier:1,clientX:150,clientY:100},{identifier:2,clientX:230,clientY:100}],
+                            [{identifier:1,clientX:100,clientY:100},{identifier:2,clientX:280,clientY:100}]
+                        ]) {
+                            const event=new Event('touchstart',{bubbles:true,cancelable:true});
+                            Object.defineProperty(event,'touches',{value:touches});
+                            target.dispatchEvent(event);prevented.push(event.defaultPrevented);
+                        }
+                        const end=new Event('touchend',{bubbles:true,cancelable:true});
+                        Object.defineProperties(end,{touches:{value:[]},changedTouches:{value:[]}});
+                        target.dispatchEvent(end);
+                        return {before,after:Tabs.current,prevented,touchAction:getComputedStyle(target).touchAction};
+                    });
+                    assert.equal(zoom.after,zoom.before);
+                    assert.deepEqual(zoom.prevented,[false,false]);
+                    assert.ok(zoom.touchAction.includes('pinch-zoom'));
                     if (engine === 'chromium') {
                         // CDP sends real browser input, unlike dispatching DOM TouchEvents.
                         const cdp = await context.newCDPSession(page);
-                        if(mode==='native') await page.evaluate(()=>{
+                        await page.evaluate(()=>{
                             const track=document.querySelector('.views-track'),scroll=track.scrollTo;
                             window.originalNativeWrites=0;
                             track.scrollTo=function(...args){window.originalNativeWrites++;return scroll.apply(this,args);};
@@ -96,7 +117,7 @@ async function main() {
                         }
                         await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
                         await aligned(page,'settings');
-                        if(mode==='native') {
+                        {
                             await page.evaluate(async()=>{
                                 const until=performance.now()+1000;
                                 while(performance.now()<until) {
@@ -106,45 +127,23 @@ async function main() {
                             });
                             assert.equal(await page.evaluate(()=>window.originalNativeWrites),0,'original native must not drive or complete a swipe with JS scroll commands');
                         }
-                    } else if (mode === 'native') {
+                    } else {
                         // Desktop WebKit cannot emulate a physical iPhone drag.
                         await page.locator('.views-track').evaluate(n=>n.scrollTo({left:n.clientWidth*2,behavior:'smooth'}));
-                        await aligned(page,'settings');
-                    } else if (mode === 'pointer') {
-                        await page.mouse.move(290,100);
-                        await page.mouse.down();
-                        await page.mouse.move(90,100,{steps:8});
-                        await page.mouse.up();
-                        await aligned(page,'settings');
-                    } else {
-                        await page.evaluate(mode => {
-                            const target=document.querySelector('.view-dashboard .app-title');
-                            if (mode==='pointer') {
-                                for(const [type,x] of [['pointerdown',290],['pointermove',90],['pointerup',90]])
-                                    target.dispatchEvent(new PointerEvent(type,{bubbles:true,pointerId:7,pointerType:'touch',isPrimary:true,clientX:x,clientY:100}));
-                            } else {
-                                for(const [type,x] of [['touchstart',290],['touchmove',90],['touchend',90]]) {
-                                    const touch={identifier:7,clientX:x,clientY:100};
-                                    const e=new Event(type,{bubbles:true,cancelable:true});
-                                    Object.defineProperties(e,{touches:{value:type==='touchend'?[]:[touch]},changedTouches:{value:[touch]}});
-                                    target.dispatchEvent(e);
-                                }
-                            }
-                        },mode);
                         await aligned(page,'settings');
                     }
                     // Wait for the existing 400 ms ghost-click protection to expire.
                     const finished = await page.evaluate(()=>performance.now());
                     await page.waitForFunction(t=>performance.now()-t>=400,finished);
                     await page.locator('#advanced-settings summary').click();
-                    await page.selectOption('#swipe-version',mode==='native'?'baseline':'native');
-                    await Promise.all([page.waitForEvent('load'),page.locator('#swipe-version-form button[type="submit"]').click()]);
-                    await aligned(page,'settings');
-                    assert.equal(await page.locator('html').getAttribute('data-swipe'),mode==='native'?'baseline':'native');
+                    assert.equal(await page.locator('#swipe-version-form, #swipe-version').count(),0);
+                    assert.deepEqual(await page.evaluate(()=>({mode:localStorage.getItem('mykep_swipe_test'),blur:localStorage.getItem('mykep_swipe_blur')})),{mode:null,blur:null});
+                    await page.reload();await aligned(page,'settings');
+                    assert.equal(await page.locator('html').getAttribute('data-swipe'),'native');
                     await page.locator('#advanced-settings summary').click();
-                    await page.screenshot({path:`.mykep-local/swipe-modes/${engine}-${platform}-${mode}.png`});
+                    await page.screenshot({path:`.mykep-local/swipe-modes/${engine}-${platform}-${savedMode || 'fresh'}.png`});
                     assert.deepEqual(errors,[]);
-                    console.log(`${engine} ${platform} ${mode}: taps, history, modal, swipe, persistent mode/blur passed`);
+                    console.log(`${engine} ${platform} ${savedMode || 'fresh'}: native taps, history, modal, swipe and retired-preference migration passed`);
                     await context.close();
                 }
             } finally { await browser.close(); }

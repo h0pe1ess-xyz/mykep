@@ -1,16 +1,10 @@
 document.documentElement.dataset.tab = location.pathname === '/schedule.html' ? 'schedule' : location.pathname === '/settings.html' ? 'settings' : 'dashboard';
-// Native scrolling is the default; preserve the released classic option.
-(() => {
-    let mode = 'native', blur = 'on';
-    try {
-        const saved = localStorage.getItem('mykep_swipe_test');
-        if (['baseline', 'native'].includes(saved)) mode = saved;
-        if (localStorage.getItem('mykep_swipe_blur') === 'off') blur = 'off';
-    } catch { /* Unavailable storage keeps the default native carousel. */ }
-    document.documentElement.dataset.swipeChoice = mode;
-    document.documentElement.dataset.swipe = mode;
-    document.documentElement.dataset.swipeBlur = blur;
-})();
+// Old experiment preferences must not reactivate the retired carousel.
+document.documentElement.dataset.swipe = 'native';
+try {
+    localStorage.removeItem('mykep_swipe_test');
+    localStorage.removeItem('mykep_swipe_blur');
+} catch { /* Storage may be unavailable; native scrolling needs no preference. */ }
 /* Run in <head>: only installed iOS gets the viewport-anchored app shell.
  * Safari tabs, Android and the installation/onboarding UI keep their layout.
  */
@@ -63,7 +57,7 @@ window.mykepViewportReport = function() {
         const box = node.getBoundingClientRect();
         return {top:box.top,bottom:box.bottom};
     });
-    return { version: '2.10.18', mode: getMyKepDisplayMode(),
+    return { version: '2.10.19', mode: getMyKepDisplayMode(),
         iosFixActive: document.documentElement.classList.contains('ios-standalone'),
         screen: {width:window.screen.width,height:window.screen.height,
             availableHeight:window.screen.availHeight,pixelRatio:window.devicePixelRatio,
@@ -117,97 +111,6 @@ window.mykepViewportReport = function() {
     });
 })();
 
-/* App gestures: contain overscroll while preserving browser zoom.
- * Browser/OS-owned gestures are best-effort; no history traps or synthetic clicks.
- */
-(() => {
-    'use strict';
-    // Experimental modes let CSS/native scrolling own gestures. A document-wide
-    // cancelable listener would still put the whole carousel on the slow path.
-    if (document.documentElement.dataset.swipe !== 'baseline') return;
-    const ua = navigator.userAgent || '';
-    const ios = /iPad|iPhone|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
-    const options = { passive: false, capture: true };
-    const EDGE = 20;
-    let state = null;
-
-    function cancel(event) {
-        if (event.cancelable) event.preventDefault();
-    }
-
-    function scrollContainers(target) {
-        const containers = { x: [], y: [] };
-        for (let node = target; node && node !== document.documentElement && node !== document.body; node = node.parentElement) {
-            const style = getComputedStyle(node);
-            for (const axis of ['x', 'y']) {
-                const vertical = axis === 'y';
-                const overflow = vertical ? style.overflowY : style.overflowX;
-                if (!/^(auto|scroll|overlay)$/.test(overflow)) continue;
-                const max = vertical ? node.scrollHeight - node.clientHeight : node.scrollWidth - node.clientWidth;
-                const behavior = vertical ? style.overscrollBehaviorY : style.overscrollBehaviorX;
-                const stop = behavior === 'none' || behavior === 'contain';
-                if (max > 1 || stop) containers[axis].push({ node, max, stop });
-            }
-        }
-        return containers;
-    }
-
-    function canScroll(containers, axis, delta) {
-        for (const { node, max, stop } of containers[axis]) {
-            const position = axis === 'y' ? node.scrollTop : node.scrollLeft;
-            if (max > 1 && ((delta > 0 && position > 0) || (delta < 0 && position < max - 1))) return true;
-            if (stop) return false;
-        }
-        return false;
-    }
-
-    document.addEventListener('touchstart', event => {
-        if (event.touches.length !== 1 || window.visualViewport?.scale > 1) {
-            state = null;
-            return;
-        }
-        const touch = event.touches[0];
-        const width = document.documentElement.clientWidth || window.innerWidth;
-        const edge = ios && (touch.clientX <= EDGE || touch.clientX >= width - EDGE);
-        state = { id: touch.identifier, x: touch.clientX, y: touch.clientY,
-            startX: touch.clientX, startY: touch.clientY, axis: null,
-            containers: scrollContainers(event.target), edge };
-        const control = event.target.closest?.('a, button, input, textarea, select, label, summary, [role="button"], [contenteditable="true"]');
-        if (edge && !control) cancel(event);
-    }, options);
-
-    document.addEventListener('touchmove', event => {
-        if (event.touches.length > 1 || window.visualViewport?.scale > 1) {
-            state = null;
-            return;
-        }
-        if (!state || event.touches.length !== 1) return;
-        const touch = event.touches[0];
-        if (touch.identifier !== state.id) return;
-        const dx = touch.clientX - state.x;
-        const dy = touch.clientY - state.y;
-        if (Math.max(Math.abs(dx), Math.abs(dy)) < 2) return;
-        const totalX = touch.clientX - state.startX;
-        const totalY = touch.clientY - state.startY;
-        if (!state.axis && Math.max(Math.abs(totalX), Math.abs(totalY)) >= 10) {
-            state.axis = Math.abs(totalX) > Math.abs(totalY) * 1.2 ? 'x' : 'y';
-        }
-        const axis = state.axis || (Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y');
-        if ((state.edge && axis === 'x') || !canScroll(state.containers, axis, axis === 'x' ? dx : dy)) {
-            cancel(event);
-        }
-        state.x = touch.clientX;
-        state.y = touch.clientY;
-    }, options);
-
-    const reset = () => { state = null; };
-    document.addEventListener('touchend', reset, { passive: true, capture: true });
-    document.addEventListener('touchcancel', reset, { passive: true, capture: true });
-    window.addEventListener('pageshow', reset);
-    window.addEventListener('pagehide', reset);
-    document.addEventListener('visibilitychange', reset);
-})();
-
 /* Fit contents to the actual main track, without viewport/safe-area overrides. */
 (() => {
     let frame = 0;
@@ -216,8 +119,7 @@ window.mykepViewportReport = function() {
     function fit() {
         frame = 0;
         const main = document.getElementById('dashboard-main');
-        if (!main || !main.clientHeight || document.documentElement.dataset.tab !== 'dashboard' &&
-            document.documentElement.dataset.swipe !== 'native') return;
+        if (!main || !main.clientHeight) return;
         const width = main.clientWidth, height = main.clientHeight;
         if (!needsFit && width === fittedWidth && height === fittedHeight) return;
         needsFit = false;

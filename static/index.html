@@ -9,7 +9,7 @@
 <meta content="MyKep - розклад пар для студентів ФКЕП ІФНТУНГ: заняття на сьогодні й тиждень, аудиторії, викладачі та таймер. Студентський PWA-застосунок з офлайн-доступом." name="description"/>
 <meta content="index, follow, max-image-preview:large" name="robots"/>
 <meta content="MyKep" name="application-name"/>
-<meta content="2.10.18" name="mykep-build"/>
+<meta content="2.10.19" name="mykep-build"/>
 <link href="https://mykep.pp.ua/" rel="canonical"/>
 <meta content="website" property="og:type"/>
 <meta content="MyKep" property="og:site_name"/>
@@ -30,6 +30,8 @@
 <link href="favicon.ico" rel="icon" type="image/x-icon"/>
 <link href="icons/icon-192.png" rel="apple-touch-icon"/>
 <link href="manifest.json" rel="manifest"/>
+<meta content="MyKep" name="apple-mobile-web-app-title"/>
+<script src="/js/brand.js?v=2.10.19"></script>
 <meta content="yes" name="mobile-web-app-capable"/>
 
 <meta content="yes" name="apple-mobile-web-app-capable"/>
@@ -37,7 +39,7 @@
 <meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"/>
 
 
-<script defer="" src="/js/bells.js?v=2.10.18"></script>
+<script defer="" src="/js/bells.js?v=2.10.19"></script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -93,11 +95,11 @@
   ]
 }
     </script>
-<script defer="" src="/js/requests.js?v=2.10.18"></script>
-<script src="/js/boot.js?v=2.10.18"></script><link href="/css/app.css?v=2.10.18" rel="stylesheet"/><script defer="" src="/js/calendar-config.js?v=2.10.18"></script><script defer="" src="/js/utils.js?v=2.10.18"></script><script defer="" src="/js/pwa.js?v=2.10.18"></script><script defer="" src="/js/api.js?v=2.10.18"></script><script defer="" src="/js/teacher-hints.js?v=2.10.18"></script><script defer="" src="/js/dashboard.js?v=2.10.18"></script><script defer="" src="/js/schedule-share.js?v=2.10.18"></script><script defer="" src="/js/schedule.js?v=2.10.18"></script><script defer="" src="/js/dialogs.js?v=2.10.18"></script>
-<script defer="" src="/js/settings.js?v=2.10.18"></script><script defer="" src="/js/support.js?v=2.10.18"></script><script defer="" src="/js/onboarding.js?v=2.10.18"></script><script defer="" src="/js/tabs.js?v=2.10.18"></script><script defer="" src="/js/app.js?v=2.10.18"></script></head>
+<script defer="" src="/js/requests.js?v=2.10.19"></script>
+<script src="/js/boot.js?v=2.10.19"></script><link href="/css/app.css?v=2.10.19" rel="stylesheet"/><script defer="" src="/js/calendar-config.js?v=2.10.19"></script><script defer="" src="/js/utils.js?v=2.10.19"></script><script defer="" src="/js/pwa.js?v=2.10.19"></script><script defer="" src="/js/api.js?v=2.10.19"></script><script defer="" src="/js/teacher-hints.js?v=2.10.19"></script><script defer="" src="/js/dashboard.js?v=2.10.19"></script><script defer="" src="/js/schedule-share.js?v=2.10.19"></script><script defer="" src="/js/schedule.js?v=2.10.19"></script><script defer="" src="/js/dialogs.js?v=2.10.19"></script>
+<script defer="" src="/js/settings.js?v=2.10.19"></script><script defer="" src="/js/support.js?v=2.10.19"></script><script defer="" src="/js/onboarding.js?v=2.10.19"></script><script defer="" src="/js/tabs.js?v=2.10.19"></script><script defer="" src="/js/app.js?v=2.10.19"></script></head>
 <body>
-<h1 class="sr-only page-heading">MyKep - розклад пар ФКЕП ІФНТУНГ</h1>
+<h1 class="sr-only page-heading" data-app-brand>MyKep - розклад пар ФКЕП ІФНТУНГ</h1>
 <noscript>
 <style>body { flex-direction: column; align-items: center; justify-content: flex-start; overflow-y: auto; } .page-heading { position: static; width: auto; height: auto; margin: 24px 24px 0; clip: auto; clip-path: none; overflow: visible; white-space: normal; flex-shrink: 0; } #main-app { display: none; } .no-js-info { max-width: 42rem; padding: 32px 24px; overflow-y: auto; line-height: 1.6; } .no-js-info a { text-decoration: underline; }</style>
 <main class="no-js-info">
@@ -111,7 +113,7 @@
 
 <div class="onboarding-slide active" id="ob-slide-1">
 <div class="onboarding-body">
-<h2>Вітаємо в MyKep</h2>
+<h2 data-app-brand>Вітаємо в MyKep</h2>
 <p>Ваш розклад завжди під рукою.</p>
 <div class="onboarding-features">
 <div class="feature-item">
@@ -321,7 +323,7 @@
 <h2 class="app-title">Налаштування</h2>
 <div class="location-badge">
 <svg fill="none" height="12" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="12"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>
-                MyKep v2.10.18
+                <span data-app-brand>MyKep v2.10.19</span>
             </div>
 </header><main class="main-content" style="justify-content: flex-start; gap: 16px; padding-top: 10px;">
 <div class="settings-card">
@@ -364,19 +366,6 @@
 </div>
 </div>
 </section>
-<form class="swipe-version-form" id="swipe-version-form">
-<label class="settings-title" for="swipe-version">Перелистування вкладок</label>
-<div class="native-select-wrapper">
-<select aria-describedby="swipe-version-help" class="text-input native-select" id="swipe-version">
-<option value="native">Нова версія</option>
-<option value="baseline">Стара версія</option>
-</select>
-<svg class="select-chevron" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
-</div>
-<p class="help-text" id="swipe-version-help">Після застосування MyKep перезапуститься</p>
-<button class="settings-btn" type="submit">Застосувати й перезапустити</button>
-<p class="help-text" role="status" id="swipe-version-status"></p>
-</form>
 </div>
 </details>
 </div>
@@ -402,7 +391,7 @@
 </div>
 <div class="settings-card" hidden="" id="settings-install-card">
 <div class="settings-row">
-<div class="settings-info"><div class="settings-title">Встановлення MyKep</div><div class="settings-desc">Інструкція для вашого пристрою</div></div>
+<div class="settings-info"><div class="settings-title" data-app-brand>Встановлення MyKep</div><div class="settings-desc">Інструкція для вашого пристрою</div></div>
 <button class="settings-btn" id="show-install-help" type="button">Інструкція</button>
 </div>
 </div>
@@ -454,9 +443,9 @@
 <button class="settings-btn danger" id="clear-cache-btn">Очистити</button>
 </div>
 </div>
-<details class="data-notice"><summary><svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M3 1.5 10 6 3 10.5Z"/></svg>Про дані</summary><p>MyKep зберігає в цьому браузері групу, налаштування, проходження вступу, випадковий UID і офлайн-розклад. Сервер записує час запиту, UID, групу, тип події, режим PWA/браузера та User-Agent для статистики. Також сервер зберігає останній вибір тривалості пар і версії перелистування та денні підрахунки відкриття сторінок за цим UID. Автооновлення позначаються окремо від відкриттів і дій. Старі записи означають успішні запити API й можуть включати автооновлення. Деталі історії автоматично не видаляються. IP використовується захистом адмінки; цей опис не охоплює окремі журнали хостингу. Окрема статистика хостингу не входить до цього опису. З питаннями щодо даних: <a href="https://t.me/oddxq" rel="noopener">@oddxq</a></p></details>
+<details class="data-notice"><summary><svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M3 1.5 10 6 3 10.5Z"/></svg>Про дані</summary><p>MyKep зберігає в цьому браузері групу, налаштування, проходження вступу, випадковий UID і офлайн-розклад. Сервер записує час запиту, UID, групу, тип події, режим PWA/браузера та User-Agent для статистики. Також сервер зберігає налаштування тривалості пар, версію перелистування та денні підрахунки відкриття сторінок за цим UID. Автооновлення позначаються окремо від відкриттів і дій. Старі записи означають успішні запити API й можуть включати автооновлення. Деталі історії автоматично не видаляються. IP використовується захистом адмінки; цей опис не охоплює окремі журнали хостингу. Окрема статистика хостингу не входить до цього опису. З питаннями щодо даних: <a href="https://t.me/oddxq" rel="noopener">@oddxq</a></p></details>
 <div style="text-align: center; margin-top: 30px; margin-bottom: 20px; font-size: 12px; color: var(--text-muted); opacity: 0.5;">
-                MyKep v2.10.18
+                <span data-app-brand>MyKep v2.10.19</span>
             </div>
 </main></section></div></div><nav aria-label="Основна навігація" class="bottom-nav">
 <a aria-label="Розклад" class="nav-btn" data-tab="schedule" href="/schedule.html"><svg aria-hidden="true" fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24" width="20"><rect height="16" rx="3" width="18" x="3" y="5"/><path d="M7 3v5m10-5v5M3 11h18"/></svg><span class="nav-label">Розклад</span></a>

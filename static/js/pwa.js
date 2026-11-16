@@ -57,7 +57,7 @@ async function showPWAGuide(force = false) {
     overlay.setAttribute('aria-describedby', 'pwa-lead');
     overlay.innerHTML = `
         <section class="pwa-card">
-            <img src="/icons/install-144.webp" alt="" class="pwa-icon" width="72" height="72" loading="eager" decoding="async">
+            <img src="${AppBrand.isTest ? AppBrand.icon : '/icons/install-144.webp'}" alt="" class="pwa-icon" width="72" height="72" loading="eager" decoding="async">
             <h2 id="pwa-title" tabindex="-1"></h2>
             <p id="pwa-lead"></p>
             <div id="pwa-content"></div>
@@ -87,7 +87,7 @@ async function showPWAGuide(force = false) {
         <span id="pwa-copy-status" class="help-text" role="status"></span>
         <div class="pwa-support-links">
             <a class="pwa-support-link" id="pwa-support" href="https://t.me/oddxq" target="_blank" rel="noopener noreferrer">Написати в підтримку</a>
-            <a class="pwa-support-channel" href="https://t.me/MyKep_news" target="_blank" rel="noopener noreferrer">Відкрити канал MyKep</a>
+            <a class="pwa-support-channel" href="https://t.me/MyKep_news" target="_blank" rel="noopener noreferrer">Відкрити канал</a>
         </div>`;
     const help = `<details class="pwa-external-help"><summary>Не виходить встановити?</summary>
         <p>Відкрий цей сайт у ${browser}. Якщо ти у Telegram, у його меню обери «Відкрити у браузері». Або скопіюй посилання й встав його в ${browser}.</p>${copyControls}</details>`;
@@ -124,15 +124,15 @@ async function showPWAGuide(force = false) {
             body = `<button class="btn btn-primary" id="pwa-install" type="button">${canPrompt ? 'Встановити MyKep' : 'Як встановити'}</button>${help}`;
         }
         overlay.dataset.state = state;
-        title.textContent = heading;
-        lead.textContent = description;
-        content.innerHTML = body;
+        title.textContent = AppBrand.text(heading);
+        lead.textContent = AppBrand.text(description);
+        content.innerHTML = AppBrand.text(body);
         const secureLink = content.querySelector('#pwa-secure');
         if (secureLink) secureLink.href = secureURL.href;
         const supportLink = content.querySelector('#pwa-support');
         if (supportLink && typeof createSupportTelegramURL === 'function') {
             const updateSupportLink = () => {
-                supportLink.href = createSupportTelegramURL('Не вдається встановити або відкрити MyKep.\n\n' + getCurrentSupportReport());
+                supportLink.href = createSupportTelegramURL(AppBrand.text('Не вдається встановити або відкрити MyKep.\n\n') + getCurrentSupportReport());
             };
             updateSupportLink();
             supportLink.addEventListener('click', updateSupportLink);
@@ -162,13 +162,13 @@ async function showPWAGuide(force = false) {
         if (pwaInstalledThisPage) render(true);
         else if ((state === 'intro' || state === 'manual') && deferredInstallPrompt && !ctx.embedded && !insecure) {
             const button = content.querySelector('#pwa-install');
-            if (button) button.textContent = 'Встановити MyKep';
+            if (button) button.textContent = AppBrand.text('Встановити MyKep');
             else {
                 const install = document.createElement('button');
                 install.className = 'btn btn-primary';
                 install.id = 'pwa-install';
                 install.type = 'button';
-                install.textContent = 'Встановити MyKep';
+                install.textContent = AppBrand.text('Встановити MyKep');
                 content.querySelector('.pwa-external-help').before(install);
             }
         }

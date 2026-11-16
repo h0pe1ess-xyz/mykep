@@ -36,7 +36,7 @@ function loadScheduleShareLogo() {
         }
         logo.onload = () => finish();
         logo.onerror = () => finish(new Error('Logo unavailable'));
-        logo.src = '/icons/icon-192.png';
+        logo.src = AppBrand.icon;
     });
     return scheduleShareLogoPromise;
 }
@@ -159,7 +159,7 @@ async function createSchedulePNG(data) {
     ctx.clip();
     ctx.drawImage(logo, 48, 44, 112, 112);
     ctx.restore();
-    draw(['MyKep'], `700 72px ${family}`, colors.accent, 184, 40, 84);
+    draw([AppBrand.name], `700 72px ${family}`, colors.accent, 184, 40, 84);
     let y = draw(group, `500 30px ${family}`, colors.muted, 184, 128, 40);
     y = draw(label, `500 30px ${family}`, colors.text, 48, y + 28, 40) + 48;
     for (const card of cards) {
@@ -207,7 +207,7 @@ async function createSchedulePNG(data) {
     y = draw(notice, fonts.footer, colors.muted, 48, y, 32) + 20;
     rule(48, y, 852, y);
     y += 26;
-    draw(['mykep.pp.ua'], `600 46px ${family}`, colors.accent, 48, y, 56);
+    draw([AppBrand.isTest ? location.hostname : 'mykep.pp.ua'], `600 46px ${family}`, colors.accent, 48, y, 56);
     const now = getKyivNow();
     const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     draw([`Створено ${scheduleExportDateLabel(now)} · ${time}`], `400 22px ${family}`, colors.muted, 48, y + 64, 30);
@@ -258,7 +258,7 @@ function initScheduleSharing() {
                 try {
                     const blob = await createSchedulePNG(data);
                     if (token !== scheduleExportToken || Tabs.current !== 'schedule') return;
-                    const filename = `MyKep-${data.group}-${data.day}.png`.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+                    const filename = `${AppBrand.name}-${data.group}-${data.day}.png`.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
                     scheduleExportFile = new File([blob], filename, { type: 'image/png' });
                     generated = true;
                 } catch (error) {

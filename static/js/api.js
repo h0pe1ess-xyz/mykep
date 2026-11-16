@@ -278,7 +278,7 @@ function recordUsage(page = null) {
     const payload = {uid:getUserId(),page,
         duration1:storage.get('mykep_duration1') === '80' ? 80 : 60,
         duration2:storage.get('mykep_duration2') === '80' ? 80 : 60,
-        swipe:document.documentElement.dataset.swipe === 'baseline' ? 'baseline' : 'native'};
+        swipe:'native'};
     const key = page || 'state', signature = JSON.stringify(payload), now = performance.now();
     const previous = usageReceipts.recent.get(key);
     if (previous?.signature === signature && now - previous.time < 2000) return;
