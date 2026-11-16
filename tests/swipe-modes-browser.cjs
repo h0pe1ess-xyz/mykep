@@ -99,7 +99,9 @@ async function main() {
                     });
                     assert.equal(zoom.after,zoom.before);
                     assert.deepEqual(zoom.prevented,[false,false]);
-                    assert.ok(zoom.touchAction.includes('pinch-zoom'));
+                    // CSSOM may serialize pan-x pan-y pinch-zoom as its alias.
+                    assert.ok(zoom.touchAction==='manipulation' || zoom.touchAction.includes('pinch-zoom'),
+                        `${engine} ${platform}: pinch zoom is disabled (${zoom.touchAction})`);
                     if (engine === 'chromium') {
                         // CDP sends real browser input, unlike dispatching DOM TouchEvents.
                         const cdp = await context.newCDPSession(page);
