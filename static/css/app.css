@@ -15,7 +15,7 @@
     --accent-border: rgba(255, 133, 70, 0.42);
     --pill-active: #dfd1c9;
     --pill-dark: #372e29;
-    --card-bg: #29201b;
+    --card-bg: #241b15;
     --bg-elevated: #342923;
     --gradient-space: ;
     --transition-fast: 0.15s ease;
@@ -24,7 +24,7 @@
 
 @supports (color: oklch(50% 0.02 50)) {
     :root {
-        --card-bg: oklch(25.5% 0.018 50);
+        --card-bg: oklch(23% 0.018 50);
         --bg-elevated: oklch(29% 0.02 50);
         --text-muted: oklch(74% 0.02 60);
         --accent-text: oklch(82% 0.11 50);
@@ -59,7 +59,7 @@ html {
 
 body {
     background-color: var(--bg-main);
-    background-image: radial-gradient(circle at 50% 15% var(--gradient-space), rgba(255, 85, 0, 0.07) 0%, transparent 65%);
+    background-image: radial-gradient(circle at 50% 15%, rgba(255, 85, 0, 0.12) 0%, transparent 65%);
     color: var(--text-main);
     display: flex;
     justify-content: center;
@@ -150,7 +150,7 @@ a {
 
 .timer-widget { position: relative; isolation: isolate; width: 100%; display: flex; flex-direction: column; align-items: center; }
 /* Avoid filtered surfaces beneath updating text on WebKit's sliding track. */
-.timer-widget::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 55% var(--gradient-space), rgba(255, 85, 0, 0.1), rgba(255, 85, 0, 0) 70%); z-index: 0; pointer-events: none; }
+.timer-widget::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 55%, rgba(255, 85, 0, 0.14), rgba(255, 85, 0, 0) 70%); z-index: 0; pointer-events: none; }
 .timer-svg { width: 100%; max-height: 180px; position: relative; z-index: 1; overflow: visible; }
 .arc-track { fill: none; stroke: var(--border-color); stroke-width: 30; stroke-linecap: round; }
 .arc-progress {
@@ -407,7 +407,7 @@ a {
 .modal-item.selected { background: var(--accent-soft); color: var(--accent-text); }
 
 
-.onboarding-overlay { position: fixed; inset: 0; background: var(--bg-main); background-image: radial-gradient(circle at 50% 15% var(--gradient-space), rgba(255, 85, 0, 0.1) 0%, transparent 60%); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 24px; transition: opacity var(--transition-normal); }
+.onboarding-overlay { position: fixed; inset: 0; background: var(--bg-main); background-image: radial-gradient(circle at 50% 15%, rgba(255, 85, 0, 0.15) 0%, transparent 60%); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 24px; transition: opacity var(--transition-normal); }
 .onboarding-card { width: 100%; max-width: 400px; background: rgba(36, 28, 24, 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 24px; padding: 32px 24px; text-align: center; overflow: hidden; position: relative; min-height: 440px; display: flex; flex-direction: column; }
 .onboarding-slide { position: absolute; inset: 0; padding: 32px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity var(--transition-normal); }
 .onboarding-slide.active { opacity: 1; pointer-events: auto; }
@@ -494,7 +494,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .author-profile { min-width: 0; }
 .author-profile .avatar { width: clamp(64px, 22vw, 96px); height: clamp(64px, 22vw, 96px); }
 .author-name { overflow-wrap: anywhere; }
-.pwa-overlay { position: fixed; left: 0; right: 0; z-index: 10000; background: var(--bg-main); background-image: radial-gradient(circle at 50% 15% var(--gradient-space), rgba(255,85,0,.1), transparent 60%); display: flex; align-items: center; justify-content: center; padding-left: 16px; padding-right: 16px; overflow-y: auto; }
+.pwa-overlay { position: fixed; left: 0; right: 0; z-index: 10000; background: var(--bg-main); background-image: radial-gradient(circle at 50% 15%, rgba(255,85,0,.15), transparent 60%); display: flex; align-items: center; justify-content: center; padding-left: 16px; padding-right: 16px; overflow-y: auto; }
 .pwa-card { background: var(--bg-surface); border-radius: 16px; padding: 32px 24px 20px; width: 100%; max-width: 420px; max-height: 100%; overflow-y: auto; overscroll-behavior: contain; box-shadow: 0 16px 40px rgba(0,0,0,.35); text-align: center; }
 .pwa-icon { display: block; width: 72px; height: 72px; object-fit: contain; border-radius: 16px; margin: 0 auto 24px; }
 .pwa-card h2 { font-size: 26px; line-height: 1.2; font-weight: 650; letter-spacing: -.025em; text-wrap: balance; margin-bottom: 12px; overflow-wrap: anywhere; }

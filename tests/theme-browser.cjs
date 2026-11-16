@@ -69,9 +69,9 @@ async function run() {
                             assert.equal(info.accent,'rgb(31, 23, 20)');
                             assert.equal(info.iconColor,'rgb(255, 85, 0)');
                             assert.equal(info.glow,'none');
-                            assert.equal(info.cardBackground,'oklch(0.255 0.018 50)');
+                            assert.equal(info.cardBackground,'oklch(0.23 0.018 50)');
                             assert.deepEqual(pixel,[31,23,20,255]);
-                            assert.deepEqual(cardPixel,[42,32,27,255]);
+                            assert.deepEqual(cardPixel,[36,27,21,255]);
                         }
                     }
                     if(!baselineOnly) {
