@@ -25,10 +25,8 @@ function currentDisplayMode() {
     return isPWA() ? 'standalone' : 'browser';
 }
 async function fetchJSON(url, timeout = 10000) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeout);
-    try {
-        const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+    return withRequestTimeout(timeout, async signal => {
+        const response = await fetch(url, { signal, cache: 'no-store' });
         const result = await response.json();
         if (!response.ok || result.status !== 'success') {
             const error = new Error(result.message || 'Сервер тимчасово недоступний.');
@@ -36,7 +34,7 @@ async function fetchJSON(url, timeout = 10000) {
             throw error;
         }
         return result;
-    } finally { clearTimeout(timer); }
+    });
 }
 async function fetchGroups(force = false) {
     if (groupsRequest) return groupsRequest;
@@ -225,37 +223,38 @@ async function loadScheduleResponse(context) {
     const {key,group,duration1,duration2} = context;
     const cached = cachedScheduleForKey(key);
     const query = new URLSearchParams({group,duration1,duration2,uid:getUserId(),mode:currentDisplayMode(),event:'refresh'});
-    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(),10000);
-    try {
-        const response = await fetch(`/api/schedule?${query}`,{signal:controller.signal,cache:'no-store',headers: cached?.etag ? {'If-None-Match':cached.etag} : {}});
-        let entry;
-        if (response.status === 304 && cached?.cycle) {
-            entry = {...cached, meta: {updated_at:response.headers.get('X-Source-Checked-At') || cached.meta?.updated_at,stale:response.headers.get('X-Source-Stale') === 'true'}};
-        } else {
-            const result = await response.json();
-            if (!response.ok || result.status !== 'success') { const error = new Error(result.message); error.status=response.status; throw error; }
-            if (!validCycle(result.cycle)) throw new Error('Некоректний цикл розкладу.');
-            acceptCalendarConfig(result.calendar?.config);
-            const cycle = cached?.cycle && JSON.stringify(cached.cycle) === JSON.stringify(result.cycle) ? cached.cycle : result.cycle;
-            entry = {key,cycle,meta:result.meta,etag:response.headers.get('ETag'),savedAt:Date.now()};
-        }
-        entry.offline=false;
-        entry.usedAt=Date.now();
-        saveScheduleEntry(entry);
-        return entry;
-    } catch (error) {
-        if (error.status === 404 || error.status === 422) {
-            scheduleEntries = readScheduleEntries().filter(entry => entry.key !== key);
-            persistScheduleEntries();
-        }
-        if (error.status !== 404 && error.status !== 422 && cached?.cycle) {
-            const entry = {...cached,offline:true,usedAt:Date.now(),meta:{...cached.meta,stale:true}};
+    return withRequestTimeout(10000, async signal => {
+        try {
+            const response = await fetch(`/api/schedule?${query}`,{signal,cache:'no-store',headers: cached?.etag ? {'If-None-Match':cached.etag} : {}});
+            let entry;
+            if (response.status === 304 && cached?.cycle) {
+                entry = {...cached, meta: {updated_at:response.headers.get('X-Source-Checked-At') || cached.meta?.updated_at,stale:response.headers.get('X-Source-Stale') === 'true'}};
+            } else {
+                const result = await response.json();
+                if (!response.ok || result.status !== 'success') { const error = new Error(result.message); error.status=response.status; throw error; }
+                if (!validCycle(result.cycle)) throw new Error('Некоректний цикл розкладу.');
+                acceptCalendarConfig(result.calendar?.config);
+                const cycle = cached?.cycle && JSON.stringify(cached.cycle) === JSON.stringify(result.cycle) ? cached.cycle : result.cycle;
+                entry = {key,cycle,meta:result.meta,etag:response.headers.get('ETag'),savedAt:Date.now()};
+            }
+            entry.offline=false;
+            entry.usedAt=Date.now();
             saveScheduleEntry(entry);
             return entry;
+        } catch (error) {
+            if (error.status === 404 || error.status === 422) {
+                scheduleEntries = readScheduleEntries().filter(entry => entry.key !== key);
+                persistScheduleEntries();
+            }
+            if (error.status !== 404 && error.status !== 422 && cached?.cycle) {
+                const entry = {...cached,offline:true,usedAt:Date.now(),meta:{...cached.meta,stale:true}};
+                saveScheduleEntry(entry);
+                return entry;
+            }
+            return {data:null,legacyFallback:error.status !== 404 && error.status !== 422,
+                notice:error.status === 404 ? error.message : 'Не вдалося завантажити розклад. Перевірте з’єднання й спробуйте ще раз.'};
         }
-        return {data:null,legacyFallback:error.status !== 404 && error.status !== 422,
-            notice:error.status === 404 ? error.message : 'Не вдалося завантажити розклад. Перевірте з’єднання й спробуйте ще раз.'};
-    } finally { clearTimeout(timeout); }
+    });
 }
 
 function recordScheduleAction(event,group = scheduleRequestContext().group) {
@@ -299,13 +298,11 @@ async function sendUsage() {
         while (usageReceipts.pending.length) {
             const body = usageReceipts.pending.shift();
             if (navigator.onLine === false) { usageReceipts.pending.length = 0; break; }
-            const controller = new AbortController(), timeout = setTimeout(() => controller.abort(),5000);
             try {
-                const response = await fetch('/api/usage',{method:'POST',cache:'no-store',keepalive:true,
-                    headers:{'Content-Type':'application/json'},body,signal:controller.signal});
+                const response = await withRequestTimeout(5000, signal => fetch('/api/usage',{method:'POST',cache:'no-store',keepalive:true,
+                    headers:{'Content-Type':'application/json'},body,signal}));
                 if (!response.ok) console.warn('Usage was not recorded:',response.status);
             } catch (error) { console.warn('Usage delivery failed:',error.name); }
-            finally { clearTimeout(timeout); }
         }
     } finally { usageReceipts.sending = false; }
 }

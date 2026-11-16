@@ -39,18 +39,17 @@ function renderTeacherLabel(value) {
         if (typeof window.requestDashboardFit === 'function') window.requestDashboardFit();
     }
     async function loadURL(url) {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
-        try {
-            const response = await fetch(url, { signal: controller.signal });
-            if (response.ok) { const payload=await response.json(); install(payload); if (url.startsWith('/api/') && Object.keys(teacherDirectory).length) storage.set('mykep_teachers',JSON.stringify(payload)); }
-        } catch { /* Bundled/offline directory remains available. */ }
-        finally { clearTimeout(timeout); }
+        return withRequestTimeout(8000, async signal => {
+            try {
+                const response = await fetch(url, { signal });
+                if (response.ok) { const payload=await response.json(); install(payload); if (url.startsWith('/api/') && Object.keys(teacherDirectory).length) storage.set('mykep_teachers',JSON.stringify(payload)); }
+            } catch { /* Bundled/offline directory remains available. */ }
+        });
     }
     function load() {
         if (!loading) loading = (async () => {
             try { install(JSON.parse(storage.get('mykep_teachers') || 'null')); } catch { /* Bundled fallback follows. */ }
-            await loadURL('/data/teacher-hints.json?v=2.10.15');
+            await loadURL('/data/teacher-hints.json?v=2.10.16');
             await loadURL('/api/teacher-hints');
         })().finally(() => { loading=null; });
         return loading;

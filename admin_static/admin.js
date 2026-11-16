@@ -90,19 +90,20 @@
             headers['Content-Type'] = 'application/json';
             if (state.csrf) headers['X-CSRF-Token'] = state.csrf;
         }
-        let response;
-        const controller = new AbortController();
         const timeoutMs = method === 'GET' ? 15000 : 45000;
-        const timeout = setTimeout(() => controller.abort(), timeoutMs);
         let json = null;
-        try {
-            response = await fetch('/api/admin' + path, { method, headers, signal: controller.signal, credentials: 'same-origin', cache: 'no-store',
-                redirect: 'error', referrerPolicy: 'no-referrer', ...(method !== 'GET' && body !== undefined ? { body: JSON.stringify(body) } : {}) });
-            json = await response.json();
-        } catch {
-            if ($('offline-banner')) $('offline-banner').hidden = false;
-            throw new ApiError(0, controller.signal.aborted ? 'Час очікування вичерпано. Перевірте стан операції перед повторною спробою.' : "Немає з'єднання з сервером.");
-        } finally { clearTimeout(timeout); }
+        const response = await withRequestTimeout(timeoutMs, async signal => {
+            try {
+                const response = await fetch('/api/admin' + path, { method, headers, signal, credentials: 'same-origin', cache: 'no-store',
+                    redirect: 'error', referrerPolicy: 'no-referrer', ...(method !== 'GET' && body !== undefined ? { body: JSON.stringify(body) } : {}) });
+                try { json = await response.json(); }
+                catch (error) { if (!(error instanceof SyntaxError) || signal.aborted) throw error; }
+                return response;
+            } catch {
+                if ($('offline-banner')) $('offline-banner').hidden = false;
+                throw new ApiError(0, signal.aborted ? 'Час очікування вичерпано. Перевірте стан операції перед повторною спробою.' : "Немає з'єднання з сервером.");
+            }
+        });
         if ($('offline-banner')) $('offline-banner').hidden = true;
         if (response.status === 401 && !path.startsWith('/auth') && path !== '/me') {
             showLogin('Сесія завершилась. Увійдіть знову.');

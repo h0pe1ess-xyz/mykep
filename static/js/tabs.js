@@ -37,7 +37,7 @@ const Tabs = (() => {
 
     function isBlocked() {
         return document.getElementById('main-app').inert ||
-            !!document.querySelector('.modal-overlay.active, .pwa-overlay') ||
+            !!document.querySelector('dialog.modal-overlay[open], .pwa-overlay') ||
             storage.get('mykep_onboarded') !== 'true';
     }
 
@@ -196,7 +196,7 @@ const Tabs = (() => {
 
     function start(event) {
         if (gesture) reset();
-        if (event.touches.length !== 1 || isBlocked() || ownsHorizontalScroll(event.target)) return;
+        if (event.touches.length !== 1 || window.visualViewport?.scale > 1 || isBlocked() || ownsHorizontalScroll(event.target)) return;
         const point = event.touches[0];
         const width = document.documentElement.clientWidth;
         if (point.clientX <= 20 || point.clientX >= width - 20) return;
@@ -309,7 +309,7 @@ const Tabs = (() => {
                 nativeGesture = null;
                 cancelAnimationFrame(nativeChainFrame);
                 nativeChainFrame = 0;
-                if (event.touches.length !== 1) {
+                if (event.touches.length !== 1 || window.visualViewport?.scale > 1) {
                     clearNativeGesture();
                     return;
                 }
@@ -416,7 +416,7 @@ const Tabs = (() => {
             if (!isBlocked()) show(link.dataset.tab);
         });
         window.addEventListener('popstate', () => {
-            document.querySelectorAll('.modal-overlay.active').forEach(modal => modal.classList.remove('active'));
+            document.querySelectorAll('dialog.modal-overlay[open]').forEach(modal => Dialogs.close(modal));
             restoreHistory();
         });
         // Android height-only viewport events must not rewind an active pan.

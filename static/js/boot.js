@@ -63,7 +63,7 @@ window.mykepViewportReport = function() {
         const box = node.getBoundingClientRect();
         return {top:box.top,bottom:box.bottom};
     });
-    return { version: '2.10.15', mode: getMyKepDisplayMode(),
+    return { version: '2.10.16', mode: getMyKepDisplayMode(),
         iosFixActive: document.documentElement.classList.contains('ios-standalone'),
         screen: {width:window.screen.width,height:window.screen.height,
             availableHeight:window.screen.availHeight,pixelRatio:window.devicePixelRatio,
@@ -117,7 +117,7 @@ window.mykepViewportReport = function() {
     });
 })();
 
-/* App gestures: preserve one-finger scrolling, suppress page zoom and overscroll.
+/* App gestures: contain overscroll while preserving browser zoom.
  * Browser/OS-owned gestures are best-effort; no history traps or synthetic clicks.
  */
 (() => {
@@ -162,9 +162,8 @@ window.mykepViewportReport = function() {
     }
 
     document.addEventListener('touchstart', event => {
-        if (event.touches.length !== 1) {
+        if (event.touches.length !== 1 || window.visualViewport?.scale > 1) {
             state = null;
-            cancel(event);
             return;
         }
         const touch = event.touches[0];
@@ -178,8 +177,8 @@ window.mykepViewportReport = function() {
     }, options);
 
     document.addEventListener('touchmove', event => {
-        if (event.touches.length > 1) {
-            cancel(event);
+        if (event.touches.length > 1 || window.visualViewport?.scale > 1) {
+            state = null;
             return;
         }
         if (!state || event.touches.length !== 1) return;
@@ -207,10 +206,6 @@ window.mykepViewportReport = function() {
     window.addEventListener('pageshow', reset);
     window.addEventListener('pagehide', reset);
     document.addEventListener('visibilitychange', reset);
-    // Older iOS WebKit may ignore the viewport's user-scalable flag.
-    for (const name of ['gesturestart', 'gesturechange', 'gestureend']) {
-        document.addEventListener(name, cancel, options);
-    }
 })();
 
 /* Fit contents to the actual main track, without viewport/safe-area overrides. */

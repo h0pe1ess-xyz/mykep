@@ -15,9 +15,8 @@ const BellSchedule = (() => {
 
     function load() {
         if (!dataPromise) {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 10000);
-            dataPromise = fetch(dataURL, { signal: controller.signal }).then(async response => {
+            dataPromise = withRequestTimeout(10000, async signal => {
+                const response = await fetch(dataURL, { signal });
                 if (!response.ok) throw new Error(`Bell times HTTP ${response.status}`);
                 const data = await response.json();
                 for (const duration of ['60', '80']) {
@@ -28,7 +27,7 @@ const BellSchedule = (() => {
                     }
                 }
                 return data;
-            }).finally(() => clearTimeout(timeout)).catch(error => { dataPromise = null; throw error; });
+            }).catch(error => { dataPromise = null; throw error; });
         }
         return dataPromise;
     }

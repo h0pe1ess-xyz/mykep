@@ -6,7 +6,7 @@ import json
 from datetime import datetime, date
 from contextlib import asynccontextmanager
 from typing import Literal, Optional
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
@@ -203,6 +203,7 @@ async def teacher_directory():
 
 
 class ActivityEvent(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     uid: str = Field(min_length=8, max_length=128, pattern=r'^[A-Za-z0-9_-]+$')
     group: str = Field(min_length=2, max_length=64)
     mode: Literal['standalone', 'browser']

@@ -125,7 +125,7 @@ function initControlledDayPicker(picker, items, state, renderForDay, requestArc)
         center(state.activeDay, false);
     }
     listen(picker, 'touchstart', event => {
-        if (event.touches.length !== 1) { cancel(); return; }
+        if (event.touches.length !== 1 || window.visualViewport?.scale > 1) { cancel(); return; }
         blockedUntil = 0;
         stopAnimation();
         clearTimeout(state.scrollTimeout);
@@ -135,7 +135,7 @@ function initControlledDayPicker(picker, items, state, renderForDay, requestArc)
     }, {passive:true});
     listen(picker, 'touchmove', event => {
         if (!gesture) return;
-        if (event.touches.length !== 1) { cancel(); return; }
+        if (event.touches.length !== 1 || window.visualViewport?.scale > 1) { cancel(); return; }
         const point = event.touches[0];
         if (point.identifier !== gesture.id) return;
         const dx = point.clientX - gesture.x, dy = point.clientY - gesture.y;
@@ -298,6 +298,8 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
         return;
     }
     picker.dataset.scrollEngine = 'native';
+    const hasScrollEnd = 'onscrollend' in picker;
+    let scrollRevision = 0;
     function finishScroll() {
         clearTimeout(state.scrollTimeout);
         if (picker.hidden || state.touching) return;
@@ -316,14 +318,19 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
     }
     picker.onscroll = () => {
         requestArc();
-        clearTimeout(state.scrollTimeout);
-        state.scrollTimeout = setTimeout(finishScroll, 150);
+        state.scrolled = true;
+        if (!hasScrollEnd) {
+            clearTimeout(state.scrollTimeout);
+            state.scrollTimeout = setTimeout(finishScroll, 150);
+        }
     };
-    picker.onscrollend = finishScroll;
+    if (hasScrollEnd) picker.onscrollend = finishScroll;
     const startUserScroll = event => {
+        ++scrollRevision;
         state.programmatic = false;
         if (event.type === 'touchstart') {
             state.touching = true;
+            state.scrolled = false;
             clearTimeout(state.scrollTimeout);
         }
     };
@@ -335,7 +342,8 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
         state.touching = event.touches.length > 0;
         if (!state.touching) {
             clearTimeout(state.scrollTimeout);
-            state.scrollTimeout = setTimeout(finishScroll, 150);
+            if (!hasScrollEnd) state.scrollTimeout = setTimeout(finishScroll, 150);
+            else if (!state.scrolled) finishScroll();
         }
     };
     picker.ontouchend = endUserScroll;
@@ -343,13 +351,20 @@ function initSchedulePage(scheduleDict, calendar = null, group = null) {
     items.forEach(item => {
         item.onclick = () => {
             state.programmatic = true;
+            const revision = ++scrollRevision;
             const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            picker.scrollTo({ left: item.offsetLeft + item.clientWidth / 2 - picker.clientWidth / 2,
+            const left = item.offsetLeft + item.clientWidth / 2 - picker.clientWidth / 2;
+            const unchanged = Math.abs(picker.scrollLeft - left) < 1;
+            const result = picker.scrollTo({ left,
                 behavior: reducedMotion ? 'auto' : 'smooth' });
             renderForDay(item.dataset.day, true);
-            // Refresh the arc even when tapping an already centered item.
             clearTimeout(state.scrollTimeout);
-            state.scrollTimeout = setTimeout(finishScroll, 200);
+            if (result instanceof Promise) {
+                result.then(() => {
+                    if (schedulePickerState === state && revision === scrollRevision) finishScroll();
+                });
+            } else if (unchanged) finishScroll();
+            else if (!hasScrollEnd) state.scrollTimeout = setTimeout(finishScroll, 150);
         };
     });
     const initial = items.find(item => item.dataset.day === preferredDay) || items[0];

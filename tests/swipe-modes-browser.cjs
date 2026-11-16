@@ -64,9 +64,9 @@ async function main() {
                         await page.goForward();await aligned(page,'settings');
                     }
                     await page.locator('#open-group-modal').click();
-                    await page.locator('#group-modal.active').waitFor();
+                    await page.locator('#group-modal[open]').waitFor();
                     await page.locator('#close-modal').click();
-                    await page.locator('#group-modal.active').waitFor({state:'hidden'});
+                    await page.locator('#group-modal[open]').waitFor({state:'hidden'});
                     await page.locator('.bottom-nav [data-tab="schedule"]').click();
                     await aligned(page,'schedule');
                     const selectedDay = await page.locator('.day-picker .day-item').last().getAttribute('data-day');

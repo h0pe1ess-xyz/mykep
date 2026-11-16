@@ -1,7 +1,7 @@
 /* MyKep Admin service worker: network-first app shell, never caches API data. */
-const CACHE_NAME = 'mykep-admin-v2.10.15';
+const CACHE_NAME = 'mykep-admin-v2.10.16';
 const SHELL = ['/admin/', '/admin/admin.css', '/admin/admin.js', '/admin/charts.js',
-    '/admin/manifest.webmanifest', '/admin/icon-192.png', '/admin/apple-touch-icon.png'];
+    '/admin/manifest.webmanifest', '/admin/icon-192.png', '/admin/apple-touch-icon.png', '/js/requests.js'];
 
 self.addEventListener('install', event => {
     event.waitUntil((async () => {
@@ -24,7 +24,7 @@ self.addEventListener('fetch', event => {
     const request = event.request;
     const url = new URL(request.url);
     if (request.method !== 'GET' || url.origin !== self.location.origin) return;
-    if (url.pathname.startsWith('/api/') || !url.pathname.startsWith('/admin/')) return;
+    if (url.pathname.startsWith('/api/') || (!url.pathname.startsWith('/admin/') && !SHELL.includes(url.pathname))) return;
     const key = SHELL.includes(url.pathname) ? url.pathname : (request.mode === 'navigate' ? '/admin/' : null);
     if (!key) return;
     event.respondWith((async () => {
