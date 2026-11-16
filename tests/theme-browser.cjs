@@ -30,10 +30,9 @@ async function run() {
                         sessionStorage.setItem('mykep_browser_session','yes');
                         Object.defineProperty(navigator,'standalone',{value:true});
                     });
-                    await page.goto(server.url+'/schedule.html');
-                    await page.waitForFunction(()=>typeof schedulePageData!=='undefined' && schedulePageData);
                     for(const tab of ['schedule','dashboard','settings']) {
-                        await page.evaluate(tab=>Tabs.show(tab),tab);
+                        await page.goto(server.url+({schedule:'/schedule.html',dashboard:'/',settings:'/settings.html'})[tab]);
+                        await page.waitForFunction(()=>typeof schedulePageData!=='undefined' && schedulePageData);
                         await page.waitForFunction(()=>scheduleRequests.size===0);
                         await page.locator('.bottom-nav .active').waitFor({state:'visible'});
                         await page.locator('.bottom-nav .active').evaluate(node=>Promise.all(node.getAnimations({subtree:true}).map(animation=>animation.finished)));
@@ -42,33 +41,37 @@ async function run() {
                             const rect=button.getBoundingClientRect();
                             const card=[...document.querySelectorAll(`[data-view="${Tabs.current}"] .lesson-card, [data-view="${Tabs.current}"] .lesson-card-detailed, [data-view="${Tabs.current}"] .settings-card`)]
                                 .find(node=>node.getBoundingClientRect().width>0);
+                            const cardRect=card.getBoundingClientRect();
                             return {scheme:getComputedStyle(document.documentElement).colorScheme,
                                 meta:document.querySelector('meta[name="color-scheme"]')?.content,
                                 cardBackground:getComputedStyle(card).backgroundColor,
                                 accent:getComputedStyle(button).backgroundColor,
                                 iconColor:getComputedStyle(button.querySelector('svg')).color,
                                 glow:getComputedStyle(button).boxShadow,
+                                cardSample:{x:Math.round(cardRect.left+8),y:Math.round(cardRect.top+cardRect.height/2)},
                                 sample:{x:Math.round(rect.left+6),y:Math.round(rect.top+rect.height/2)}};
                         });
                         // Sample the painted pixel: computed CSS misses compositor recoloring.
                         const file=`.mykep-local/screens/${name}-${preference}-${tab}${baselineOnly?'-baseline':''}.png`;
                         const png=await page.screenshot({path:file,animations:'disabled'});
-                        const pixel=await page.evaluate(async({encoded,x,y})=>{
+                        const {pixel,cardPixel}=await page.evaluate(async({encoded,sample,cardSample})=>{
                             const bytes=Uint8Array.from(atob(encoded),value=>value.charCodeAt(0));
                             const bitmap=await createImageBitmap(new Blob([bytes],{type:'image/png'}));
                             const canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;
                             const ctx=canvas.getContext('2d');ctx.drawImage(bitmap,0,0);bitmap.close();
-                            return [...ctx.getImageData(x,y,1,1).data];
-                        },{encoded:png.toString('base64'),...info.sample});
-                        results.push({engine:name,preference,tab,...info,pixel});
+                            const pixelAt=point=>[...ctx.getImageData(point.x,point.y,1,1).data];
+                            return {pixel:pixelAt(sample),cardPixel:pixelAt(cardSample)};
+                        },{encoded:png.toString('base64'),sample:info.sample,cardSample:info.cardSample});
+                        results.push({engine:name,preference,tab,...info,pixel,cardPixel});
                         if(!baselineOnly) {
                             assert.equal(info.scheme,'dark only');
                             assert.equal(info.meta,'dark');
                             assert.equal(info.accent,'rgb(31, 23, 20)');
                             assert.equal(info.iconColor,'rgb(255, 85, 0)');
                             assert.equal(info.glow,'none');
-                            assert.equal(info.cardBackground,'rgba(36, 28, 24, 0.65)');
+                            assert.equal(info.cardBackground,'oklch(0.255 0.018 50)');
                             assert.deepEqual(pixel,[31,23,20,255]);
+                            assert.deepEqual(cardPixel,[42,32,27,255]);
                         }
                     }
                     if(!baselineOnly) {
