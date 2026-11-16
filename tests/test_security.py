@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import hmac
 import os
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -73,8 +74,7 @@ class AdminSecurityTests(unittest.IsolatedAsyncioTestCase):
                         patch.object(auth, 'TELEGRAM_BOT_TOKEN', TEST_TOKEN)]
         for item in self.patches:
             item.start()
-        for name in ('login_ip_limiter', 'login_global_limiter', 'code_ip_limiter',
-                     'code_global_limiter', 'api_session_limiter', 'action_limiter'):
+        for name in ('login_ip_limiter', 'login_global_limiter', 'api_session_limiter', 'action_limiter'):
             getattr(auth, name).hits.clear()
         await database.init_database()
         await auth.init_admin_db()
@@ -97,7 +97,7 @@ class AdminSecurityTests(unittest.IsolatedAsyncioTestCase):
                      'analytics/daily', 'analytics/details', 'export/daily.csv'):
             with self.subTest(path=path):
                 self.assertEqual((await self.client.get('/api/admin/' + path)).status_code, 401)
-        for path in ('logout', 'login-code', 'sessions/revoke', 'actions/refresh-schedule', 'actions/rollback-schedule'):
+        for path in ('logout', 'sessions/revoke', 'actions/refresh-schedule', 'actions/rollback-schedule'):
             with self.subTest(path=path):
                 self.assertEqual((await self.client.post('/api/admin/' + path, json={})).status_code, 401)
         self.assertEqual((await self.client.post('/api/admin/auth/dev', json={'user_id': ADMIN_ID})).status_code, 405)
@@ -127,15 +127,9 @@ class AdminSecurityTests(unittest.IsolatedAsyncioTestCase):
         responses = await asyncio.gather(*(self.client.post('/api/admin/auth/telegram', json=payload) for _ in range(5)))
         self.assertEqual(sorted(response.status_code for response in responses), [200, 401, 401, 401, 401])
 
-    async def test_code_single_use_under_concurrent_requests(self):
-        code, _ = await auth.create_login_code_for_cli(ADMIN_ID)
-        users = await asyncio.gather(*(auth.consume_login_code(code) for _ in range(10)))
-        self.assertEqual(sum(user is not None for user in users), 1)
-        with self.assertRaises(PermissionError):
-            await auth.create_login_code_for_cli(1)
 
     async def test_session_expiry_revocation_and_storage_hashes(self):
-        token = await auth.create_session(ADMIN_ID, 'Test', '', 'telegram', '', '')
+        token = await auth.create_session(ADMIN_ID, 'Test', '', '', '')
         session = await auth.get_session(token)
         self.assertNotEqual(session['token_hash'], token)
         async with database.connect() as db:
@@ -143,71 +137,98 @@ class AdminSecurityTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(stored, hashlib.sha256(token.encode()).hexdigest())
         with patch.object(auth, '_now', return_value=time.time() + auth.ADMIN_IDLE_HOURS * 3600 + 1):
             self.assertIsNone(await auth.get_session(token))
-        token = await auth.create_session(ADMIN_ID, 'Test', '', 'telegram', '', '')
+        token = await auth.create_session(ADMIN_ID, 'Test', '', '', '')
         with patch.object(auth, 'ADMIN_IDS', frozenset()):
             self.assertIsNone(await auth.get_session(token))
 
-    async def test_revocation_also_invalidates_outstanding_login_codes(self):
-        token = await auth.create_session(ADMIN_ID, 'Test', '', 'telegram', '', '')
-        session = await auth.get_session(token)
-        code, _ = await auth.create_login_code(session)
-        await auth.revoke_session(session['sid'])
-        self.assertIsNone(await auth.consume_login_code(code))
-        with self.assertRaises(PermissionError):
-            await auth.create_login_code(session)
-
-    async def test_revoke_all_invalidates_cli_codes_too(self):
-        import admin_cli
-        code, _ = await auth.create_login_code_for_cli(ADMIN_ID)
-        with patch('builtins.print'):
-            await admin_cli.main(['admin_cli.py', 'revoke-all'])
-        self.assertIsNone(await auth.consume_login_code(code))
-
-    async def test_other_sessions_revocation_and_logout_invalidate_codes(self):
-        keep = await auth.create_session(ADMIN_ID, 'Keep', '', 'telegram', '', '')
-        other = await auth.create_session(ADMIN_ID, 'Other', '', 'telegram', '', '')
-        code, _ = await auth.create_login_code(await auth.get_session(other))
-        self.assertEqual(await auth.revoke_other_sessions((await auth.get_session(keep))['sid']), 1)
-        self.assertIsNone(await auth.consume_login_code(code))
-        kept = await auth.get_session(keep)
-        self.assertIsNotNone(kept)
-        code, _ = await auth.create_login_code(kept)
-        await auth.delete_session(kept['token_hash'])
-        self.assertIsNone(await auth.consume_login_code(code))
-
-    async def test_code_exchange_failure_rolls_back_consumption(self):
-        code, _ = await auth.create_login_code_for_cli(ADMIN_ID)
-        with patch.object(auth, '_insert_session', AsyncMock(side_effect=RuntimeError('fixture'))):
-            with self.assertRaises(RuntimeError):
-                await auth.consume_login_code(code)
-        self.assertIsNotNone(await auth.consume_login_code(code))
-        self.assertIsNone(await auth.consume_login_code(code))
 
     async def test_session_cap_keeps_newest_session_when_timestamps_tie(self):
         with patch.object(auth, '_now', return_value=int(time.time())):
-            tokens = [await auth.create_session(ADMIN_ID, 'Test', '', 'telegram', '', '')
+            tokens = [await auth.create_session(ADMIN_ID, 'Test', '', '', '')
                       for _ in range(auth.MAX_SESSIONS_PER_USER + 1)]
             self.assertIsNotNone(await auth.get_session(tokens[-1]))
             self.assertIsNone(await auth.get_session(tokens[0]))
 
-    async def test_code_exchange_serializes_with_revoke_all(self):
-        import admin_cli
-        for _ in range(5):
-            code, _ = await auth.create_login_code_for_cli(ADMIN_ID)
-            with patch('builtins.print'):
-                await asyncio.gather(auth.consume_login_code(code), admin_cli.main(['admin_cli.py', 'revoke-all']))
-            async with database.connect() as db:
-                self.assertEqual(await db.execute_fetchall('SELECT COUNT(*) FROM admin_sessions'), [(0,)])
-                self.assertEqual(await db.execute_fetchall('SELECT COUNT(*) FROM admin_login_codes'), [(0,)])
 
-    async def test_code_login_issues_exactly_one_session_and_limits_cursor(self):
-        code, _ = await auth.create_login_code_for_cli(ADMIN_ID)
-        response = await self.client.post('/api/admin/auth/code', json={'code': code})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {'status': 'success'})
-        self.assertEqual((await self.client.get('/api/admin/me')).status_code, 200)
+    async def test_removed_code_routes_cannot_create_sessions(self):
+        for logged_in in (False, True):
+            if logged_in:
+                await self.login()
+            for path in ('/api/admin/auth/code', '/api/admin/login-code'):
+                with self.subTest(path=path, logged_in=logged_in):
+                    response = await self.client.post(path, json={'code': 'ABCD-EFGH'})
+                    self.assertEqual(response.status_code, 405)
+                    self.assertNotIn('set-cookie', response.headers)
+                    self.assertEqual((await self.client.get(path)).status_code, 404)
+            async with database.connect() as db:
+                self.assertEqual(await db.execute_fetchall('SELECT COUNT(*) FROM admin_sessions'), [(int(logged_in),)])
+
+    async def test_removed_cli_command_does_not_issue_credentials(self):
+        import admin_cli
+        with patch('builtins.print'):
+            status = await admin_cli.main(['admin_cli.py', 'code', str(ADMIN_ID)])
+        self.assertEqual(status, 2)
+        for name in ('create_login_code', 'consume_login_code', 'create_login_code_for_cli'):
+            self.assertFalse(hasattr(auth, name))
         async with database.connect() as db:
-            self.assertEqual(await db.execute_fetchall('SELECT COUNT(*) FROM admin_sessions'), [(1,)])
+            self.assertEqual(await db.execute_fetchall('SELECT COUNT(*) FROM admin_sessions'), [(0,)])
+
+    async def test_retirement_migration_preserves_telegram_sessions_and_audit(self):
+        telegram = await auth.create_session(ADMIN_ID, 'Telegram', '', '', '')
+        legacy = await auth.create_session(ADMIN_ID, 'Legacy', '', '', '')
+        await auth.audit('fixture_event', ADMIN_ID)
+        async with database.connect() as db:
+            await db.execute("UPDATE admin_sessions SET method = 'code' WHERE token_hash = ?", (auth._sha256(legacy),))
+            await db.execute('CREATE TABLE admin_login_codes (code_hash TEXT PRIMARY KEY)')
+            await db.execute("INSERT INTO admin_login_codes VALUES ('obsolete-fixture')")
+            await db.commit()
+        await auth.init_admin_db()
+        await auth.init_admin_db()
+        self.assertIsNone(await auth.get_session(legacy))
+        self.assertEqual((await auth.get_session(telegram))['method'], 'telegram')
+        async with database.connect() as db:
+            self.assertEqual(await db.execute_fetchall("SELECT name FROM sqlite_master WHERE name = 'admin_login_codes'"), [])
+        self.assertEqual([row['event'] for row in await auth.audit_log()], ['fixture_event'])
+
+    async def test_retirement_migration_rolls_back_as_one_transaction(self):
+        legacy = await auth.create_session(ADMIN_ID, 'Legacy', '', '', '')
+        async with database.connect() as db:
+            await db.execute("UPDATE admin_sessions SET method = 'code'")
+            await db.execute('CREATE TABLE admin_login_codes (code_hash TEXT PRIMARY KEY)')
+            await db.execute("INSERT INTO admin_login_codes VALUES ('obsolete-fixture')")
+            await db.execute("CREATE TRIGGER fail_retirement BEFORE DELETE ON admin_sessions BEGIN SELECT RAISE(ABORT, 'fixture'); END")
+            await db.commit()
+        with self.assertRaises(sqlite3.IntegrityError):
+            await auth.init_admin_db()
+        async with database.connect() as db:
+            self.assertEqual(await db.execute_fetchall('SELECT * FROM admin_login_codes'), [('obsolete-fixture',)])
+            self.assertEqual(await db.execute_fetchall('SELECT token_hash FROM admin_sessions'), [(auth._sha256(legacy),)])
+
+    async def test_legacy_session_cookie_is_rejected_before_migration(self):
+        token = await auth.create_session(ADMIN_ID, 'Legacy', '', '', '')
+        async with database.connect() as db:
+            await db.execute("UPDATE admin_sessions SET method = 'code'")
+            await db.commit()
+        self.client.cookies.set(auth.COOKIE_NAME, token)
+        self.assertEqual((await self.client.get('/api/admin/me')).status_code, 401)
+        self.assertIsNone(await auth.get_session(token))
+
+    async def test_revocation_without_login_code_storage(self):
+        import admin_cli
+        keep = await auth.create_session(ADMIN_ID, 'Keep', '', '', '')
+        other = await auth.create_session(ADMIN_ID, 'Other', '', '', '')
+        self.assertEqual(await auth.revoke_session((await auth.get_session(other))['sid']), 1)
+        self.assertIsNone(await auth.get_session(other))
+        other = await auth.create_session(ADMIN_ID, 'Other', '', '', '')
+        self.assertEqual(await auth.revoke_other_sessions((await auth.get_session(keep))['sid']), 1)
+        self.assertIsNone(await auth.get_session(other))
+        self.assertIsNotNone(await auth.get_session(keep))
+        with patch('builtins.print'):
+            self.assertEqual(await admin_cli.main(['admin_cli.py', 'revoke-all']), 0)
+        self.assertIsNone(await auth.get_session(keep))
+
+    async def test_telegram_session_still_enforces_cursor_bounds(self):
+        await self.login()
         response = await self.client.get('/api/admin/analytics/details', params={'before': str(2**63)})
         self.assertEqual(response.status_code, 422)
 
@@ -215,9 +236,9 @@ class AdminSecurityTests(unittest.IsolatedAsyncioTestCase):
         for origin in ('null', 'https://localhost/evil', 'https://localhost?x=1', 'http://localhost'):
             response = await self.client.post('/api/admin/auth/telegram', json={}, headers={'Origin': origin})
             self.assertEqual(response.status_code, 403)
-        response = await self.client.post('/api/admin/auth/code', content='[]', headers={'Content-Type': 'application/json'})
+        response = await self.client.post('/api/admin/auth/telegram', content='[]', headers={'Content-Type': 'application/json'})
         self.assertEqual(response.status_code, 400)
-        for path in ('/api/activity', '/api/admin/auth/code'):
+        for path in ('/api/activity', '/api/admin/auth/telegram'):
             self.assertEqual((await self.client.post(path, content=b'x' * 4097)).status_code, 413)
             async def chunks():
                 yield b'x' * 2048

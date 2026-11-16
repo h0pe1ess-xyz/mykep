@@ -1,41 +1,41 @@
-const CACHE_NAME = 'mykep-cache-v2.10.19';
-const RELEASE_VERSION = '2.10.19';
+const CACHE_NAME = 'mykep-cache-v2.10.20';
+const RELEASE_VERSION = '2.10.20';
 const APP_SHELL = [
-    "/js/brand.js?v=2.10.19",
+    "/js/brand.js?v=2.10.20",
     "/manifest-test.json",
     "/icons/test-192.png",
     "/icons/test-512.png",
-    "/js/requests.js?v=2.10.19",
-    "/js/calendar-config.js?v=2.10.19",
-    "/js/bells.js?v=2.10.19",
-    "/data/bells.json?v=2.10.19",
-    "/js/dialogs.js?v=2.10.19",
+    "/js/requests.js?v=2.10.20",
+    "/js/calendar-config.js?v=2.10.20",
+    "/js/bells.js?v=2.10.20",
+    "/data/bells.json?v=2.10.20",
+    "/js/dialogs.js?v=2.10.20",
     "/",
     "/about.html",
-    "/css/about.css?v=2.10.19",
-    "/css/app.css?v=2.10.19",
+    "/css/about.css?v=2.10.20",
+    "/css/app.css?v=2.10.20",
     "/manifest.json",
     "/favicon.ico",
-    "/data/teacher-hints.json?v=2.10.19",
-    "/js/api.js?v=2.10.19",
-    "/js/app.js?v=2.10.19",
-    "/js/boot.js?v=2.10.19",
-    "/js/dashboard.js?v=2.10.19",
-    "/js/onboarding.js?v=2.10.19",
-    "/js/pwa.js?v=2.10.19",
-    "/js/schedule-share.js?v=2.10.19",
-    "/js/schedule.js?v=2.10.19",
-    "/js/settings.js?v=2.10.19",
-    "/js/support.js?v=2.10.19",
-    "/js/tabs.js?v=2.10.19",
-    "/js/teacher-hints.js?v=2.10.19",
-    "/js/utils.js?v=2.10.19",
+    "/data/teacher-hints.json?v=2.10.20",
+    "/js/api.js?v=2.10.20",
+    "/js/app.js?v=2.10.20",
+    "/js/boot.js?v=2.10.20",
+    "/js/dashboard.js?v=2.10.20",
+    "/js/onboarding.js?v=2.10.20",
+    "/js/pwa.js?v=2.10.20",
+    "/js/schedule-share.js?v=2.10.20",
+    "/js/schedule.js?v=2.10.20",
+    "/js/settings.js?v=2.10.20",
+    "/js/support.js?v=2.10.20",
+    "/js/tabs.js?v=2.10.20",
+    "/js/teacher-hints.js?v=2.10.20",
+    "/js/utils.js?v=2.10.20",
     "/icons/install-144.webp",
     "/icons/icon-192.png",
     "/icons/icon-512.png",
     "/icons/maskable-orange-512.png"
 ];
-const SHELL_HASHES = {"/": "d126e41a84f5cd1c7fbde49efe603d0002d2d6703548f34f6d436208f08119d9", "/about.html": "abb61dc911ad335d89da885f783a44704587c3e2099681328ca67505cca8ca05", "/css/about.css?v=2.10.19": "63f9cb041b1dbb44e5d1bbcd99a0ea7b067221aaf0fcc5f2620d3081d1b2548b", "/css/app.css?v=2.10.19": "0ef8b6b0a501e2e1879be81dd0eba7d58e6bee46514ad4f637b4f09d9d33e8e9", "/data/bells.json?v=2.10.19": "e0077bddf3aa9777c690934eac5ece991ce6b8cd5674ed9bb5eab66f1080d82c", "/data/teacher-hints.json?v=2.10.19": "62925f89ce7b723ca830be198a8016d44f7c3c477ba9500ef3d201abe9555452", "/favicon.ico": "3fec7714d2adfa4acaadea48e6f7514939ad689ed026dd221aa58cd2d369d67b", "/icons/icon-192.png": "e470d3f6cf6976a2d12c35dfe249f0561ae0ad457f046bd3612a40568dc134bd", "/icons/icon-512.png": "e2d86fe6dd7d2571e5bd941129fc3aa88469cead4c53d381abcd33ffd514d40d", "/icons/install-144.webp": "e55475df6ab9a48853cc92e9a3059734d84f002c895fc0e704df8e906b595679", "/icons/maskable-orange-512.png": "4fc555360c7c3d0b0ff993540d30e599756a15a26418280dc583ebac28db8d86", "/icons/test-192.png": "ce18a52ebbd7e14bc09a1b3022abfd2e3f59d367dd7a96c14d00caf1de330ad9", "/icons/test-512.png": "0bae4ac0e796e78269446beb85b8d2cac1ce31f9453c62240862823fb809613d", "/js/api.js?v=2.10.19": "867843a05c0ddca7bf88a9fd9ca5d77f45d83fb3dae560d76a523ec2520b3e05", "/js/app.js?v=2.10.19": "7afc09a14939cb2f26cb439ee7ee66d85250cda89c31c7840af402a2cfdf3654", "/js/bells.js?v=2.10.19": "38415a679c05471732f9074c8e8987868d258742342fadcabe1f395ecaf4d9d3", "/js/boot.js?v=2.10.19": "081655a8737abdfeada4001f3c7860b5ba37e5ec184e751421e899aed2f9fa7a", "/js/brand.js?v=2.10.19": "be9c17a253eee1ed2f26b2358ada33ab020169e20de28b94f9c9ffb033d5b5da", "/js/calendar-config.js?v=2.10.19": "5f552e607f0a260c0b117da8cc21a41c1cb95e17de9de4fe18025a1e348109ed", "/js/dashboard.js?v=2.10.19": "c88da4d93fb0330047bee4da5c6276db9de6fd70e1a9cf333d3f92682e79f2d6", "/js/dialogs.js?v=2.10.19": "b698d7b4bd160db9ffc07e1145ad925b2a0988c669ce85cc16049b72bb667b34", "/js/onboarding.js?v=2.10.19": "582adc4f745626c6d1cc3aa738457798fd8a16ee33fac05f07803255fc61c54a", "/js/pwa.js?v=2.10.19": "6cef6b1167afa0450115219ea001a735851cd41bd63fd307e615d17adf63d0bf", "/js/requests.js?v=2.10.19": "9bf3a74363ad92c530358ead4a91cc2f0ce7eeae895690034024769122aca525", "/js/schedule-share.js?v=2.10.19": "c8b928bf4b50c9def857b495bcc638bc31dce2d493b1b8c17648526754b42be9", "/js/schedule.js?v=2.10.19": "e1ad37b9590b8f6f85e9b81a5176d74bfb1cf9b8762492bee878b7a9ea14ca40", "/js/settings.js?v=2.10.19": "164ab17270b0d34ecd72d3d6ce893532752af7b491701a0ecdf9d1cf069e51ad", "/js/support.js?v=2.10.19": "23f706224d11af4ca29f57bd84f80ffa7d883e1f587260b06534678d51989f50", "/js/tabs.js?v=2.10.19": "320a2b7c34065efce088454313b7df9e54a0cf480c02564d9a3c8ff6d9a7449d", "/js/teacher-hints.js?v=2.10.19": "1941c5d4fbd1f5e7377a3ce0e0c9dd5b5bf3b8b4fc61963dcf096b01dfa243fb", "/js/utils.js?v=2.10.19": "d418cb50cc9e067c7d46751e94b4982e93127f54fb75eeca842a8135a27cee95", "/manifest-test.json": "c22b0e7559e683835839a9f50a9cfad74a2ff6cc08f417ae194fa3dcc3b4bd2c", "/manifest.json": "1ca328a0070b66bdfb49fd6aa0b6ffca26d5239bddb8752dc328f5428f954ae4"};
+const SHELL_HASHES = {"/": "b5c0a8062351ac247e154a184ab038599f76c5bd85b468236bc74c177cc76b3d", "/about.html": "2da03ad7aabc437aedbae8b89ffb0ba15bca0ddae5c51d5044d3cb0161827c57", "/css/about.css?v=2.10.20": "63f9cb041b1dbb44e5d1bbcd99a0ea7b067221aaf0fcc5f2620d3081d1b2548b", "/css/app.css?v=2.10.20": "0ef8b6b0a501e2e1879be81dd0eba7d58e6bee46514ad4f637b4f09d9d33e8e9", "/data/bells.json?v=2.10.20": "e0077bddf3aa9777c690934eac5ece991ce6b8cd5674ed9bb5eab66f1080d82c", "/data/teacher-hints.json?v=2.10.20": "62925f89ce7b723ca830be198a8016d44f7c3c477ba9500ef3d201abe9555452", "/favicon.ico": "3fec7714d2adfa4acaadea48e6f7514939ad689ed026dd221aa58cd2d369d67b", "/icons/icon-192.png": "e470d3f6cf6976a2d12c35dfe249f0561ae0ad457f046bd3612a40568dc134bd", "/icons/icon-512.png": "e2d86fe6dd7d2571e5bd941129fc3aa88469cead4c53d381abcd33ffd514d40d", "/icons/install-144.webp": "e55475df6ab9a48853cc92e9a3059734d84f002c895fc0e704df8e906b595679", "/icons/maskable-orange-512.png": "4fc555360c7c3d0b0ff993540d30e599756a15a26418280dc583ebac28db8d86", "/icons/test-192.png": "ce18a52ebbd7e14bc09a1b3022abfd2e3f59d367dd7a96c14d00caf1de330ad9", "/icons/test-512.png": "0bae4ac0e796e78269446beb85b8d2cac1ce31f9453c62240862823fb809613d", "/js/api.js?v=2.10.20": "867843a05c0ddca7bf88a9fd9ca5d77f45d83fb3dae560d76a523ec2520b3e05", "/js/app.js?v=2.10.20": "7afc09a14939cb2f26cb439ee7ee66d85250cda89c31c7840af402a2cfdf3654", "/js/bells.js?v=2.10.20": "38415a679c05471732f9074c8e8987868d258742342fadcabe1f395ecaf4d9d3", "/js/boot.js?v=2.10.20": "196abdbf6c41e5860a4d52049d1da8e451f9198b0a96ac00fc6217407b1d3075", "/js/brand.js?v=2.10.20": "be9c17a253eee1ed2f26b2358ada33ab020169e20de28b94f9c9ffb033d5b5da", "/js/calendar-config.js?v=2.10.20": "5f552e607f0a260c0b117da8cc21a41c1cb95e17de9de4fe18025a1e348109ed", "/js/dashboard.js?v=2.10.20": "c88da4d93fb0330047bee4da5c6276db9de6fd70e1a9cf333d3f92682e79f2d6", "/js/dialogs.js?v=2.10.20": "b698d7b4bd160db9ffc07e1145ad925b2a0988c669ce85cc16049b72bb667b34", "/js/onboarding.js?v=2.10.20": "582adc4f745626c6d1cc3aa738457798fd8a16ee33fac05f07803255fc61c54a", "/js/pwa.js?v=2.10.20": "6cef6b1167afa0450115219ea001a735851cd41bd63fd307e615d17adf63d0bf", "/js/requests.js?v=2.10.20": "9bf3a74363ad92c530358ead4a91cc2f0ce7eeae895690034024769122aca525", "/js/schedule-share.js?v=2.10.20": "c8b928bf4b50c9def857b495bcc638bc31dce2d493b1b8c17648526754b42be9", "/js/schedule.js?v=2.10.20": "e1ad37b9590b8f6f85e9b81a5176d74bfb1cf9b8762492bee878b7a9ea14ca40", "/js/settings.js?v=2.10.20": "164ab17270b0d34ecd72d3d6ce893532752af7b491701a0ecdf9d1cf069e51ad", "/js/support.js?v=2.10.20": "23f706224d11af4ca29f57bd84f80ffa7d883e1f587260b06534678d51989f50", "/js/tabs.js?v=2.10.20": "320a2b7c34065efce088454313b7df9e54a0cf480c02564d9a3c8ff6d9a7449d", "/js/teacher-hints.js?v=2.10.20": "232a6ee9d2560992f026606011c8b9a339a59779b99ed7369c73fe82b356d1fa", "/js/utils.js?v=2.10.20": "d418cb50cc9e067c7d46751e94b4982e93127f54fb75eeca842a8135a27cee95", "/manifest-test.json": "c22b0e7559e683835839a9f50a9cfad74a2ff6cc08f417ae194fa3dcc3b4bd2c", "/manifest.json": "1ca328a0070b66bdfb49fd6aa0b6ffca26d5239bddb8752dc328f5428f954ae4"};
 const OPTIONAL_ASSETS = ["/pfp/1-192.webp", "/pfp/2.webp"];
 const TAB_PATHS = new Set(['/', '/index.html', '/schedule.html', '/settings.html']);
 

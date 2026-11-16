@@ -9,7 +9,7 @@
     const TITLES = { overview: 'Огляд', stats: 'Статистика', server: 'Сервер', security: 'Безпека' };
     const RANGE_LABELS = [['1', 'Сьогодні'], ['7', '7 днів'], ['14', '14 днів'], ['30', '30 днів'], ['90', '90 днів'], ['all', 'Весь час']];
     const state = { config: null, me: null, csrf: null, view: 'overview', range: '14', timer: null,
-        groupQuery: '', groupSort: 'views', groupsExpanded: false, dailyMetric: 'both', codeTimer: null, lastData: {} };
+        groupQuery: '', groupSort: 'views', groupsExpanded: false, dailyMetric: 'both', lastData: {} };
     let loadSequence = 0;
     const $ = id => document.getElementById(id);
     const nf = new Intl.NumberFormat('uk-UA');
@@ -170,8 +170,6 @@
     function showLogin(message) {
         stopTimer();
         state.me = null; state.csrf = null;
-        clearInterval(state.codeTimer);
-        state.codeTimer = null;
         document.querySelectorAll('.page').forEach(page => { C.dispose(page); page.replaceChildren(); });
         state.lastData = {};
         $('status-pill').hidden = true;
@@ -193,28 +191,9 @@
             tg.hidden = true;
             $('tg-missing').hidden = false;
         }
-        if (isIOSStandalone()) { $('ios-hint').hidden = false; $('code-box').open = true; }
+        $('ios-hint').hidden = !isIOSStandalone();
         loginError(message);
     }
-    $('code-form').addEventListener('submit', async ev => {
-        ev.preventDefault();
-        const input = $('code-input');
-        const code = input.value.trim();
-        if (!code) return;
-        const btn = ev.target.querySelector('button');
-        btn.disabled = true;
-        try {
-            await api('/auth/code', { method: 'POST', body: { code } });
-            input.value = '';
-            await enterApp();
-        } catch (e) { loginError(e.message); }
-        finally { btn.disabled = false; }
-    });
-    $('code-input').addEventListener('input', ev => {
-        const raw = ev.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
-        ev.target.value = raw.length > 4 ? raw.slice(0, 4) + '-' + raw.slice(4) : raw;
-    });
-
     async function enterApp() {
         try {
             const me = await api('/me');
@@ -266,8 +245,6 @@
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.me) load(false); });
 
     function setView(view) {
-        clearInterval(state.codeTimer);
-        state.codeTimer = null;
         state.view = view;
         history.replaceState(null, '', '/admin/#/' + view);
         document.querySelectorAll('[data-view]').forEach(b => {
@@ -775,15 +752,10 @@
     /* ----------------------------------------------------------- security */
     const EVENTS = { login: ['Вхід', 'ok'], logout: ['Вихід', null], login_denied: ['Спроба входу: не адмін', 'critical'],
         login_bad_signature: ['Невалідний підпис Telegram', 'warning'], login_replay: ['Повторне використання входу', 'critical'],
-        login_bad_code: ['Невірний код входу', 'warning'], login_code_created: ['Створено код входу', null],
         refresh_schedule: ['Ручне оновлення розкладу', null], rollback_schedule: ['Відновлення попереднього розкладу', 'warning'], revoke_sessions: ['Завершення сесій', null], export: ['Експорт CSV', null] };
-    const METHODS = { telegram: 'Telegram', code: 'Код' };
+    const METHODS = { telegram: 'Telegram' };
     function renderSecurity([sessions, audit, server]) {
-        clearInterval(state.codeTimer);
-        state.codeTimer = null;
         const me = state.me, sec = server.security;
-        const codeBox = h('div', { class: 'code-display', hidden: true });
-        const codeBtn = h('button', { type: 'button', class: 'btn', text: 'Створити код входу', on: { click: () => createCode(codeBox, codeBtn) } });
         const checks = [
             ['HTTPS', sec.https, 'З’єднання зашифроване', 'Сайт відкрито без HTTPS (нормально лише локально)'],
             ['Secure-cookie', sec.secure_cookie, 'Кука сесії лише через HTTPS', 'ADMIN_COOKIE_SECURE=0: тільки для локального тесту'],
@@ -794,8 +766,6 @@
             card('Ваш акаунт', [kv([['Ім’я', me.user.name], ['Telegram', me.user.username ? '@' + me.user.username : '-'], ['ID', String(me.user.id)],
                 ['Спосіб входу', METHODS[me.session.method] || me.session.method], ['Сесія діє до', fmtDateTime(me.session.expires_at)]]),
                 h('button', { type: 'button', class: 'btn btn-danger', text: 'Вийти', on: { click: logout } })]),
-            card('Код входу для iPhone', [h('p', { class: 'muted small', text: 'iOS ізолює PWA з головного екрана від Safari, тож Telegram-вхід там може не працювати. Створіть тут одноразовий код (діє 3 хвилини) і введіть його на екрані входу в PWA.' }),
-                codeBtn, codeBox]),
             card('Перевірки безпеки', h('div', { class: 'list' }, checks.map(([name, ok, good, bad]) => h('div', { class: 'list-row' }, [
                 h('span', { class: 'badge ' + (ok ? 'b-ok' : 'b-critical'), text: ok ? 'OK' : '!' }), h('b', { text: name }), h('span', { class: 'muted small', text: ok ? good : bad })])))),
             card('Активні сесії', [h('div', { class: 'list' }, sessions.map(s => h('div', { class: 'list-row session' }, [
@@ -812,28 +782,6 @@
                     h('span', { class: 'muted small mono', text: a.ip || '' })]);
             }) : [h('p', { class: 'muted', text: 'Подій ще немає' })]), { span: 3, sub: 'Входи, невдалі спроби та дії адміністраторів (180 днів)' })
         ]));
-    }
-    async function createCode(box, btn) {
-        btn.disabled = true;
-        try {
-            const r = await api('/login-code', { method: 'POST', body: {} });
-            clearInterval(state.codeTimer);
-            let left = r.expires_in;
-            const timer = h('span', { class: 'muted small' });
-            const copy = h('button', { type: 'button', class: 'btn btn-ghost small', text: 'Копіювати', on: { click: async () => {
-                try { await navigator.clipboard.writeText(r.code); toast('Скопійовано'); } catch { toast('Не вдалося скопіювати', 'warn'); } } } });
-            box.replaceChildren(h('div', { class: 'code-value mono', text: r.code }), h('div', { class: 'code-meta' }, [timer, copy]));
-            box.hidden = false;
-            const tick = () => {
-                timer.textContent = left > 0 ? `діє ще ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : 'Код прострочено';
-                if (left <= 0) { clearInterval(state.codeTimer); box.classList.add('expired'); }
-                left--;
-            };
-            box.classList.remove('expired');
-            tick();
-            state.codeTimer = setInterval(tick, 1000);
-        } catch (e) { toast(e.message, 'error'); }
-        finally { btn.disabled = false; }
     }
     async function revoke(body) {
         if (!confirm(body.scope === 'others' ? 'Завершити всі інші сесії?' : 'Завершити цю сесію?')) return;

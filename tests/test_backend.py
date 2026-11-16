@@ -375,7 +375,7 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
         service = ScheduleService()
         await service.load()
         service.install(snapshot(), time.time())
-        token = await admin_auth.create_session(next(iter(admin_auth.ADMIN_IDS)), 'Test', '', 'test', '127.0.0.1', 'synthetic')
+        token = await admin_auth.create_session(next(iter(admin_auth.ADMIN_IDS)), 'Test', '', '127.0.0.1', 'synthetic')
         with patch.object(main.app.state, 'schedule', service), patch('schedule_service.fetch_schedule_sync', return_value=snapshot()):
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url='https://localhost') as client:
                 client.cookies.set(admin_auth.COOKIE_NAME, token)
@@ -407,7 +407,7 @@ class DatabaseTests(unittest.IsolatedAsyncioTestCase):
         with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('INSERT INTO schedule_snapshot VALUES (1, ?, ?)', (json.dumps(newer), time.time()))
             db.execute('INSERT INTO schedule_snapshot_previous VALUES (1, ?, ?)', (json.dumps(original), time.time()-60))
-        token = await admin_auth.create_session(next(iter(admin_auth.ADMIN_IDS)), 'Test', '', 'test', '127.0.0.1', 'synthetic')
+        token = await admin_auth.create_session(next(iter(admin_auth.ADMIN_IDS)), 'Test', '', '127.0.0.1', 'synthetic')
         with patch.object(main.app.state, 'schedule', service):
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url='https://localhost') as client:
                 path = '/api/admin/actions/rollback-schedule'
