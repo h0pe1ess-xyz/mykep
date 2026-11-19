@@ -25,23 +25,10 @@ function initSettings() {
     function refreshSettings() {
         renderSettings();
         recordUsage();
-        document.querySelectorAll('.modal-overlay.active').forEach(modal => Dialogs.close(modal));
+        document.querySelectorAll('dialog.modal-overlay[open]').forEach(modal => Dialogs.close(modal));
         App.reload();
     }
     renderSettings();
-    const swipeMode = document.getElementById('swipe-version');
-    swipeMode.value = document.documentElement.dataset.swipeChoice || document.documentElement.dataset.swipe || 'native';
-    document.getElementById('swipe-version-form').addEventListener('submit', event => {
-        event.preventDefault();
-        if (!['baseline', 'native'].includes(swipeMode.value)) return;
-        try {
-            localStorage.setItem('mykep_swipe_test', swipeMode.value);
-        } catch {
-            document.getElementById('swipe-version-status').textContent = 'Не вдалося зберегти вибір у браузері';
-            return;
-        }
-        location.reload();
-    });
     const installHelp = document.getElementById('show-install-help');
     const installCard = document.getElementById('settings-install-card');
     function updateInstallHelp() {
@@ -66,17 +53,16 @@ function initSettings() {
         Dialogs.close(confirmModal);
         pendingCallback = null;
     }
-    function showConfirmModal(title, desc, okText, callback, durationChange = false, returnFocus = document.activeElement) {
+    function showConfirmModal(title, desc, okText, callback, durationChange = false, invoker = document.activeElement) {
         pendingCallback = callback;
         confirmModalTitle.textContent = title;
         confirmModalDesc.textContent = desc;
         confirmOkBtn.textContent = okText;
         confirmModal.classList.toggle('is-duration-change', durationChange);
-        Dialogs.open(confirmModal,confirmCancelBtn,() => { pendingCallback=null; },returnFocus);
+        Dialogs.open(confirmModal,() => { pendingCallback=null; },invoker);
     }
     confirmCancelBtn.addEventListener('click', closeConfirmModal);
     window.addEventListener('popstate', () => {
-        // Tabs may already have hidden the modal; its focus lock still needs cleanup.
         if (pendingCallback) closeConfirmModal();
     });
     confirmOkBtn.addEventListener('click', () => {
@@ -177,18 +163,12 @@ function initGroupModal(onChange) {
     }
 
     openBtn.addEventListener('click', () => {
-        Dialogs.open(modal,closeBtn,null,openBtn);
+        Dialogs.open(modal,null,openBtn);
         loadGroups();
     });
 
     closeBtn.addEventListener('click', () => {
         Dialogs.close(modal);
-    });
-
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            Dialogs.close(modal);
-        }
     });
 
     searchInput.addEventListener('input', (e) => {

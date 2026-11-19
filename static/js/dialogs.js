@@ -1,37 +1,42 @@
-/* Shared lifecycle for settings dialogs; viewport sizing stays in app.css. */
+/* Native modals own focus, Escape, and background inertness. */
 const Dialogs = (() => {
     const opened = new Map();
-    function close(modal) {
-        const state = opened.get(modal);
-        modal.classList.remove('active');
-        if (!state) return;
+    function finish(modal) {
+        if (modal.open) return;
+        const onClose = opened.get(modal);
         opened.delete(modal);
-        document.getElementById('main-app').inert = state.inert;
-        state.onClose?.();
-        if (state.focus?.isConnected && !state.focus.closest('[inert]')) state.focus.focus({preventScroll:true});
+        onClose?.();
     }
-    function open(modal, focus, onClose, returnFocus = document.activeElement) {
-        if (opened.has(modal)) return;
-        const main = document.getElementById('main-app');
-        opened.set(modal,{focus:returnFocus,inert:main.inert,onClose});
-        main.inert=true;
-        modal.classList.add('active');
-        (focus || modal.querySelector('button, input, select'))?.focus({preventScroll:true});
+    function close(modal) {
+        modal.close();
+        finish(modal);
     }
-    document.addEventListener('click', event => {
-        if (opened.has(event.target)) close(event.target);
-    });
-    document.addEventListener('keydown', event => {
-        const modal=[...opened.keys()].at(-1);
-        if (!modal) return;
-        if (event.key === 'Escape') { event.preventDefault(); close(modal); }
-        if (event.key !== 'Tab') return;
-        const controls=[...modal.querySelectorAll('button, input, select, a[href], [tabindex="0"]')].filter(n => !n.disabled && n.getClientRects().length);
-        const first=controls[0],last=controls.at(-1);
-        if (!first) { event.preventDefault(); return; }
-        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    });
-    window.addEventListener('popstate',() => [...opened.keys()].reverse().forEach(close));
-    return {open,close};
+    function open(modal, onClose, invoker = document.activeElement) {
+        if (modal.open) return;
+        opened.set(modal, onClose);
+        // Safari does not focus clicked buttons; establish the native return target.
+        invoker?.focus({preventScroll:true});
+        modal.showModal();
+    }
+    for (const modal of document.querySelectorAll('dialog.modal-overlay')) {
+        modal.addEventListener('close', () => finish(modal));
+        if ('closedBy' in HTMLDialogElement.prototype) continue;
+        // Safari needs light-dismiss; require both ends outside the panel.
+        const outside = event => {
+            const box = modal.getBoundingClientRect();
+            return event.clientX < box.left || event.clientX > box.right ||
+                event.clientY < box.top || event.clientY > box.bottom;
+        };
+        let outsidePointer = null;
+        modal.addEventListener('pointerdown', event => {
+            outsidePointer = event.button === 0 && outside(event) ? event.pointerId : null;
+        });
+        modal.addEventListener('pointerup', event => {
+            if (outsidePointer === event.pointerId && outside(event)) close(modal);
+            outsidePointer = null;
+        });
+        modal.addEventListener('pointercancel', () => { outsidePointer = null; });
+    }
+    window.addEventListener('popstate', () => [...opened.keys()].reverse().forEach(close));
+    return {open, close};
 })();

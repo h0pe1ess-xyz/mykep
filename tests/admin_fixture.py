@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import uvicorn
+from fastapi.responses import JSONResponse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -22,6 +23,15 @@ def run():
         from schedule_service import DAYS
         fixture = {'ПІ-24-02': {day: [{'number': '1', 'subject': 'Test', 'teacher': 'Test',
                                      'cabinet': '101', 'week': '1-4'}] for day in DAYS}}
+        # Renderer routing can miss requests once the admin worker controls WebKit.
+        @main.app.middleware('http')
+        async def fixture_responses(request, call_next):
+            if request.url.path == '/api/admin/logout' and request.headers.get('x-fixture-logout-failure') == '1':
+                return JSONResponse({'detail': 'Synthetic logout failure'}, status_code=503)
+            if request.url.path == '/api/admin/config' and request.headers.get('x-fixture-telegram-disabled') == '1':
+                return JSONResponse({'status': 'success', 'data': {'telegram_login': False, 'bot_id': None}})
+            return await call_next(request)
+
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0))
             port = sock.getsockname()[1]

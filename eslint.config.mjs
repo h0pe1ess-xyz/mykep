@@ -38,6 +38,6 @@ export default [{
     rules: {'no-undef': 'error'}
 }, {
     files: ['admin_static/*.js', 'static/sw.js'],
-    languageOptions: {globals: {...globals.browser, ...globals.serviceworker}},
+    languageOptions: {globals: {...globals.browser, ...globals.serviceworker, withRequestTimeout:'readonly'}},
     rules: {'no-undef': 'error'}
 }];

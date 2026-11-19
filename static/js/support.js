@@ -49,7 +49,7 @@ async function getSupportModel(nav = navigator) {
 function buildSupportReport(device) {
     const build = document.querySelector('meta[name="mykep-build"]')?.content || 'Не визначено';
     const mode = isPWA() ? 'PWA' : 'Браузер';
-    return `Повідомлення MyKep\n\nПроблема або ідея: [опишіть тут]\n\nДані застосунку:\nВерсія: ${build}\nСистема: ${device.system}\nМодель: ${device.model}\nБраузер: ${device.browser}\nРежим: ${mode}\nВікно: ${window.innerWidth} × ${window.innerHeight}`;
+    return `Повідомлення ${AppBrand.name}\n\nПроблема або ідея: [опишіть тут]\n\nДані застосунку:\nВерсія: ${build}\nСистема: ${device.system}\nМодель: ${device.model}\nБраузер: ${device.browser}\nРежим: ${mode}\nВікно: ${window.innerWidth} × ${window.innerHeight}`;
 }
 
 function createSupportTelegramURL(report, destination = 'https://t.me/oddxq') {

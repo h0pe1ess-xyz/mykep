@@ -145,7 +145,9 @@ async function run() {
                 await page.evaluate(()=>Tabs.show('settings'));
                 await page.click('#open-group-modal');
                 await page.waitForFunction(()=>document.querySelectorAll('#modal-group-list button').length>10);
-                assert.equal(await page.evaluate(()=>document.getElementById('main-app').inert),true);
+                assert.equal(await page.locator('#group-modal').evaluate(node=>node.matches(':modal')),true);
+                await page.locator('.bottom-nav a').first().evaluate(node=>node.focus());
+                assert.equal(await page.evaluate(()=>document.activeElement.closest('#group-modal')!==null),true);
                 await page.locator('#modal-search').focus();
                 await page.setViewportSize({width:390,height:450});
                 await page.fill('#modal-search','ТЕСТ');
@@ -158,7 +160,12 @@ async function run() {
                 });
                 assert.ok(geometry.bottom<=geometry.height+1);assert.ok(geometry.scroll>0);assert.equal(geometry.active,'modal-search');
                 await page.keyboard.press('Escape');
-                assert.equal(await page.evaluate(()=>document.getElementById('main-app').inert),false);
+                // Native search fields may consume Escape to clear their query.
+                if (await page.locator('#group-modal').evaluate(node=>node.open)) {
+                    assert.equal(await page.locator('#modal-search').inputValue(),'');
+                    await page.keyboard.press('Escape');
+                }
+                assert.equal(await page.locator('#group-modal').evaluate(node=>node.open),false);
                 assert.equal(await page.evaluate(()=>document.activeElement.id),'open-group-modal');
                 await page.setViewportSize({width:390,height:844});
                 await page.evaluate(()=>Tabs.show('dashboard'));
@@ -302,7 +309,7 @@ async function run() {
                     assert.ok(Math.abs(bounds.navBottom-bounds.viewport)<=1,JSON.stringify(bounds));
                     assert.ok(Math.abs(bounds.viewport-bounds.buttonsBottom-bounds.expectedBottomSpace)<=1,JSON.stringify(bounds));
                     assert.ok(bounds.contentBottom<=bounds.navTop+1,JSON.stringify(bounds));
-                    if(!await iosPage.locator('#main-app').evaluate(n=>n.inert)) {
+                    if(!await iosPage.evaluate(()=>document.getElementById('main-app').inert || !!document.querySelector('dialog:modal'))) {
                         assert.ok(await iosPage.locator('.bottom-nav').evaluate(nav=>Array.from(nav.querySelectorAll('a')).every(n=>{
                             const r=n.getBoundingClientRect();
                             return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('a')===n;

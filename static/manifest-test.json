@@ -1,0 +1,40 @@
+{
+  "name": "TestKep",
+  "short_name": "TestKep",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#110c0a",
+  "theme_color": "#110c0a",
+  "description": "Розклад пар ФКЕП ІФНТУНГ: заняття, аудиторії, викладачі та таймер. Незалежний студентський PWA-застосунок.",
+  "icons": [
+    {
+      "src": "/icons/test-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/test-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "id": "/",
+  "scope": "/",
+  "lang": "uk",
+  "categories": [
+    "education",
+    "utilities"
+  ],
+  "shortcuts": [
+    {
+      "name": "Розклад",
+      "url": "/schedule.html"
+    },
+    {
+      "name": "Налаштування",
+      "url": "/settings.html"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 """Admin authentication: Telegram Login verification, server-side sessions,
-one-time login codes, rate limiting and an audit log.
+rate limiting and an audit log.
 
 Security model
 - Only Telegram IDs from config.ADMIN_IDS (hard allowlist) can get a session.
@@ -28,9 +28,6 @@ logger = logging.getLogger(__name__)
 
 COOKIE_NAME = '__Host-mykep_admin' if ADMIN_COOKIE_SECURE else 'mykep_admin_dev'
 AUTH_MAX_AGE_SECONDS = 300
-CODE_TTL_SECONDS = 180
-CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'  # no 0/O/1/I/L
-CODE_LENGTH = 8
 MAX_SESSIONS_PER_USER = 10
 _TG_FIELD = re.compile(r'^[a-z_]{1,32}$')
 
@@ -94,8 +91,6 @@ class RateLimiter:
 
 login_global_limiter = RateLimiter(120, 600)
 login_ip_limiter = RateLimiter(10, 600)          # Telegram login attempts per IP
-code_ip_limiter = RateLimiter(5, 600)            # login-code guesses per IP
-code_global_limiter = RateLimiter(40, 600)       # all login-code guesses (anti-botnet)
 api_session_limiter = RateLimiter(240, 60)       # admin API calls per session
 action_limiter = RateLimiter(10, 60)             # heavy actions per session
 
@@ -107,15 +102,16 @@ async def init_admin_db():
             created_at REAL NOT NULL, last_seen REAL NOT NULL, expires_at REAL NOT NULL,
             ip TEXT, user_agent TEXT)''')
         await db.execute('CREATE INDEX IF NOT EXISTS idx_admin_sessions_user ON admin_sessions(user_id)')
-        await db.execute('''CREATE TABLE IF NOT EXISTS admin_login_codes (
-            code_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, display_name TEXT,
-            username TEXT, created_at REAL NOT NULL, expires_at REAL NOT NULL)''')
         await db.execute('''CREATE TABLE IF NOT EXISTS admin_used_auth (
             auth_hash TEXT PRIMARY KEY, used_at REAL NOT NULL)''')
         await db.execute('''CREATE TABLE IF NOT EXISTS admin_audit (
             id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, event TEXT NOT NULL,
             user_id INTEGER, ip TEXT, detail TEXT)''')
         await db.execute('CREATE INDEX IF NOT EXISTS idx_admin_audit_ts ON admin_audit(ts)')
+        # Retire stored credentials and their sessions as one transaction.
+        await db.execute('BEGIN IMMEDIATE')
+        await db.execute('DROP TABLE IF EXISTS admin_login_codes')
+        await db.execute("DELETE FROM admin_sessions WHERE method != 'telegram'")
         await db.commit()
 
 
@@ -124,7 +120,6 @@ async def cleanup():
     async with connect() as db:
         await db.execute('DELETE FROM admin_sessions WHERE expires_at < ? OR last_seen < ?',
                          (now, now - ADMIN_IDLE_HOURS * 3600))
-        await db.execute('DELETE FROM admin_login_codes WHERE expires_at < ?', (now,))
         await db.execute('DELETE FROM admin_used_auth WHERE used_at < ?', (now - 86400,))
         await db.execute('DELETE FROM admin_audit WHERE ts < ?', (now - 180 * 86400,))
         await db.commit()
@@ -193,7 +188,7 @@ async def consume_auth_hash(auth_hash):
         return cur.rowcount == 1
 
 async def _insert_session(db: Connection, user_id: int, display_name: str | None,
-                          username: str | None, method: str, ip: str | None,
+                          username: str | None, ip: str | None,
                           user_agent: str | None) -> str:
     if user_id not in ADMIN_IDS:
         raise PermissionError('not an admin')
@@ -201,7 +196,7 @@ async def _insert_session(db: Connection, user_id: int, display_name: str | None
     now = _now()
     await db.execute('INSERT INTO admin_sessions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (
         _sha256(token), secrets.token_urlsafe(9), user_id, (display_name or '')[:64], (username or '')[:64],
-        secrets.token_urlsafe(32), method, now, now, now + ADMIN_SESSION_HOURS * 3600,
+        secrets.token_urlsafe(32), 'telegram', now, now, now + ADMIN_SESSION_HOURS * 3600,
         (ip or '')[:64], (user_agent or '')[:200]))
     # Keep at most N newest sessions per admin.
     await db.execute('''DELETE FROM admin_sessions WHERE user_id = ? AND token_hash NOT IN (
@@ -210,9 +205,9 @@ async def _insert_session(db: Connection, user_id: int, display_name: str | None
     return token
 
 
-async def create_session(user_id, display_name, username, method, ip, user_agent):
+async def create_session(user_id, display_name, username, ip, user_agent):
     async with connect() as db:
-        token = await _insert_session(db, user_id, display_name, username, method, ip, user_agent)
+        token = await _insert_session(db, user_id, display_name, username, ip, user_agent)
         await db.commit()
     return token
 
@@ -229,7 +224,7 @@ async def get_session(token):
         if not rows:
             return None
         sid, user_id, name, username, csrf, method, created, last_seen, expires = rows[0]
-        if expires <= now or last_seen <= now - ADMIN_IDLE_HOURS * 3600 or user_id not in ADMIN_IDS:
+        if method != 'telegram' or expires <= now or last_seen <= now - ADMIN_IDLE_HOURS * 3600 or user_id not in ADMIN_IDS:
             await db.execute('DELETE FROM admin_sessions WHERE token_hash = ?', (token_hash,))
             await db.commit()
             return None
@@ -242,8 +237,6 @@ async def get_session(token):
 
 async def delete_session(token_hash):
     async with connect() as db:
-        await db.execute('DELETE FROM admin_login_codes WHERE user_id IN '
-                         '(SELECT user_id FROM admin_sessions WHERE token_hash = ?)', (token_hash,))
         await db.execute('DELETE FROM admin_sessions WHERE token_hash = ?', (token_hash,))
         await db.commit()
 
@@ -260,8 +253,6 @@ async def list_sessions(current_sid):
 
 async def revoke_session(sid):
     async with connect() as db:
-        await db.execute('DELETE FROM admin_login_codes WHERE user_id IN '
-                         '(SELECT user_id FROM admin_sessions WHERE sid = ?)', (str(sid)[:32],))
         cur = await db.execute('DELETE FROM admin_sessions WHERE sid = ?', (str(sid)[:32],))
         await db.commit()
         return cur.rowcount
@@ -269,8 +260,6 @@ async def revoke_session(sid):
 
 async def revoke_other_sessions(current_sid):
     async with connect() as db:
-        await db.execute('DELETE FROM admin_login_codes WHERE user_id IN '
-                         '(SELECT user_id FROM admin_sessions WHERE sid != ?)', (current_sid,))
         cur = await db.execute('DELETE FROM admin_sessions WHERE sid != ?', (current_sid,))
         await db.commit()
         return cur.rowcount
@@ -285,60 +274,3 @@ def describe_user_agent(ua):
                else 'Chrome' if ('chrome' in ua_l or 'crios' in ua_l) else 'Safari' if 'safari' in ua_l
                else 'Браузер')
     return f'{browser} · {os_name}'
-
-def normalize_code(value):
-    return re.sub(r'[^A-Z0-9]', '', str(value or '').upper())[:32]
-
-
-async def create_login_code(session):
-    if session['user_id'] not in ADMIN_IDS:
-        raise PermissionError('not an admin')
-    code = ''.join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
-    now = _now()
-    async with connect() as db:
-        # Recheck under the write lock: revocation may finish after the API's
-        # session check but before this operation reaches SQLite.
-        await db.execute('BEGIN IMMEDIATE')
-        if 'token_hash' in session:
-            live = await db.execute_fetchall(
-                'SELECT 1 FROM admin_sessions WHERE token_hash = ? AND user_id = ? '
-                'AND expires_at > ? AND last_seen > ?',
-                (session['token_hash'], session['user_id'], now, now - ADMIN_IDLE_HOURS * 3600))
-            if not live:
-                raise PermissionError('session revoked or expired')
-        # At most 3 live codes per admin.
-        await db.execute('''DELETE FROM admin_login_codes WHERE user_id = ? AND code_hash NOT IN (
-            SELECT code_hash FROM admin_login_codes WHERE user_id = ? AND expires_at > ?
-            ORDER BY created_at DESC, rowid DESC LIMIT 2)''', (session['user_id'], session['user_id'], now))
-        await db.execute('INSERT INTO admin_login_codes VALUES (?, ?, ?, ?, ?, ?)', (
-            _sha256(code), session['user_id'], session['name'], session['username'], now, now + CODE_TTL_SECONDS))
-        await db.commit()
-    return f'{code[:4]}-{code[4:]}', CODE_TTL_SECONDS
-
-
-async def consume_login_code(raw_code: str, ip: str = '', user_agent: str = '') -> dict | None:
-    code = normalize_code(raw_code)
-    if len(code) != CODE_LENGTH or any(c not in CODE_ALPHABET for c in code):
-        return None
-    async with connect() as db:
-        # Consumption and session creation must serialize with revocation.
-        # Otherwise a consumed code could create a new session after revoke-all.
-        await db.execute('BEGIN IMMEDIATE')
-        rows = await db.execute_fetchall(
-            'SELECT user_id, display_name, username, expires_at FROM admin_login_codes WHERE code_hash = ?',
-            (_sha256(code),))
-        if not rows:
-            return None
-        await db.execute('DELETE FROM admin_login_codes WHERE code_hash = ?', (_sha256(code),))
-        user_id, name, username, expires = rows[0]
-        if expires <= _now() or user_id not in ADMIN_IDS:
-            await db.commit()
-            return None
-        token = await _insert_session(db, user_id, name, username, 'code', ip, user_agent)
-        await db.commit()
-    return {'id': user_id, 'name': name, 'username': username, 'token': token}
-
-
-async def create_login_code_for_cli(user_id):
-    """Break-glass: used by admin_cli.py from the server shell."""
-    return await create_login_code({'user_id': user_id, 'name': 'CLI', 'username': ''})

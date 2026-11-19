@@ -2,7 +2,7 @@ aiosqlite==0.22.1
 annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.15.1
-certifi==2026.10.18
+certifi==2026.10.23
 charset-normalizer==3.5.2
 chompjs==1.4.1
 click==8.5.0
@@ -10,7 +10,7 @@ cloudscraper==1.2.71
 fastapi==0.143.1
 h11==0.16.0
 idna==3.20
-opentelemetry-api==1.45.1
+opentelemetry-api==1.45.2
 pydantic==2.14.1
 pydantic_core==2.50.1
 pyparsing==3.3.3

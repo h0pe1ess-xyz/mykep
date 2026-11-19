@@ -66,6 +66,7 @@ class PublicAPITests(unittest.IsolatedAsyncioTestCase):
                 for monday in ('9999-12-27', '0001-01-01', '2101-01-03'):
                     self.assertEqual((await client.get('/api/schedule', params={'monday':monday})).status_code, 422)
                 self.assertEqual((await client.post('/api/activity', json={**event, 'group':'НЕІСНУЮЧА-ГРУПА'})).status_code, 422)
+                self.assertEqual((await client.post('/api/activity', json={**event, 'extra':'unexpected'})).status_code, 422)
                 self.assertEqual((await client.post('/api/activity', json=event)).status_code, 204)
                 self.assertEqual((await client.post('/api/activity', json=event)).status_code, 204)
                 limited = await client.post('/api/activity', json={**event, 'uid':'another-user'})

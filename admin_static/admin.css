@@ -70,15 +70,11 @@ button:disabled { opacity: .55; cursor: wait; }
 .login-card > p { margin: 0 0 24px; }
 .login-foot { text-align: center; }
 .hint { padding: 12px; background: #2b271f; border: 1px solid #746343; border-radius: 4px; font-size: 13px; color: #f4dbb1; overflow-wrap: anywhere; }
-.code-box { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 8px; }
-.code-box summary, .chart-data summary { cursor: pointer; min-height: 44px; padding: 10px 0; color: var(--muted); }
-.code-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.code-form input, .group-tools input, .group-tools select {
+.chart-data summary { cursor: pointer; min-height: 44px; padding: 10px 0; color: var(--muted); }
+.group-tools input, .group-tools select {
     min-width: 0; min-height: 44px; padding: 9px 10px; border-radius: 4px; border: 1px solid var(--line2); background: var(--bg);
     font-size: 16px;
 }
-.code-form input { flex: 1 1 150px; width: 100%; font-family: ui-monospace, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; }
-.code-form .btn { flex: 1 0 auto; }
 .error { color: #ffb5b5; font-size: 14px; overflow-wrap: anywhere; }
 
 /* Explicit tracks prevent SVG intrinsic size from expanding a grid ancestor.
@@ -237,10 +233,6 @@ main { width: 100%; max-width: 1480px; min-width: 0; margin-inline: auto; paddin
 .audit { display: grid; grid-template-columns: minmax(0, 1fr); max-height: 520px; overflow-y: auto; }
 .audit-row { display: grid; grid-template-columns: 108px auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
 .audit-row > * { min-width: 0; overflow-wrap: anywhere; }
-.code-display { margin-top: 16px; padding: 16px; border: 1px dashed var(--line2); text-align: center; }
-.code-display.expired { color: var(--muted); }
-.code-value { font: 650 28px/1.5 ui-monospace, Menlo, monospace; letter-spacing: .05em; overflow-wrap: anywhere; user-select: all; }
-.code-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; }
 .skeleton { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .sk { height: 110px; background: var(--card2); border: 1px solid var(--line); border-radius: 4px; }
 .sk-wide { height: 64px; }
@@ -304,7 +296,6 @@ main { width: 100%; max-width: 1480px; min-width: 0; margin-inline: auto; paddin
     .kpi-grid, .tile-grid { grid-template-columns: minmax(0, 1fr); }
     .kpi-value { font-size: 27px; }
     .login-card { padding: 20px 16px; }
-    .code-value { font-size: 24px; }
 }
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
@@ -379,8 +370,8 @@ main { padding-top: 28px; }
 .segmented button { background: #1b1511; color: var(--muted); border-color: #705744; }
 .segmented button.active { color: #ffdabd; background: #3e2718; border-color: #d98e5f; }
 .segmented button:hover { background: #342319; color: var(--text); }
-.group-tools input, .group-tools select, .code-form input { background: #17110e; border-radius: 8px; border-color: #8d7563; }
-.group-tools input:focus-visible, .group-tools select:focus-visible, .code-form input:focus-visible { outline-color: #ffb77f; }
+.group-tools input, .group-tools select { background: #17110e; border-radius: 8px; border-color: #8d7563; }
+.group-tools input:focus-visible, .group-tools select:focus-visible { outline-color: #ffb77f; }
 .gt-row { padding-block: 13px; }
 .gt-head { padding-bottom: 14px; color: #e8c5a9; }
 
@@ -419,7 +410,7 @@ main { padding-top: 28px; }
 .status-banner .check.c-unknown i { background: var(--faint); }
 .status-banner.s-unknown > .status-main > .status-dot { background: var(--faint); }
 
-/* Entry screen: brand, purpose, primary action, secondary code action. */
+/* Entry screen: brand, purpose and Telegram login. */
 .login { grid-template-columns: minmax(0, 440px); gap: 18px; }
 .login-card { padding: 32px; background: #211812; border: 1px solid #826047; border-radius: 16px; }
 .login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
@@ -432,8 +423,6 @@ main { padding-top: 28px; }
 .login-access-note b { font-size: 13px; color: #ffca9e; }
 .btn-tg { min-height: 48px; background: #1d638e; border-color: #549dc1; color: #fff; }
 .btn-tg:hover { background: #26729f; }
-.code-box { margin-top: 24px; padding-top: 12px; }
-.code-box summary { color: #ffca9e; line-height: 1.6; }
 .login-foot { margin: 0; font-size: 12px; color: var(--faint); }
 .login-card .error { margin: 18px 0 0; padding: 14px; border: 1px solid #a96762; border-radius: 8px; background: #381c1b; color: #ffc4be; line-height: 1.65; }
 
@@ -453,9 +442,6 @@ main { padding-top: 28px; }
 .audit { gap: 10px; padding-right: 4px; }
 .audit-row { padding: 14px; gap: 12px 16px; border: 1px solid var(--line); border-radius: 8px; background: #19130f; line-height: 1.7; }
 .audit-row > .badge { justify-self: start; }
-.code-display { padding: 20px; background: #2d2016; border-color: #d49363; border-radius: 10px; }
-.code-value { color: #ffd6b4; }
-.code-display.expired .code-value { color: var(--faint); }
 .toast { background: #37261c; border-radius: 9px; }
 .sk { background: #2b211b; }
 .tabbar { background: #19130f; border-top-color: #5d4332; }

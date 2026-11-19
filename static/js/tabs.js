@@ -9,13 +9,11 @@ const Tabs = (() => {
         settings: 'Налаштування - MyKep'
     };
     let current = document.documentElement.dataset.tab || 'dashboard';
-    let views, track, nav, gesture;
-    let frame = 0;
+    let views, track, nav;
     let clickBlockedUntil = 0;
     const listeners = new Set();
-    const native = document.documentElement.dataset.swipe === 'native';
-    const androidNative = native && /Android/i.test(navigator.userAgent || '');
-    const replaceTabHistory = native && document.documentElement.classList.contains('ios-standalone');
+    const androidNative = /Android/i.test(navigator.userAgent || '');
+    const replaceTabHistory = document.documentElement.classList.contains('ios-standalone');
     let settleTimer = 0;
     let nativeTouching = false;
     let nativeOrigin = null;
@@ -29,15 +27,15 @@ const Tabs = (() => {
     let scrollRevision = 0;
     function diagnostics() {
         return {version:document.querySelector('meta[name="mykep-build"]')?.content,
-            mode:document.documentElement.dataset.swipeChoice || document.documentElement.dataset.swipe,
-            engine:native ? 'native' : 'legacy',
+            mode:'native',
+            engine:'native',
             snap:track && getComputedStyle(track).scrollSnapType,
             current};
     }
 
     function isBlocked() {
         return document.getElementById('main-app').inert ||
-            !!document.querySelector('.modal-overlay.active, .pwa-overlay') ||
+            !!document.querySelector('dialog.modal-overlay[open], .pwa-overlay') ||
             storage.get('mykep_onboarded') !== 'true';
     }
 
@@ -55,7 +53,7 @@ const Tabs = (() => {
     function continueNativeChain(forceDestination = false) {
         // Complete interrupted series and limited edge swipes.
         // Ordinary single swipes retain browser-owned snapping.
-        if (androidNative || !native || nativeTarget === null ||
+        if (androidNative || nativeTarget === null ||
             (!nativeCompleting && nativeSwipes < 2 && !forceDestination)) return;
         nativeCompleting = true;
         track.style.scrollSnapType = 'none';
@@ -70,7 +68,7 @@ const Tabs = (() => {
     }
 
     function sampleNativeGesture(point) {
-        if (!native || !nativeGesture || point.identifier !== nativeGesture.id) return;
+        if (!nativeGesture || point.identifier !== nativeGesture.id) return;
         const dx = point.clientX - nativeGesture.x;
         const dy = point.clientY - nativeGesture.y;
         if (!nativeGesture.axis && Math.max(Math.abs(dx), Math.abs(dy)) >= 8) {
@@ -83,7 +81,7 @@ const Tabs = (() => {
 
     function show(tab, { historyMode = 'push', focus = false, fromScroll = false, immediate = false } = {}) {
         if (!names.includes(tab)) return;
-        if (native && !fromScroll) {
+        if (!fromScroll) {
             nativeNavigation = null;
             clearNativeGesture();
             nativeTouching = false;
@@ -97,17 +95,14 @@ const Tabs = (() => {
                 return;
             }
         }
-        cancelDrag();
         const changed = current !== tab;
         const activeElement = document.activeElement;
         const moveFocus = focus || activeElement?.closest('.view')?.dataset.view !== tab &&
             !!activeElement?.closest('.view');
         current = tab;
         document.documentElement.dataset.tab = tab;
-        track.classList.remove('is-dragging');
-        track.style.transform = '';
         resetScroll();
-        document.title = titles[tab];
+        document.title = AppBrand.text(titles[tab]);
         const activeView = track.querySelector(`[data-view="${tab}"]`);
         activeView.inert = false;
         activeView.removeAttribute('aria-hidden');
@@ -129,24 +124,15 @@ const Tabs = (() => {
             history[replaceTabHistory ? 'replaceState' : 'pushState'](null, '', paths[tab] + location.search);
         }
         if (changed) listeners.forEach(listener => listener(tab));
-        if (native && !fromScroll) {
+        if (!fromScroll) {
             track.scrollTo({left: names.indexOf(tab) * track.clientWidth,
                 behavior: immediate || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
         }
     }
 
-    function cancelDrag() {
-        if (frame) cancelAnimationFrame(frame);
-        frame = 0;
-        gesture = null;
-    }
-
     function reset() {
-        cancelDrag();
-        track?.classList.remove('is-dragging');
-        if (track) track.style.transform = '';
         resetScroll();
-        if (native && track) {
+        if (track) {
             const destination = nativeNavigation ||
                 (nativeCompleting ? names[nativeTarget] : null);
             nativeTouching = false;
@@ -178,13 +164,6 @@ const Tabs = (() => {
         resetScroll();
     }
 
-    function renderDrag() {
-        frame = 0;
-        if (!gesture || gesture.axis !== 'x') return;
-        if (isBlocked()) { reset(); return; }
-        track.style.transform = `translate3d(${gesture.position}px, 0, 0)`;
-    }
-
     function ownsHorizontalScroll(target, boundary = views) {
         if (target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="slider"], [data-no-swipe], .day-picker')) return true;
         for (let node = target; node && node !== boundary; node = node.parentElement) {
@@ -192,63 +171,6 @@ const Tabs = (() => {
                 /auto|scroll/.test(getComputedStyle(node).overflowX)) return true;
         }
         return false;
-    }
-
-    function start(event) {
-        if (gesture) reset();
-        if (event.touches.length !== 1 || isBlocked() || ownsHorizontalScroll(event.target)) return;
-        const point = event.touches[0];
-        const width = document.documentElement.clientWidth;
-        if (point.clientX <= 20 || point.clientX >= width - 20) return;
-        const viewWidth = views.clientWidth;
-        if (!viewWidth) return;
-        gesture = { id: point.identifier, x: point.clientX, y: point.clientY,
-            index: names.indexOf(current), width: viewWidth, axis: null,
-            origin: 0, position: 0, samples: [[event.timeStamp, point.clientX]] };
-    }
-
-    function move(event) {
-        if (!gesture) return;
-        // An uncancelable move belongs to the browser, not our tab carousel.
-        if (!event.cancelable) { reset(); return; }
-        if (event.touches.length !== 1) { reset(); return; }
-        const point = event.touches[0];
-        if (point.identifier !== gesture.id) { reset(); return; }
-        const dx = point.clientX - gesture.x;
-        const dy = point.clientY - gesture.y;
-        if (!gesture.axis) {
-            if (Math.max(Math.abs(dx), Math.abs(dy)) < 10) return;
-            if (Math.abs(dx) <= Math.abs(dy) * 1.2) { reset(); return; }
-            if (isBlocked()) { reset(); return; }
-            gesture.axis = 'x';
-            gesture.origin = new DOMMatrixReadOnly(getComputedStyle(track).transform).m41;
-            track.style.transform = `translate3d(${gesture.origin}px, 0, 0)`;
-            track.classList.add('is-dragging');
-        }
-        if (event.cancelable) event.preventDefault();
-        gesture.samples.push([event.timeStamp, point.clientX]);
-        while (gesture.samples.length > 2 && gesture.samples[1][0] < event.timeStamp - 100) gesture.samples.shift();
-        const { index, width, origin } = gesture;
-        const min = -Math.min(names.length - 1, index + 1) * width;
-        const max = -Math.max(0, index - 1) * width;
-        gesture.position = Math.max(min, Math.min(max, origin + dx));
-        if (!frame) frame = requestAnimationFrame(renderDrag);
-    }
-
-    function end(event) {
-        if (!gesture || gesture.axis !== 'x') { reset(); return; }
-        if (isBlocked()) { reset(); return; }
-        const { width, samples, index } = gesture;
-        const point = [...event.changedTouches].find(touch => touch.identifier === gesture.id);
-        if (!point || event.touches.length) { reset(); return; }
-        const dx = point.clientX - gesture.x;
-        const first = samples[0];
-        const velocity = (point.clientX - first[1]) / Math.max(event.timeStamp - first[0], 1);
-        clickBlockedUntil = performance.now() + 400;
-        const passed = Math.abs(dx) >= width * 0.25 ||
-            Math.abs(dx) >= 30 && Math.abs(velocity) > 0.35 && Math.sign(velocity) === Math.sign(dx);
-        const target = names[index + (dx < 0 ? 1 : -1)];
-        show(passed && target ? target : current);
     }
 
     function settleNative() {
@@ -293,115 +215,107 @@ const Tabs = (() => {
         views = document.getElementById('views');
         track = views.querySelector('.views-track');
         nav = document.querySelector('.bottom-nav');
-        if (native) {
-            window.addEventListener('touchstart', event => {
-                // The Back guard is outside views. A follow-up touch on it
-                // still belongs to an unfinished tab swipe, while its own
-                // preventDefault continues to block browser Back.
-                const edgeContinuation = native && nativeOrigin !== null && nativeSwipes > 0 &&
-                    event.target.closest?.('.swipe-edge-left');
-                if (!views.contains(event.target) && !edgeContinuation) return;
-                nativeNavigation = null;
-                clearTimeout(settleTimer);
-                cancelAnimationFrame(settleFrame);
-                settleFrame = 0;
-                nativeTouching = true;
-                nativeGesture = null;
-                cancelAnimationFrame(nativeChainFrame);
-                nativeChainFrame = 0;
-                if (event.touches.length !== 1) {
-                    clearNativeGesture();
-                    return;
-                }
-                // Chromium owns fling interruption and snap selection on Android.
-                // The iOS chain workaround disables snapping and restarts smooth
-                // scrolling after rapid contacts, competing with that native pan.
-                if (androidNative) return;
-                // Each new gesture before settlement earns another tab step.
-                // Rounding the still-moving position can otherwise treat the
-                // second swipe as the first one and bounce back to the middle.
-                if (nativeOrigin === null) {
-                    nativeOrigin = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
-                    nativeTarget = nativeOrigin;
-                    nativeSwipes = 0;
-                }
-                if (!isBlocked() && !ownsHorizontalScroll(event.target, track)) {
-                    const point = event.touches[0];
-                    nativeGesture = {id:point.identifier, x:point.clientX, y:point.clientY,
-                        time:event.timeStamp, width:track.clientWidth, left:track.getBoundingClientRect().left,
-                        axis:null, dx:0};
-                }
-            }, {passive: true, capture: true});
-            window.addEventListener('touchmove', event => {
-                if (event.touches.length === 1) sampleNativeGesture(event.touches[0]);
-            }, {passive:true, capture:true});
-            const releaseNative = event => {
-                if (!nativeTouching) return;
-                nativeTouching = event.touches.length > 0;
-                if (event.type === 'touchcancel') clearNativeGesture();
-                let limitedSwipe = false;
-                let changedTarget = false;
-                const point = nativeGesture && Array.from(event.changedTouches || []).find(touch => touch.identifier === nativeGesture.id);
-                if (!nativeTouching && event.type === 'touchend' && point) {
-                    sampleNativeGesture(point);
-                    const endDx = point.clientX - nativeGesture.x;
-                    // A native pan may end close to its starting coordinate.
-                    // Preserve its observed movement instead of dropping a
-                    // second swipe and later undoing the browser's destination.
-                    const dx = Math.abs(endDx) < 8 ? nativeGesture.dx : endDx;
-                    // Native scrolling can accept a short flick that does not
-                    // meet the legacy 30px threshold. Count its horizontal
-                    // intent without changing browser-owned single-swipe motion.
-                    const room = dx > 0 ? nativeGesture.left + nativeGesture.width - nativeGesture.x :
-                        nativeGesture.x - nativeGesture.left;
-                    if (nativeGesture.axis === 'x' && Math.abs(dx) >= 8) {
-                        const target = Math.max(0, Math.min(names.length - 1, nativeTarget + (dx < 0 ? 1 : -1)));
-                        changedTarget = target !== nativeTarget;
-                        limitedSwipe = room <= 48 && changedTarget;
-                        if (limitedSwipe) clickBlockedUntil = performance.now() + 400;
-                        if (target !== nativeTarget) ++nativeSwipes;
-                        nativeTarget = target;
-                    }
-                }
-                if (!nativeTouching && changedTarget) {
-                    // Further outward contacts must not restart the same
-                    // completion and hold a fast swipe series between pages.
-                    continueNativeChain(limitedSwipe);
-                }
-                nativeGesture = null;
-                clearTimeout(settleTimer);
-                settleTimer = setTimeout(settleNative, 180);
-            };
-            window.addEventListener('touchend', releaseNative, {passive: true, capture: true});
-            window.addEventListener('touchcancel', releaseNative, {passive: true, capture: true});
-            track.addEventListener('scroll', () => {
-                ++scrollRevision;
-                clearTimeout(settleTimer);
-                // Observe idle scrolling on engines without scrollend.
-                settleTimer = setTimeout(settleNative, 180);
-            }, {passive: true});
-            views.addEventListener('wheel', () => {
-                nativeNavigation = null;
+        window.addEventListener('touchstart', event => {
+            // The Back guard is outside views. A follow-up touch on it
+            // still belongs to an unfinished tab swipe, while its own
+            // preventDefault continues to block browser Back.
+            const edgeContinuation = nativeOrigin !== null && nativeSwipes > 0 &&
+                event.target.closest?.('.swipe-edge-left');
+            if (!views.contains(event.target) && !edgeContinuation) return;
+            nativeNavigation = null;
+            clearTimeout(settleTimer);
+            cancelAnimationFrame(settleFrame);
+            settleFrame = 0;
+            nativeTouching = true;
+            nativeGesture = null;
+            cancelAnimationFrame(nativeChainFrame);
+            nativeChainFrame = 0;
+            if (event.touches.length !== 1 || window.visualViewport?.scale > 1) {
                 clearNativeGesture();
-            }, {passive: true});
-            views.addEventListener('pointerdown', event => {
-                nativeNavigation = null;
-                if (event.pointerType !== 'touch') clearNativeGesture();
-            }, {passive: true});
-            track.addEventListener('scrollend', nativeScrollEnded);
-            // Late viewport/safe-area changes must not leave the wrong tab visible.
-            let width = track.clientWidth;
-            new ResizeObserver(() => {
-                if (width === track.clientWidth) return;
-                width = track.clientWidth;
-                reset();
-            }).observe(track);
-        } else {
-            views.addEventListener('touchstart', start, { passive: true });
-            views.addEventListener('touchmove', move, { passive: false });
-            window.addEventListener('touchend', end, { passive: true });
-            document.addEventListener('touchcancel', reset, { passive: true, capture: true });
-        }
+                return;
+            }
+            // Chromium owns fling interruption and snap selection on Android.
+            // The iOS chain workaround disables snapping and restarts smooth
+            // scrolling after rapid contacts, competing with that native pan.
+            if (androidNative) return;
+            // Each new gesture before settlement earns another tab step.
+            // Rounding the still-moving position can otherwise treat the
+            // second swipe as the first one and bounce back to the middle.
+            if (nativeOrigin === null) {
+                nativeOrigin = Math.max(0, Math.min(names.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
+                nativeTarget = nativeOrigin;
+                nativeSwipes = 0;
+            }
+            if (!isBlocked() && !ownsHorizontalScroll(event.target, track)) {
+                const point = event.touches[0];
+                nativeGesture = {id:point.identifier, x:point.clientX, y:point.clientY,
+                    time:event.timeStamp, width:track.clientWidth, left:track.getBoundingClientRect().left,
+                    axis:null, dx:0};
+            }
+        }, {passive: true, capture: true});
+        window.addEventListener('touchmove', event => {
+            if (event.touches.length === 1) sampleNativeGesture(event.touches[0]);
+        }, {passive:true, capture:true});
+        const releaseNative = event => {
+            if (!nativeTouching) return;
+            nativeTouching = event.touches.length > 0;
+            if (event.type === 'touchcancel') clearNativeGesture();
+            let limitedSwipe = false;
+            let changedTarget = false;
+            const point = nativeGesture && Array.from(event.changedTouches || []).find(touch => touch.identifier === nativeGesture.id);
+            if (!nativeTouching && event.type === 'touchend' && point) {
+                sampleNativeGesture(point);
+                const endDx = point.clientX - nativeGesture.x;
+                // A native pan may end close to its starting coordinate.
+                // Preserve its observed movement instead of dropping a
+                // second swipe and later undoing the browser's destination.
+                const dx = Math.abs(endDx) < 8 ? nativeGesture.dx : endDx;
+                // Count short native flicks without changing browser-owned
+                // single-swipe motion.
+                const room = dx > 0 ? nativeGesture.left + nativeGesture.width - nativeGesture.x :
+                    nativeGesture.x - nativeGesture.left;
+                if (nativeGesture.axis === 'x' && Math.abs(dx) >= 8) {
+                    const target = Math.max(0, Math.min(names.length - 1, nativeTarget + (dx < 0 ? 1 : -1)));
+                    changedTarget = target !== nativeTarget;
+                    limitedSwipe = room <= 48 && changedTarget;
+                    if (limitedSwipe) clickBlockedUntil = performance.now() + 400;
+                    if (target !== nativeTarget) ++nativeSwipes;
+                    nativeTarget = target;
+                }
+            }
+            if (!nativeTouching && changedTarget) {
+                // Further outward contacts must not restart the same
+                // completion and hold a fast swipe series between pages.
+                continueNativeChain(limitedSwipe);
+            }
+            nativeGesture = null;
+            clearTimeout(settleTimer);
+            settleTimer = setTimeout(settleNative, 180);
+        };
+        window.addEventListener('touchend', releaseNative, {passive: true, capture: true});
+        window.addEventListener('touchcancel', releaseNative, {passive: true, capture: true});
+        track.addEventListener('scroll', () => {
+            ++scrollRevision;
+            clearTimeout(settleTimer);
+            // Observe idle scrolling on engines without scrollend.
+            settleTimer = setTimeout(settleNative, 180);
+        }, {passive: true});
+        views.addEventListener('wheel', () => {
+            nativeNavigation = null;
+            clearNativeGesture();
+        }, {passive: true});
+        views.addEventListener('pointerdown', event => {
+            nativeNavigation = null;
+            if (event.pointerType !== 'touch') clearNativeGesture();
+        }, {passive: true});
+        track.addEventListener('scrollend', nativeScrollEnded);
+        // Late viewport/safe-area changes must not leave the wrong tab visible.
+        let width = track.clientWidth;
+        new ResizeObserver(() => {
+            if (width === track.clientWidth) return;
+            width = track.clientWidth;
+            reset();
+        }).observe(track);
         views.addEventListener('scroll', resetScroll, { passive: true });
         views.addEventListener('click', event => {
             if (performance.now() < clickBlockedUntil) {
@@ -416,7 +330,7 @@ const Tabs = (() => {
             if (!isBlocked()) show(link.dataset.tab);
         });
         window.addEventListener('popstate', () => {
-            document.querySelectorAll('.modal-overlay.active').forEach(modal => modal.classList.remove('active'));
+            document.querySelectorAll('dialog.modal-overlay[open]').forEach(modal => Dialogs.close(modal));
             restoreHistory();
         });
         // Android height-only viewport events must not rewind an active pan.
@@ -427,7 +341,7 @@ const Tabs = (() => {
         window.addEventListener('blur', reset);
         document.addEventListener('visibilitychange', reset);
         show(current, { historyMode: 'none', immediate: true });
-        if (document.documentElement.classList.contains('ios-standalone') && native) {
+        if (document.documentElement.classList.contains('ios-standalone')) {
             // Keep the iOS Back guard off the native scroller and right edge.
             const edge = document.createElement('div');
             edge.className = 'swipe-edge-guard swipe-edge-left';
